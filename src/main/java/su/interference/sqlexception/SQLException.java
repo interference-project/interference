@@ -30,18 +30,18 @@ package su.interference.sqlexception;
  */
 
 public class SQLException extends Exception {
-    private String SQLErrorText;
+    private String message;
 
     public SQLException () {
         
     }
 
     public SQLException (String e) {
-        SQLErrorText = e;
+        message = e;
     }
 
-    public String getSQLErrorText () {
-        return SQLErrorText;
+    public String getSQLExceptionMessage () {
+        return message;
     }
 
 }
