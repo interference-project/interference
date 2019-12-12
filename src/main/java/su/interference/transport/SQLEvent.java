@@ -112,18 +112,18 @@ public class SQLEvent extends TransportEventImpl {
             //s.startStatement();
             final SQLStatement sql = cur == null ? SQLStatementFactory.getInstance(this.sql, s) : SQLStatementFactory.getInstance(this.sql, cur, s);
             //todo temp solution
-            try {
-                if (sql instanceof SQLSystem) {
-                    sql.executeSQL(s);
+            if (sql.getSQLException() != null) {
+                return new EventResult(TransportCallback.FAILURE, cur.getCursorId(), null, sql.getSQLException());
+            } else {
+                try {
+                    if (sql instanceof SQLSystem) {
+                        sql.executeSQL(s);
+                    }
+                } catch (SQLException e) {
+                    return new EventResult(TransportCallback.FAILURE, cur.getCursorId(), null, e);
                 }
-            } catch (SQLException e) {
-                return new EventResult(TransportCallback.FAILURE, cur.getCursorId(), null, e);
+                return new EventResult(TransportCallback.SUCCESS, cur.getCursorId(), null, null);
             }
-            //todo process exceptions
-            if (sql.getSQLErrorText() != null) {
-                return new EventResult(TransportCallback.FAILURE, cur.getCursorId(), null, new RuntimeException(sql.getSQLErrorText()));
-            }
-            return new EventResult(TransportCallback.SUCCESS, cur.getCursorId(), null, null);
         }
     }
 

@@ -78,7 +78,9 @@ public class SyncFrameEvent extends TransportEventImpl {
                     for (DataFile f : dfs) {
                         final int order = (f.getFileId() % Storage.MAX_NODES) % Config.getConfig().FILES_AMOUNT;
                         if (order == allocOrder) {
+                            //final LLT llt = LLT.getLLT();
                             bd = t.createNewFrame(null, f.getFileId(), b.getFrameType(), b.getAllocId(), b.isStarted(), false, true, s, null);
+                            //llt.commit();
                             //bd.setAllocId(b.getAllocId());
                             bd.setFrame(null);
                             b.setDf(f);

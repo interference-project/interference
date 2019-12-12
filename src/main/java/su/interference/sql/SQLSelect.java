@@ -41,6 +41,7 @@ import java.util.*;
 
 public class SQLSelect implements SQLStatement {
     private static final String SELECT_CLAUSE = "SELECT";
+    private static final String STREAM_CLAUSE = " STREAM ";
     private static final String DISTINCT_CLAUSE = " DISTINCT ";
     private static final String FROM_CLAUSE = " FROM ";
     private static final String WHERE_CLAUSE = " WHERE ";
@@ -55,13 +56,14 @@ public class SQLSelect implements SQLStatement {
     private SQLJoin             join;
     private ArrayList<SQLNode>  nodes;
 
+    private boolean stream;
     private boolean distinct;
     private boolean entityResult;
     private Table   entityTable;
-    private String  SQLErrorText;
+    private SQLException sqlException;
 
-    public String getSQLErrorText() {
-        return SQLErrorText;
+    public SQLException getSQLException() {
+        return sqlException;
     }
 
     public SQLSelect () {
@@ -79,10 +81,11 @@ public class SQLSelect implements SQLStatement {
         try {
             parseSQL(sql, cur, s);
         } catch (SQLException e) {
-            SQLErrorText = e.getSQLErrorText();
+            sqlException = e;
+            logger.error(e.getClass().getSimpleName()+" thrown during parse of sql statement: "+sql);
         } catch (Exception e) {
-            e.printStackTrace();
-            SQLErrorText = e.getMessage();
+            sqlException = new SQLException(e.getMessage());
+            logger.error(e.getClass().getSimpleName()+" thrown during parse of sql statement: "+sql);
         }
     }
 
@@ -151,10 +154,13 @@ public class SQLSelect implements SQLStatement {
         if (!SQL.startsWith(SELECT_CLAUSE)) {
             throw new InvalidSQLStatement();
         }
-        if (SQL.indexOf(DISTINCT_CLAUSE)>6) {
+        if (SQL.indexOf(STREAM_CLAUSE) >6 ) {
+            this.stream = true;
+        }
+        if (SQL.indexOf(DISTINCT_CLAUSE) >6 ) {
             this.distinct = true;
         }
-        if (SQL.indexOf(FROM_CLAUSE) < SELECT_CLAUSE.length()+1) {
+        if (SQL.indexOf(FROM_CLAUSE) < SELECT_CLAUSE.length() + 1) {
             throw new MissingFromClause();
         }
         if (sql.substring(SELECT_CLAUSE.length(), SQL.indexOf(" FROM ")).trim().equals("")) {

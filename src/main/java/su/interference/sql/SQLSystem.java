@@ -114,27 +114,7 @@ public class SQLSystem implements SQLStatement {
     public DataSet executeSQL (Session s) throws SQLException {
 
         String message    = "";
-        String action     = "";
-        String actionName = "";
-        boolean nowrap  = false;
-        boolean command = true;
-/*
-        if (stmt.equals("initStorage")) {
-            Storage.getStorage().initStorage();
-        }
-        if (stmt.equals("checkStorage")) {
-            Storage.getStorage().checkStorage();
-        }
-        if (stmt.equals("openStorage")) {
-            Storage.getStorage().openStorage();
-        }
-        if (stmt.equals("closeStorage")) {
-            Storage.getStorage().closeStorage();
-        }
-        if (stmt.equals("dropStorage")) {
-            Storage.getStorage().dropStorage();
-        }
-*/
+
         try {
             /*
             if (stmt.equals("createInstance")) {
@@ -202,7 +182,7 @@ public class SQLSystem implements SQLStatement {
         return null;
     }
 
-    public String getSQLErrorText() {
+    public SQLException getSQLException() {
         return null;
     }
 

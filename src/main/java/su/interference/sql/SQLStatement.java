@@ -36,7 +36,7 @@ import su.interference.core.DataSet;
 public interface SQLStatement {
 
     DataSet executeSQL (Session s) throws SQLException;
-    String getSQLErrorText();
+    SQLException getSQLException();
     CList getCols();
 
 }
