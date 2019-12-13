@@ -1,13 +1,15 @@
 # interference
-simple distributed persistent layer for java applications
-(c) 2019 head systems, ltd
-                          
-current revision: 2019.3
-for detailed information see docs/InterferenceManual.pdf
-contacts: info@inteference.su
-https://github.com/interference-project/inteference
 
-Concepts & features
+##### simple distributed persistent layer for java applications
+##### (c) 2019 head systems, ltd
+##### current revision: 2019.3
+##### for detailed information see docs/InterferenceManual.pdf
+
+##### contacts: info@inteference.su
+##### https://github.com/interference-project/inteference
+
+
+## Concepts & features
 
 - supports Base JPA annotations
 - supports distributed SQL queries
@@ -24,7 +26,7 @@ Concepts & features
 - supports complex event processing and streaming SQL (in next release)
 
 
-Quick Start Application
+## Quick Start Application
 
 The interference-test application shows example of using the basic 
 interference use cases. Before starting and using, read the manual.
@@ -37,6 +39,7 @@ To get started with interference, you need to include the interference.jar
 library in your project configuration. For maven pom.xml, this might look 
 like this:
 
+```
 <dependencies>
     <dependency>
         <groupId>su.interference</groupId>
@@ -45,16 +48,19 @@ like this:
     </dependency>
     ...
 </dependencies>
+```
 
 Next, specify the necessary set of keys in the project 
 (application) settings (jmxremote settings is optional):
 
+```
 -Dsu.interference.config=interference.properties
 -Dcom.sun.management.jmxremote 
 -Dcom.sun.management.jmxremote.port=8888
 -Dcom.sun.management.jmxremote.local.only=false 
 -Dcom.sun.management.jmxremote.authenticate=false 
 -Dcom.sun.management.jmxremote.ssl=false
+```
 
 To run a single local interference node, you can use the standard 
 supplied interference.properties configuration. Note that file 
@@ -63,18 +69,20 @@ Next, see the configuration section.
 
 Then, add following code into initializing section of your java application:
 
+```
 Instance instance = Instance.getInstance();
 Session session = Session.getSession();
 instance.startupInstance(session);
+```
 
-where Instance is su.inteference.core.Instance 
-and Session is su.interference.persistent.Session.
+where Instance is su.inteference.core.Instance and Session is su.interference.persistent.Session.
 
 
-Service as standalone
+## Service as standalone
 
 This option can be used when the cluster node is used solely for the purpose of further horizontal scaling of the data retrieving mechanism:
 
+```
 java -cp interference.jar 
 -Dsu.interference.config=interference.properties
 -Dcom.sun.management.jmxremote 
@@ -83,4 +91,4 @@ java -cp interference.jar
 -Dcom.sun.management.jmxremote.authenticate=false 
 -Dcom.sun.management.jmxremote.ssl=false 
 su.interference.standalone.Start
-
+```
