@@ -24,6 +24,7 @@
 
 package su.interference.serialize;
 
+import su.interference.api.SerializerApi;
 import su.interference.core.DataChunk;
 import su.interference.core.Instance;
 import su.interference.core.RowHeader;
@@ -47,7 +48,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @since 1.0
  */
 
-public class CustomSerializer implements Serializer {
+public class CustomSerializer implements SerializerApi {
 
     private byte[] b = new byte[]{};
 
@@ -69,61 +70,48 @@ public class CustomSerializer implements Serializer {
 
     public byte[] serialize (String t, Object fo) throws IllegalAccessException, UnsupportedEncodingException, ClassNotFoundException, InternalException, InstantiationException {
         if (!Types.isPrimitiveType(t)) {
-            if (t.equals("java.lang.Integer")) {
-                return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromInt(fo==null?0:(Integer)fo));
-            }
-            if (t.equals("java.lang.Long")) {
-                return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromLong(fo==null?0:(Long)fo));
-            }
-            if (t.equals("java.util.concurrent.atomic.AtomicInteger")) {
-                return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromInt(fo==null?0:((AtomicInteger)fo).get()));
-            }
-            if (t.equals("java.util.concurrent.atomic.AtomicLong")) {
-                return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromLong(fo==null?0:((AtomicLong)fo).get()));
-            }
-            if (t.equals("java.lang.Float")) {
-                return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromFloat(fo==null?0:(Float)fo));
-            }
-            if (t.equals("java.lang.Double")) {
-                return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromDouble(fo==null?0:(Double)fo));
-            }
-            if (t.equals("java.util.Date")) {
-                return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromDate((Date)fo));
-            }
-            if (t.equals("java.lang.String")) {
-                return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromString((String)fo));
-            }
-            if (t.equals("java.util.ArrayList")) {
-                return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromArrayList((ArrayList)fo));
-            }
-            if (t.equals("[B")) {
-                return append(fo==null?new byte[]{0}:new byte[]{1},(byte[])fo);
-            }
-            if (t.equals("su.interference.core.DataChunk")) {
-                return append(fo==null?new byte[]{0}:new byte[]{1}, append(getBytesFromInt(((DataChunk)fo).getT().getObjectId()),
-                        append(getBytesFromInt(((DataChunk)fo).getHeader().getRowID().getFileId()), getBytesFromLong(((DataChunk)fo).getHeader().getRowID().getFramePointer())),
-                        append(((DataChunk)fo).getHeader().getHeader(), ((DataChunk)fo).getChunk())));
+            switch (t) {
+                case ("java.lang.Integer"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromInt(fo==null?0:(Integer)fo));
+                case ("java.lang.Long"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromLong(fo==null?0:(Long)fo));
+                case ("java.util.concurrent.atomic.AtomicInteger"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromInt(fo==null?0:((AtomicInteger)fo).get()));
+                case ("java.util.concurrent.atomic.AtomicLong"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromLong(fo==null?0:((AtomicLong)fo).get()));
+                case ("java.lang.Float"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromFloat(fo==null?0:(Float)fo));
+                case ("java.lang.Double"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromDouble(fo==null?0:(Double)fo));
+                case ("java.util.Date"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromDate((Date)fo));
+                case ("java.lang.String"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromString((String)fo));
+                case ("java.util.ArrayList"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromArrayList((ArrayList)fo));
+                case ("[B"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},(byte[])fo);
+                case ("su.interference.core.DataChunk"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1}, append(getBytesFromInt(((DataChunk)fo).getT().getObjectId()),
+                            append(getBytesFromInt(((DataChunk)fo).getHeader().getRowID().getFileId()), getBytesFromLong(((DataChunk)fo).getHeader().getRowID().getFramePointer())),
+                            append(((DataChunk)fo).getHeader().getHeader(), ((DataChunk)fo).getChunk())));
             }
         } else {
-            if (t.equals("byte")) {
-                byte[] res = new byte[1];
-                res[0] = (Byte)fo;
-                return res;
-            }
-            if (t.equals("char")) {
-                return getBytesFromChar((Character)fo);
-            }
-            if (t.equals("int")) {
-                return getBytesFromInt((Integer)fo);
-            }
-            if (t.equals("long")) {
-                return getBytesFromLong((Long)fo);
-            }
-            if (t.equals("float")) {
-                return getBytesFromFloat((Float)fo);
-            }
-            if (t.equals("double")) {
-                return getBytesFromDouble((Double)fo);
+            switch (t) {
+                case ("byte"):
+                    byte[] res = new byte[1];
+                    res[0] = (Byte) fo;
+                    return res;
+                case ("char"):
+                    return getBytesFromChar((Character) fo);
+                case ("int"):
+                    return getBytesFromInt((Integer) fo);
+                case ("long"):
+                    return getBytesFromLong((Long) fo);
+                case ("float"):
+                    return getBytesFromFloat((Float) fo);
+                case ("double"):
+                    return getBytesFromDouble((Double) fo);
             }
         }
         return null;
@@ -137,69 +125,54 @@ public class CustomSerializer implements Serializer {
 
     private Object deserialize (byte[] b, String t, String g) throws UnsupportedEncodingException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
         if (!Types.isPrimitiveType(t)) {
-            //for notnull types, 1-byte length value equals null object and must contains 0 in digit equivalent
             int isNull = getIntFromBytes(substring(b,0,1));
             if (isNull==0) {
                 return null;
             }
-            if (t.equals("java.lang.Integer")) {
-                return new Integer(getIntFromBytes(substring(b,1,b.length)));
-            }
-            if (t.equals("java.lang.Long")) {
-                return new Long(getLongFromBytes(substring(b,1,b.length)));
-            }
-            if (t.equals("java.util.concurrent.atomic.AtomicInteger")) {
-                return new AtomicInteger(getIntFromBytes(substring(b,1,b.length)));
-            }
-            if (t.equals("java.util.concurrent.atomic.AtomicLong")) {
-                return new AtomicLong(getLongFromBytes(substring(b,1,b.length)));
-            }
-            if (t.equals("java.lang.Float")) {
-                return new Float(getFloatFromBytes(substring(b,1,b.length)));
-            }
-            if (t.equals("java.lang.Double")) {
-                return new Double(getDoubleFromBytes(substring(b,1,b.length)));
-            }
-            if (t.equals("java.lang.Byte")) {
-                return new Byte(b[1]);
-            }
-            if (t.equals("java.util.Date")) {
-                return getDateFromBytes(substring(b,1,b.length));
-            }
-            if (t.equals("java.lang.String")) {
-                return getStringFromBytes(substring(b,1,b.length));
-            }
-            if (t.equals("java.util.ArrayList")) {
-                return getArrayListFromBytes(substring(b,1,b.length), g);
-            }
-            if (t.equals("[B")) {
-                return substring(b,1,b.length);
-            }
-            if (t.equals("su.interference.core.DataChunk")) {
-                Table to = Instance.getInstance().getTableById(getIntFromBytes(substring(b,1,5)));
-                int file = getIntFromBytes(substring(b,5,9));
-                long frame = getLongFromBytes(substring(b,9,17));
-                RowHeader h = new RowHeader(substring(b,17,33),file,frame);
-                return new DataChunk(substring(b,33,b.length), to, h, null);
+            switch (t) {
+                case ("java.lang.Integer"):
+                    return new Integer(getIntFromBytes(substring(b, 1, b.length)));
+                case ("java.lang.Long"):
+                    return new Long(getLongFromBytes(substring(b, 1, b.length)));
+                case ("java.util.concurrent.atomic.AtomicInteger"):
+                    return new AtomicInteger(getIntFromBytes(substring(b, 1, b.length)));
+                case ("java.util.concurrent.atomic.AtomicLong"):
+                    return new AtomicLong(getLongFromBytes(substring(b, 1, b.length)));
+                case ("java.lang.Float"):
+                    return new Float(getFloatFromBytes(substring(b, 1, b.length)));
+                case ("java.lang.Double"):
+                    return new Double(getDoubleFromBytes(substring(b, 1, b.length)));
+                case ("java.lang.Byte"):
+                    return new Byte(b[1]);
+                case ("java.util.Date"):
+                    return getDateFromBytes(substring(b, 1, b.length));
+                case ("java.lang.String"):
+                    return getStringFromBytes(substring(b, 1, b.length));
+                case ("java.util.ArrayList"):
+                    return getArrayListFromBytes(substring(b, 1, b.length), g);
+                case ("[B"):
+                    return substring(b, 1, b.length);
+                case ("su.interference.core.DataChunk"):
+                    Table to = Instance.getInstance().getTableById(getIntFromBytes(substring(b, 1, 5)));
+                    int file = getIntFromBytes(substring(b, 5, 9));
+                    long frame = getLongFromBytes(substring(b, 9, 17));
+                    RowHeader h = new RowHeader(substring(b, 17, 33), file, frame);
+                    return new DataChunk(substring(b, 33, b.length), to, h, null);
             }
         } else {
-            if (t.equals("byte")) {
-                return b[0];
-            }
-            if (t.equals("int")) {
-                return getIntFromBytes(b);
-            }
-            if (t.equals("long")) {
-                return getLongFromBytes(b);
-            }
-            if (t.equals("float")) {
-                return getFloatFromBytes(b);
-            }
-            if (t.equals("double")) {
-                return getDoubleFromBytes(b);
-            }
-            if (t.equals("char")) {
-                return getCharFromBytes(b);
+            switch (t) {
+                case ("byte"):
+                    return b[0];
+                case ("int"):
+                    return getIntFromBytes(b);
+                case ("long"):
+                    return getLongFromBytes(b);
+                case ("float"):
+                    return getFloatFromBytes(b);
+                case ("double"):
+                    return getDoubleFromBytes(b);
+                case ("char"):
+                    return getCharFromBytes(b);
             }
         }
         return null;
@@ -211,43 +184,35 @@ public class CustomSerializer implements Serializer {
             if (v.length()==0) {
                 return null;
             }
-            if (t.equals("java.lang.Integer")) {
-                return Integer.parseInt(v);
-            }
-            if (t.equals("java.lang.Long")) {
-                return Long.parseLong(v);
-            }
-            if (t.equals("java.util.concurrent.atomic.AtomicInteger")) {
-                return new AtomicInteger(Integer.parseInt(v));
-            }
-            if (t.equals("java.util.concurrent.atomic.AtomicLong")) {
-                return new AtomicLong(Long.parseLong(v));
-            }
-            if (t.equals("java.lang.Float")) {
-                return Float.parseFloat(v);
-            }
-            if (t.equals("java.lang.Double")) {
-                return Double.parseDouble(v);
-            }
-            if (t.equals("java.util.Date")) {
-                SimpleDateFormat df = new SimpleDateFormat(Instance.getInstance().getDateFormat());
-                return df.parse(v);
-            }
-            if (t.equals("java.lang.String")) {
-                return v;
+            switch (t) {
+                case ("java.lang.Integer"):
+                    return Integer.parseInt(v);
+                case ("java.lang.Long"):
+                    return Long.parseLong(v);
+                case ("java.util.concurrent.atomic.AtomicInteger"):
+                    return new AtomicInteger(Integer.parseInt(v));
+                case ("java.util.concurrent.atomic.AtomicLong"):
+                    return new AtomicLong(Long.parseLong(v));
+                case ("java.lang.Float"):
+                    return Float.parseFloat(v);
+                case ("java.lang.Double"):
+                    return Double.parseDouble(v);
+                case ("java.util.Date"):
+                    SimpleDateFormat df = new SimpleDateFormat(Instance.getInstance().getDateFormat());
+                    return df.parse(v);
+                case ("java.lang.String"):
+                    return v;
             }
         } else {
-            if (t.equals("int")) {
-                return Integer.parseInt(v);
-            }
-            if (t.equals("long")) {
-                return Long.parseLong(v);
-            }
-            if (t.equals("float")) {
-                return Float.parseFloat(v);
-            }
-            if (t.equals("double")) {
-                return Double.parseDouble(v);
+            switch (t) {
+                case ("int"):
+                    return Integer.parseInt(v);
+                case ("long"):
+                    return Long.parseLong(v);
+                case ("float"):
+                    return Float.parseFloat(v);
+                case ("double"):
+                    return Double.parseDouble(v);
             }
         }
         return null;
@@ -355,8 +320,6 @@ public class CustomSerializer implements Serializer {
             if (b.length>0) {
                 if (t.indexOf("<")>=0&&t.indexOf(">")>0) {
                     String et = t.substring(t.indexOf("<")+1,t.lastIndexOf(">"));
-                    //for cases like inline Lists (ArrayList<ArrayList<...>>)
-                    //et must contain only type name (java.util.ArrayList)
                     if (et.indexOf("<")>=0) {
                         et = et.substring(0, et.indexOf("<"));
                     }
