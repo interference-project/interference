@@ -3,7 +3,7 @@
 ##### simple distributed persistent layer for java applications
 ##### (c) 2019 head systems, ltd
 ##### current revision: 2019.3
-##### for detailed information see docs/InterferenceManual.pdf
+##### for detailed information see doc/InterferenceManual.pdf
 
 ##### contacts: info@inteference.su
 ##### https://github.com/interference-project/inteference
