@@ -26,23 +26,21 @@ package su.interference.transport;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import su.interference.api.TransportApi;
 import su.interference.core.Config;
 import su.interference.exception.InternalException;
 
-import java.io.IOException;
 import java.net.InetAddress;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collector;
-import java.util.stream.Collectors;
 
 /**
  * @author Yuriy Glotanov
  * @since 1.0
  */
 
-public class TransportContext {
+public class TransportContext implements TransportApi {
 
     private final static Logger logger = LoggerFactory.getLogger(TransportContext.class);
     private static TransportContext transportContext;
