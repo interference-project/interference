@@ -65,21 +65,25 @@ public class DataChunk implements Chunk {
     private final CustomSerializer sr = new CustomSerializer();
 
     //returns datacolumn set
-    public ValueSet getDcs() throws ClassNotFoundException, IllegalAccessException, InternalException, MalformedURLException {
+    public ValueSet getDcs() {
         if (dcs==null) {
-            final Field[] f = t.getFields();
-            final Object[] vs = new Object[f.length];
-            for (int i=0; i<f.length; i++) {
-                final int m = f[i].getModifiers();
-                final Transient ta = f[i].getAnnotation(Transient.class);
-                if (ta==null) {
-                    if (Modifier.isPrivate(m)) {
-                        f[i].setAccessible(true);
+            try {
+                final Field[] f = this.t == null ? this.entity.getClass().getFields() : t.getFields();
+                final List<Object> vs = new ArrayList<>();
+                for (int i = 0; i < f.length; i++) {
+                    final int m = f[i].getModifiers();
+                    final Transient ta = f[i].getAnnotation(Transient.class);
+                    if (ta == null) {
+                        if (Modifier.isPrivate(m)) {
+                            f[i].setAccessible(true);
+                        }
+                        vs.add(f[i].get(entity));
                     }
-                    vs[i] = f[i].get(entity);
                 }
+                dcs = new ValueSet(vs.toArray(new Object[]{}));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
-            dcs = new ValueSet(vs);
         }
         return dcs;
     }

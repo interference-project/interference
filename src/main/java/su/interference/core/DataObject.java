@@ -60,14 +60,18 @@ public interface DataObject {
     long getIdValue(Session s, LLT llt) throws Exception;
     long getIncValue(Session s, LLT llt) throws Exception;
     void incFrameAmount ();
+    Class getSc();
+    Class getGenericClass();
     boolean isNoTran() throws ClassNotFoundException, MalformedURLException;
     boolean isIndex() throws ClassNotFoundException, MalformedURLException;
     Object newInstance() throws IOException, InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException;
     Object getInstance() throws IOException, InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException;
     void usedSpace (FrameData bd, int used, boolean persist, Session s, LLT llt);
     void addIndexValue (DataChunk dc) throws IllegalAccessException, InvocationTargetException, NoSuchMethodException;
-    Field[] getColumns();
     java.lang.reflect.Field[] getFields() throws ClassNotFoundException, InternalException, MalformedURLException;
+    java.lang.reflect.Field getIdField();
+    String getIdFieldType();
+    String getIdFieldGetter();
     FrameData allocateFrame(DataFile df, DataObject t, Session s, LLT llt) throws Exception;
 
 }

@@ -60,7 +60,7 @@ public class IndexList {
     }
 
     public synchronized void add (IndexElementKey key, Object element) {
-        IndexElement e = new IndexElement(key, element);
+        IndexElement e = new IndexElement(key, element, false);
 
         boolean cnue = true;
         IndexElementList target = list.get(start);
@@ -92,9 +92,9 @@ public class IndexList {
                 addElementList(newlist);
                 prevtg = target;
                 if (newlist.isDivided()) {
-                    e = new IndexElement(newlist.getMaxValue(), new Integer(newlist.getPtr()));
+                    e = new IndexElement(newlist.getMaxValue(), new Integer(newlist.getPtr()), true);
                 } else {
-                    e = new IndexElement(prevtg.getMaxValue(), new Integer(prevtg.getPtr()));
+                    e = new IndexElement(prevtg.getMaxValue(), new Integer(prevtg.getPtr()), true);
                 }
                 if (prevtg.getParent()==0) { //add parent ElementList - always type 2 (node)
                     target = new IndexElementList(2);

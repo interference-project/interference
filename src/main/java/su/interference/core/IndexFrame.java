@@ -208,7 +208,9 @@ public class IndexFrame extends Frame {
     }
 
     public ValueSet sort() throws ClassNotFoundException, IllegalAccessException, InternalException, MalformedURLException {
-        this.data.sort();
+        if (!this.data.isSorted()) {
+            this.data.sort();
+        }
         this.sorted = true;
         if (this.data.size()>0) {
             return ((DataChunk)this.data.get(this.data.size()-1)).getDcs();
@@ -255,13 +257,16 @@ public class IndexFrame extends Frame {
     }
 
     //return first element which found - for unique indexes
-    public DataChunk getObjectByKey(ValueSet key) throws ClassNotFoundException, IllegalAccessException, InternalException, MalformedURLException {
+    public DataChunk getObjectByKey(ValueSet key) {
+/*
         for (Chunk ie : this.data.getChunks()) {
             if (((DataChunk)ie).getDcs().equals(key)) {
                 return (DataChunk)ie;
             }
         }
         return null;
+*/
+        return (DataChunk) this.data.getByKey(key);
     }
 
     //return all element which found - for non-unique indexes
