@@ -1,5 +1,5 @@
 ###########################################
-# init storage time parameters:
+# init storage parameters:
 ###########################################
 
 # node identifier of the current instance
@@ -52,7 +52,7 @@ diskio.mode=sync
 sync.period=10
 sync.lock.enable=true
 
-cluster.nodes=localhost:8069
+cluster.nodes=
 auto.register.classes=su.interference.test.Dept,su.interference.test.Emp
 
 #-Dlogback.configurationFile=config/app-log-config.xml
