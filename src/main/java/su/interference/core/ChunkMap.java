@@ -35,20 +35,26 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ChunkMap {
     private final ConcurrentHashMap<Integer, Chunk> hmap;
+    private final ConcurrentHashMap<ValueSet, Chunk> imap;
     private final List<Chunk> list;
+    private volatile boolean sorted;
 
     public ChunkMap() {
-        hmap = new ConcurrentHashMap<Integer, Chunk>();
-        list = new CopyOnWriteArrayList<Chunk>();
+        hmap = new ConcurrentHashMap<>();
+        imap = new ConcurrentHashMap<>();
+        list = new CopyOnWriteArrayList<>();
     }
 
     public void sort() {
         Collections.sort(list);
+        sorted = true;
     }
 
     public void add(Chunk c) {
         hmap.put(c.getHeader().getPtr(), c);
+        imap.put(c.getDcs(), c);
         list.add(c);
+        sorted = false;
     }
 
     public List<Chunk> getChunks() {
@@ -63,10 +69,16 @@ public class ChunkMap {
         return list.get(i);
     }
 
+    public Chunk getByKey(ValueSet key) {
+        return imap.get(key);
+    }
+
     public void removeByPtr(int i) {
         final boolean x = list.remove(hmap.get(i));
-        final Object o = hmap.remove(i);
-        if (!x || o == null) {
+        final Chunk c = (Chunk)hmap.remove(i);
+        imap.remove(c.getDcs());
+        sorted = false;
+        if (!x || c == null) {
             throw new RuntimeException("Internal error during remove object from frame");
         }
     }
@@ -75,6 +87,8 @@ public class ChunkMap {
         final Chunk c = list.get(i);
         list.remove(i);
         hmap.remove(c.getHeader().getPtr());
+        imap.remove(c.getDcs());
+        sorted = false;
     }
 
     public int size() {
@@ -84,6 +98,11 @@ public class ChunkMap {
     public void clear() {
         hmap.clear();
         list.clear();
+        imap.clear();
+        sorted = false;
     }
 
+    public boolean isSorted() {
+        return sorted;
+    }
 }

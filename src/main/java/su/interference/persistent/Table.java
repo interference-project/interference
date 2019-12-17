@@ -118,6 +118,10 @@ public class Table implements DataObject, ResultSet {
     @Transient
     private final java.lang.reflect.Field idfield;
     @Transient
+    private final String idfieldtype;
+    @Transient
+    private final String idfieldgetter;
+    @Transient
     private final java.lang.reflect.Field generatedfield;
     @Transient
     private final WaitFrame[] lbs;
@@ -127,18 +131,16 @@ public class Table implements DataObject, ResultSet {
     private final AtomicInteger ixFrameCurr = new AtomicInteger(0);
     @SuppressWarnings("WeakerAccess")
     @Transient
-    public Field[] columns;
-
-    public Class getGenericClass() {
-        return genericClass;
-    }
-
-    public void setGenericClass(Class genericClass) {
-        this.genericClass = genericClass;
-    }
+    public java.lang.reflect.Field[] fields;
+    @Transient
+    public String[] fieldtypes;
 
     public Class getSc() {
         return sc;
+    }
+
+    public Class getGenericClass() {
+        return genericClass;
     }
 
     public void setSc(Class sc) {
@@ -208,14 +210,6 @@ public class Table implements DataObject, ResultSet {
 
     public long getLastFrameId() {
         return this.getFileLast()+this.getFrameLast();
-    }
-
-    public Field[] getColumns() {
-        return columns;
-    }
-
-    public void setColumns(Field[] columns) {
-        this.columns = columns;
     }
 
     //todo rename to isSystem
@@ -424,13 +418,17 @@ public class Table implements DataObject, ResultSet {
         return null;
     }
 
-    public java.lang.reflect.Field[] getFields() throws ClassNotFoundException, InternalException, MalformedURLException {
+    private java.lang.reflect.Field[] getTableFields() throws ClassNotFoundException, MalformedURLException {
         final Class c = this.getTableClass();
         final ArrayList<java.lang.reflect.Field> res = new ArrayList<java.lang.reflect.Field>();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
         for (int i=0; i<f.length; i++) {
             Transient ta = f[i].getAnnotation(Transient.class);
             if (ta==null) {
+                final int m = f[i].getModifiers();
+                if (Modifier.isPrivate(m)) {
+                    f[i].setAccessible(true);
+                }
                 res.add(f[i]);
             }
         }
@@ -438,7 +436,20 @@ public class Table implements DataObject, ResultSet {
         return fields;
     }
 
-    private java.lang.reflect.Field getIdField() throws ClassNotFoundException, MalformedURLException {
+    private String[] getTableFieldTypes() throws ClassNotFoundException, MalformedURLException {
+        final java.lang.reflect.Field[] fs = getFields();
+        String[] res = new String[fs.length];
+        for (int i = 0; i < fs.length; i++) {
+            res[i] = fs[i].getType().getName();
+        }
+        return res;
+    }
+
+    public java.lang.reflect.Field[] getFields() {
+        return fields;
+    }
+
+    private java.lang.reflect.Field getTableIdField() throws ClassNotFoundException, MalformedURLException {
         final Class c = this.getTableClass();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
         for (int i=0; i<f.length; i++) {
@@ -448,6 +459,18 @@ public class Table implements DataObject, ResultSet {
             }
         }
         return null;
+    }
+
+    public java.lang.reflect.Field getIdField() {
+        return this.idfield;
+    }
+
+    public String getIdFieldType() {
+        return this.idfieldtype;
+    }
+
+    public String getIdFieldGetter() {
+        return this.idfieldgetter;
     }
 
     private java.lang.reflect.Field getGeneratedField() throws ClassNotFoundException, MalformedURLException {
@@ -498,7 +521,11 @@ public class Table implements DataObject, ResultSet {
         IndexEntity xa = (IndexEntity)this.genericClass.getAnnotation(IndexEntity.class);
         this.notran = ca!=null;
         this.index = xa!=null;
-        this.idfield = getIdField();
+        this.idfield = getTableIdField();
+        this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
+        this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
+        this.fields = getTableFields();
+        this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
     }
 
@@ -519,7 +546,11 @@ public class Table implements DataObject, ResultSet {
         IndexEntity xa = (IndexEntity)this.genericClass.getAnnotation(IndexEntity.class);
         this.notran = ca!=null;
         this.index = xa!=null;
-        this.idfield = getIdField();
+        this.idfield = getTableIdField();
+        this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
+        this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
+        this.fields = getTableFields();
+        this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
         this.sc = pclass;
     }
@@ -541,7 +572,11 @@ public class Table implements DataObject, ResultSet {
         IndexEntity xa = (IndexEntity)this.genericClass.getAnnotation(IndexEntity.class);
         this.notran = ca!=null;
         this.index = xa!=null;
-        this.idfield = getIdField();
+        this.idfield = getTableIdField();
+        this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
+        this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
+        this.fields = getTableFields();
+        this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
     }
 
@@ -561,7 +596,11 @@ public class Table implements DataObject, ResultSet {
         IndexEntity xa = (IndexEntity)this.genericClass.getAnnotation(IndexEntity.class);
         this.notran = ca!=null;
         this.index = xa!=null;
-        this.idfield = getIdField();
+        this.idfield = getTableIdField();
+        this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
+        this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
+        this.fields = getTableFields();
+        this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
     }
 
@@ -577,8 +616,12 @@ public class Table implements DataObject, ResultSet {
         IndexEntity xa = (IndexEntity)this.genericClass.getAnnotation(IndexEntity.class);
         this.notran = ca!=null;
         this.index = xa!=null;
-        this.idfield = getIdField();
+        this.idfield = getTableIdField();
+        this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
+        this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
         this.generatedfield = getGeneratedField();
+        this.fields = getTableFields();
+        this.fieldtypes = getTableFieldTypes();
         initIndexFields();
     }
 
@@ -605,7 +648,11 @@ public class Table implements DataObject, ResultSet {
         final IndexEntity xa = (IndexEntity)this.genericClass.getAnnotation(IndexEntity.class);
         this.notran = sa!=null;
         this.index = xa!=null;
-        this.idfield = getIdField();
+        this.idfield = getTableIdField();
+        this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
+        this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
+        this.fields = getTableFields();
+        this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
         this.indexes = new ArrayList<IndexField>();
         this.maps = new ArrayList<MapField>();
@@ -989,9 +1036,12 @@ public class Table implements DataObject, ResultSet {
             return null;
         }
 
+        Metrics.get("persistGetChunk").start();
         final DataChunk dc = this.getChunkByEntity(o, s);
+        Metrics.get("persistGetChunk").stop();
 
         if (dc==null) {
+            Metrics.get("persistInsertChunk").start();
             if (this.isNoTran()) {
                 this.ident(o, s, llt); //ident system entities during persist
             }
@@ -1032,8 +1082,11 @@ public class Table implements DataObject, ResultSet {
             //system-only table in-memory indexes
             this.addIndexValue(nc);
             bd.release();
+            Metrics.get("persistInsertChunk").stop();
 
+            Metrics.get("persistInsertIndex").start();
             this.persistIndexes(nc, s, llt);
+            Metrics.get("persistInsertIndex").stop();
 
             if (extllt == null) { llt.commit(); }
 
@@ -1302,9 +1355,26 @@ public class Table implements DataObject, ResultSet {
             if (idf == null) {
                 logger.error("No @Id annotated column found for " + this.getName());
             }
+            final MapField mf = this.getMapFieldByColumn(idf.getName());
             final IndexField ix = this.getIndexFieldByColumn(idf.getName());
-            if (ix!=null) {
-                final String type = idf.getType().getName();
+            final String type = idf.getType().getName();
+            if (mf != null) {
+                if (type.equals("int")||type.equals("java.lang.Integer")) {
+                    final Method z = c.getMethod("get"+idf.getName().substring(0,1).toUpperCase()+idf.getName().substring(1,idf.getName().length()), null);
+                    final int i = (Integer)z.invoke(o, null);
+                    return (DataChunk)mf.getMap().get(i);
+                }
+                if (type.equals("long")||type.equals("java.lang.Long")) {
+                    final Method z = c.getMethod("get"+idf.getName().substring(0,1).toUpperCase()+idf.getName().substring(1,idf.getName().length()), null);
+                    final long l = (Long)z.invoke(o, null);
+                    return (DataChunk)mf.getMap().get(l);
+                }
+                if (type.equals("java.lang.String")) {
+                    final Method z = c.getMethod("get"+idf.getName().substring(0,1).toUpperCase()+idf.getName().substring(1,idf.getName().length()), null);
+                    final String ss = (String)z.invoke(o, null);
+                    return (DataChunk)mf.getMap().get(ss);
+                }
+            } else if (ix != null) {
                 if (type.equals("int")||type.equals("java.lang.Integer")) {
                     final Method z = c.getMethod("get"+idf.getName().substring(0,1).toUpperCase()+idf.getName().substring(1,idf.getName().length()), null);
                     final int i = (Integer)z.invoke(o, null);

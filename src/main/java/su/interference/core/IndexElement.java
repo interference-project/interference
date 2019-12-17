@@ -32,19 +32,20 @@ import java.util.Date;
  */
 
 public class IndexElement implements Comparable {
-    private IndexElementKey key;
-    private Object          element;
+    final private IndexElementKey key;
+    private Object element;
+    final private boolean ex;
 
-    public IndexElement (IndexElementKey key, Object element) {
+    public IndexElement (IndexElementKey key, Object element, boolean ex) {
         this.key = key;
         this.element = element;
+        this.ex = ex;
     }
 
     public int compareTo(final Object obj) {
         final IndexElement j = (IndexElement)obj;
         final int res = this.getKey().compareTo(j.getKey());
-        final String clname = this.getElement().getClass().getSimpleName();
-        if (clname.equals("Integer")&&res==0) {
+        if (this.ex && res == 0) {
             if ((Integer)this.getElement() < (Integer)j.getElement()) { return -1; } else if ((Integer)this.getElement() > (Integer)j.getElement()) { return 1; }
             return 0;
         }
@@ -53,10 +54,6 @@ public class IndexElement implements Comparable {
 
     public IndexElementKey getKey() {
         return key;
-    }
-
-    public void setKey(IndexElementKey key) {
-        this.key = key;
     }
 
     public Object getElement() {
@@ -68,26 +65,7 @@ public class IndexElement implements Comparable {
     }
 
     public String ElementToString () {
-        String clname = this.element.getClass().getSimpleName();
-        if (clname.equals("Integer")) {
-            return ""+ (Integer)this.element;
-        }
-        if (clname.equals("Long")) {
-            return ""+ (Long)this.element;
-        }
-        if (clname.equals("Float")) {
-            return ""+ (Float)this.element;
-        }
-        if (clname.equals("Double")) {
-            return ""+ (Double)this.element;
-        }
-        if (clname.equals("String")) {
-            return ""+ (String)this.element;
-        }
-        if (clname.equals("Date")) {
-            return ""+ (Date)this.element;
-        }
-        return "Datatype not recognized";
+        return "" + this.element;
     }
 
 }

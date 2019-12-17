@@ -400,6 +400,9 @@ public class Instance implements Interference {
         Metrics.register(Metrics.TIMER, "executeQuery");
         Metrics.register(Metrics.TIMER, "deallocateQuery");
         Metrics.register(Metrics.TIMER, "syncFrames");
+        Metrics.register(Metrics.TIMER, "persistGetChunk");
+        Metrics.register(Metrics.TIMER, "persistInsertChunk");
+        Metrics.register(Metrics.TIMER, "persistInsertIndex");
         Metrics.register(Metrics.HISTOGRAM, "recordRCount");
         Metrics.register(Metrics.HISTOGRAM, "recordLCount");
         Metrics.register(Metrics.HISTOGRAM, "syncQueue");
