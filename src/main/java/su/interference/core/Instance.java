@@ -571,9 +571,9 @@ public class Instance implements Interference {
 
     public FrameData getFrameById (long id) {
         final Table t = getTableByName("su.interference.persistent.FrameData");
-        final IndexField ixf = t.getIndexFieldByColumn("frameId");
-        final IndexList ixl = ixf.getIndex();
-        final DataChunk dc = (DataChunk)ixl.getObjectByKey(id);
+        final MapField ixf = t.getMapFieldByColumn("frameId");
+        final Map ixl = ixf.getMap();
+        final DataChunk dc = (DataChunk)ixl.get(id);
         if (dc != null) {
             return (FrameData)dc.getEntity();
         }
@@ -582,9 +582,9 @@ public class Instance implements Interference {
 
     public FrameData getFrameByAllocId (long id) {
         final Table t = getTableByName("su.interference.persistent.FrameData");
-        final IndexField ixf = t.getIndexFieldByColumn("allocId");
-        final IndexList ixl = ixf.getIndex();
-        final DataChunk dc = (DataChunk)ixl.getObjectByKey(id);
+        final MapField ixf = t.getMapFieldByColumn("allocId");
+        final Map ixl = ixf.getMap();
+        final DataChunk dc = (DataChunk)ixl.get(id);
         if (dc!=null) {
             return (FrameData)dc.getEntity();
         }
@@ -593,9 +593,9 @@ public class Instance implements Interference {
 
     public Chunk getChunkByPointer (long frameId, int ptr) throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, IOException {
         final Table t = getTableByName("su.interference.persistent.FrameData");
-        final IndexField ixf = t.getIndexFieldByColumn("frameId");
-        final IndexList ixl = ixf.getIndex();
-        final DataChunk dc = (DataChunk)ixl.getObjectByKey(frameId);
+        final MapField ixf = t.getMapFieldByColumn("frameId");
+        final Map ixl = ixf.getMap();
+        final DataChunk dc = (DataChunk)ixl.get(frameId);
         if (dc!=null) {
             return ((FrameData)dc.getEntity()).getFrame().data.getByPtr(ptr);
         }

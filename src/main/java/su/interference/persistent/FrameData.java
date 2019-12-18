@@ -88,7 +88,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @MgmtColumn(width=10, show=true, form=false, edit=false)
     private volatile long nextFrame;
     @Column
-    @IndexColumn
+    @MapColumn
     @MgmtColumn(width=10, show=true, form=false, edit=false)
     private volatile long allocId; //virtual Id field
     @Column
@@ -102,7 +102,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @IndexColumn
     private AtomicInteger allocated;
     @Id
-    @IndexColumn
+    @MapColumn
     @Transient
     private long frameId; //virtual Id field
     @Transient

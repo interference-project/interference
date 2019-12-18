@@ -24,17 +24,11 @@
 
 package su.interference.persistent;
 
-import su.interference.core.DisableSync;
-import su.interference.core.SystemEntity;
-import su.interference.core.DataChunk;
-import su.interference.core.IndexColumn;
+import su.interference.core.*;
 import su.interference.mgmt.MgmtColumn;
 import su.interference.exception.InternalException;
 
-import javax.persistence.Entity;
-import javax.persistence.Column;
-import javax.persistence.Id;
-import javax.persistence.Transient;
+import javax.persistence.*;
 import java.io.Serializable;
 import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
@@ -68,7 +62,7 @@ public class TransFrame implements Comparable, FilePartitioned, Serializable {
     @MgmtColumn(width=10, show=true, form=false, edit=false)
     private int diff;
     @Id
-    @IndexColumn
+    @MapColumn
     @MgmtColumn(width=10, show=true, form=false, edit=false)
     @Transient
     private transient String frameId;
@@ -83,7 +77,7 @@ public class TransFrame implements Comparable, FilePartitioned, Serializable {
     }
 
     public String getFrameId() {
-        return getHexByLong(transId)+getHexByLong(cframeId)+getHexByLong(uframeId);
+        return transId + "-" + cframeId + "-" + uframeId;
     }
 
     public TransFrame() {
@@ -169,24 +163,5 @@ public class TransFrame implements Comparable, FilePartitioned, Serializable {
     public void setDiff(int diff) {
         this.diff = diff;
     }
-
-    public String getHexByInt (int val) {
-       String s = Integer.toHexString(val);
-       String p = new String();
-       for (int i=0; i < 8-s.length(); i++) {
-           p = p + "0";
-       }
-       return p + s;
-    }
-
-    public String getHexByLong (long val) {
-       String s = Long.toHexString(val);          
-       String p = new String();
-       for (int i=0; i < 16-s.length(); i++) {
-           p = p + "0";
-       }
-       return p + s;
-    }
-
 
 }
