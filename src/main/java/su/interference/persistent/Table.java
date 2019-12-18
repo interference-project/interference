@@ -661,16 +661,16 @@ public class Table implements DataObject, ResultSet {
 
         if (this.name.equals("su.interference.persistent.FrameData")) {
             getIndexFieldByColumn("objectId").setIndex(ixl);
-            final IndexList ixlb = new IndexList();
-            final IndexList ixla = new IndexList();
+            final Map<Long, Object> ixlb = new HashMap();
+            final Map<Long, Object> ixla = new HashMap();
             final IndexList ixls = new IndexList();
             for (Object o : ixl.getContent()) {
-                ixlb.add(((FrameData) ((DataChunk) o).getEntity()).getFrameId(), o);
-                ixla.add(((FrameData) ((DataChunk) o).getEntity()).getAllocId(), o);
+                ixlb.put(((FrameData) ((DataChunk) o).getEntity()).getFrameId(), o);
+                ixla.put(((FrameData) ((DataChunk) o).getEntity()).getAllocId(), o);
                 ixls.add(((FrameData) ((DataChunk) o).getEntity()).getStarted(), o);
             }
-            getIndexFieldByColumn("frameId").setIndex(ixlb);
-            getIndexFieldByColumn("allocId").setIndex(ixla);
+            getMapFieldByColumn("frameId").setMap(ixlb);
+            getMapFieldByColumn("allocId").setMap(ixla);
             getIndexFieldByColumn("started").setIndex(ixls);
         } else if (this.name.equals("su.interference.persistent.UndoChunk")) {
             //none
