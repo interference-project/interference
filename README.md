@@ -28,8 +28,8 @@
 - supports complex event processing and streaming SQL (in next release)
 
 ## NOTE:
-nterference is not a RDBMS in the classical sense, and it does 
-not contain ddl operations (the table structure is created on the basis 
+Interference is not a RDBMS in the classical sense, and it does 
+not support ddl operations (the table structure is created on the basis 
 of @Entity class JPA-compatible annotations), foreign keys. Standard 
 dml operations, like UPDATE, DELETE for bulk changes and check constraints 
 are planned to be implemented in future versions.
