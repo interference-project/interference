@@ -34,11 +34,10 @@ import su.interference.transport.TransportContext;
 
 import java.lang.reflect.Field;
 import java.net.MalformedURLException;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.ArrayList;
 import java.lang.reflect.InvocationTargetException;
 import java.io.IOException;
 
@@ -72,6 +71,7 @@ public class SQLCursor implements FrameIterator {
     private final SQLColumn joinedCC;
     private SQLColumn extJoinedCC;
 
+    private static Map<Integer, ConcurrentLinkedQueue<FrameApi>> sfmap = new HashMap();
     private static final int BATCH_SIZE = 4;
     private final static Logger logger = LoggerFactory.getLogger(SQLCursor.class);
 
@@ -88,13 +88,19 @@ public class SQLCursor implements FrameIterator {
         this.last = last;
         this.peristent = !cur.getSqlStmt().isEntityResult();
 
+        if (cur.isStream()) {
+            sfmap.put(lbi.getObjectId(), new ConcurrentLinkedQueue<FrameApi>());
+        }
+
         //todo wrong case - column set must be rebuilded for prevent bad indexes intersect cases
         //todo need to refactor SQLJoin - extJoinedCC must be set on construct time
 
         if (cur.getType() == Cursor.SLAVE_TYPE && cur.getResultTargetName() != null && this.id == 1) {
             target = this.peristent ? s.registerTable(cur.getResultTargetName(), s, rscols, null, null, ixflag && last) : new ResultList(cur.getSqlStmt().getEntityTable());
-        } else {
+        } else if (cur.getType() == Cursor.MASTER_TYPE) {
             target = this.peristent ? s.registerTable("su.interference.persistent.R$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols, null, null, ixflag && last) : new ResultList(cur.getSqlStmt().getEntityTable());
+        } else if (cur.getType() == Cursor.STREAM_TYPE) {
+            target = new StreamQueue();
         }
         current = new FrameHolder(target);
 
@@ -190,6 +196,37 @@ public class SQLCursor implements FrameIterator {
             }
         }
         logger.debug("SQL cursor is build: tasks amount = "+tasks.size()+", use NC check = "+last);
+    }
+
+    public void stream() throws Exception {
+        final Queue<FrameApi> q = sfmap.get(lbi.getObjectId());
+        boolean cnue = true;
+        if (!cur.isStream()) {
+            logger.error("wrong stream method call: SQL statement is not a stream");
+        }
+        if (q == null) {
+            throw new RuntimeException("internal error: queue not exist for object id = "+lbi.getObjectId());
+        }
+        while (cnue) {
+            FrameApi f = q.poll();
+            if (f != null) {
+                FrameJoinTask task = new FrameJoinTask(cur, f, null, target, rscols, nc, id, Config.getConfig().LOCAL_NODE_ID, last, lbi.isLeftfs(), null, s);
+                final Future<List<Object>> ft = exec.submit(task);
+                for (Object o : ft.get()) {
+                    target.persist(o, s);
+                }
+            }
+            if (q.peek() == null) {
+                Thread.sleep(1000);
+            }
+        }
+    }
+
+    public static void addStreamFrame(FrameApi f) {
+        final Queue<FrameApi> q = sfmap.get(f.getObjectId());
+        if (q != null) {
+            q.add(f);
+        }
     }
 
     // execute single task (on local node only)

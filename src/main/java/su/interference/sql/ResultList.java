@@ -53,6 +53,10 @@ public class ResultList implements ResultSet {
         return null;
     }
 
+    public Object poll() {
+        return null;
+    }
+
     public List<Chunk> getAll(Session s) {
         return null;
     }

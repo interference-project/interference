@@ -56,6 +56,10 @@ public class ResultSetImpl implements ResultSet {
         return null;
     }
 
+    public Object poll() {
+        return null;
+    }
+
     public List<Chunk> getAll(Session s) throws Exception {
         return null;
     }

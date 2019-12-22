@@ -1164,6 +1164,10 @@ public class Table implements DataObject, ResultSet {
         }
     }
 
+    public Object poll() {
+        return null;
+    }
+
     private void persistIndexes(DataChunk c, Session s, LLT llt) throws Exception {
         for (IndexDescript ids : this.getIndexNames()) {
             final Table ixt = Instance.getInstance().getTableByName("su.interference.persistent."+ids.getName());
