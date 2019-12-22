@@ -124,7 +124,11 @@ public class SQLJoin {
             SQLCursor last = null;
             for (SQLCursor sqlc : preparedCursors) {
                 last = sqlc;
-                sqlc.build();
+                if (cur.isStream()) {
+                    sqlc.stream();
+                } else {
+                    sqlc.build();
+                }
             }
 
             temp = last.flushTarget();

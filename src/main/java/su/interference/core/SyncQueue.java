@@ -31,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.persistent.*;
 import su.interference.exception.*;
+import su.interference.sql.SQLCursor;
 import su.interference.transport.TransportSyncTask;
 
 /**
@@ -66,6 +67,7 @@ public class SyncQueue implements Runnable, ManageProcess {
             FreeFrame fb = null;
             try {
                 frames.add(new SyncFrame((Frame) entry.getValue(), s, fb));
+                SQLCursor.addStreamFrame(((Frame) entry.getValue()).getFrameData());
             } catch (MissingSyncFrameException e) {
                 logger.debug("Unable to sync frame "+((Frame) entry.getValue()).getPtr()+" because removed by freeing");
             }

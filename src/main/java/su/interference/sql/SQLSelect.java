@@ -148,16 +148,16 @@ public class SQLSelect implements SQLStatement {
         final String sql = s.trim();
         final String SQL = s.toUpperCase().trim();
 
-        cursor = cur==null?new Cursor(sql, Cursor.MASTER_TYPE):cur;
+        cursor = cur==null?new Cursor(sql, this.stream ? Cursor.STREAM_TYPE : Cursor.MASTER_TYPE):cur;
         cursor.setSqlStmt(this);
 
         if (!SQL.startsWith(SELECT_CLAUSE)) {
             throw new InvalidSQLStatement();
         }
-        if (SQL.indexOf(STREAM_CLAUSE) >6 ) {
+        if (SQL.indexOf(STREAM_CLAUSE) == SELECT_CLAUSE.length()) {
             this.stream = true;
         }
-        if (SQL.indexOf(DISTINCT_CLAUSE) >6 ) {
+        if (SQL.indexOf(DISTINCT_CLAUSE) == SELECT_CLAUSE.length()) {
             this.distinct = true;
         }
         if (SQL.indexOf(FROM_CLAUSE) < SELECT_CLAUSE.length() + 1) {
@@ -186,7 +186,10 @@ public class SQLSelect implements SQLStatement {
             }
         }
 
-        final String[] clds = sql.substring(SELECT_CLAUSE.length(), SQL.indexOf(FROM_CLAUSE)).trim().split(",");
+        final int cldsStart = stream ? SELECT_CLAUSE.length() + STREAM_CLAUSE.length() :
+                              distinct ? SELECT_CLAUSE.length() + DISTINCT_CLAUSE.length() :
+                              SELECT_CLAUSE.length();
+        final String[] clds = sql.substring(cldsStart, SQL.indexOf(FROM_CLAUSE)).trim().split(",");
         final String[] tbls = sql.substring(SQL.indexOf(FROM_CLAUSE)+6, baselen).trim().split(",");
 
         final int wpos = SQL.indexOf(WHERE_CLAUSE);

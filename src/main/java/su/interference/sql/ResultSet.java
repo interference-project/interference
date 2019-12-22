@@ -41,6 +41,7 @@ import java.util.List;
 
 public interface ResultSet {
     DataChunk persist(Object o, Session s) throws Exception;
+    Object poll();
     List<Chunk> getAll(Session s) throws Exception;
     ArrayList<Object> getAll(Session s, int ptr) throws Exception;
     int getObjectId();

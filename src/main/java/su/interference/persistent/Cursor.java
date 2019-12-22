@@ -48,6 +48,8 @@ public class Cursor implements Serializable {
     @Transient
     public static final int SLAVE_TYPE      = 2;
     @Transient
+    public static final int STREAM_TYPE     = 3;
+    @Transient
     public static final int STATE_IDLE      = 1;
     @Transient
     public static final int STATE_PREPARED  = 2;
@@ -211,4 +213,9 @@ public class Cursor implements Serializable {
     public void startStatement(long tranId) throws Exception {
         this.session.startStatement(tranId);
     }
+
+    public boolean isStream() {
+        return this.type == STREAM_TYPE ? true : false;
+    }
+
 }
