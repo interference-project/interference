@@ -28,6 +28,7 @@
 - supports complex event processing and streaming SQL (in next release)
 
 ## NOTE:
+
 Interference is not a RDBMS in the classical sense, and it does 
 not support ddl operations (the table structure is created on the basis 
 of @Entity class JPA-compatible annotations), foreign keys. Standard 
