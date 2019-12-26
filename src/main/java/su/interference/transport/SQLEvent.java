@@ -26,13 +26,16 @@ package su.interference.transport;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import su.interference.core.Frame;
 import su.interference.core.Instance;
 import su.interference.persistent.Cursor;
 import su.interference.persistent.Session;
 import su.interference.sql.*;
 import su.interference.sqlexception.SQLException;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author Yuriy Glotanov
@@ -43,19 +46,17 @@ public class SQLEvent extends TransportEventImpl {
     private final static Logger logger = LoggerFactory.getLogger(SQLEvent.class);
     private final long cursorId;
     private final int targetId;
-    private final long leftAllocId;
-    private final long rightAllocId;
+    private final Map<String, FrameApiJoin> joins;
     private final String rightType;
     private final String sql;
     private final String resultTargetName;
     private final long tranId;
     private final boolean execute;
 
-    public SQLEvent(int channelId, long cursorId, long leftAllocId, long rightAllocId, String rightType, int targetId, String sql, String resultTargetName, long tranId, boolean execute) {
+    public SQLEvent(int channelId, long cursorId, Map<String, FrameApiJoin> joins, String rightType, int targetId, String sql, String resultTargetName, long tranId, boolean execute) {
         super(channelId);
         this.cursorId = cursorId;
-        this.leftAllocId = leftAllocId;
-        this.rightAllocId = rightAllocId;
+        this.joins = joins;
         this.rightType = rightType;
         this.targetId = targetId;
         this.sql = sql;
@@ -73,23 +74,28 @@ public class SQLEvent extends TransportEventImpl {
             final SQLCursor c = sql.getSQLCursorById(1);
             final SQLJoinDispatcher d = c.getHmap();
             final FrameIterator rbi = d == null ? null : d.getRbi();
+            final List<FrameApiJoin> res = new ArrayList<>();
             FrameApi b_ = null;
-            if (rightAllocId == 0 && rbi != null && (rightType.equals("SQLHashMapFrame") || rightType.equals("SQLIndexFrame"))) {
-                rbi.resetIterator();
+            for (Map.Entry<String, FrameApiJoin> entry : joins.entrySet()) {
+                final FrameApiJoin j = entry.getValue();
+                if (j.getRightAllocId() == 0 && rbi != null && (rightType.equals("SQLHashMapFrame") || rightType.equals("SQLIndexFrame"))) {
+                    rbi.resetIterator();
+                    try {
+                        b_ = rbi.nextFrame();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+                final FrameApi bd1 = Instance.getInstance().getFrameByAllocId(j.getLeftAllocId());
+                final FrameApi bd2 = j.getRightAllocId() == 0 ? b_ : Instance.getInstance().getFrameByAllocId(j.getRightAllocId());
                 try {
-                    b_ = rbi.nextFrame();
+                    j.setResult(c.execute(bd1, bd2));
+                    res.add(j);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    return new EventResult(TransportCallback.FAILURE, this.cursorId, null, e);
                 }
             }
-            final FrameApi bd1 = Instance.getInstance().getFrameByAllocId(leftAllocId);
-            final FrameApi bd2 = rightAllocId==0?b_:Instance.getInstance().getFrameByAllocId(rightAllocId);
-            try {
-                final List<Object> res = c.execute(bd1, bd2);
-                return new EventResult(TransportCallback.SUCCESS, this.cursorId, res, null);
-            } catch (Exception e) {
-                return new EventResult(TransportCallback.FAILURE, this.cursorId,null, e);
-            }
+            return new EventResult(TransportCallback.SUCCESS, this.cursorId, res, null);
         } else {
             final Session s = Session.getSession();
             final Cursor cur = this.cursorId == 0 ? null : new Cursor(this.sql, this.resultTargetName, Cursor.SLAVE_TYPE);
