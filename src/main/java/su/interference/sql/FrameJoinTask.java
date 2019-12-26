@@ -101,6 +101,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
         ResultSetEntity rsa = (ResultSetEntity)c1.getAnnotation(ResultSetEntity.class);
         final boolean c1rs = rsa!=null?true:false;
 
+/*
         if (cur.getType() == Cursor.MASTER_TYPE && nodeId != Config.getConfig().LOCAL_NODE_ID && this.leftfs) {
             Metrics.get("remoteTask").start();
             final TransportEvent transportEvent = new SQLEvent(nodeId, cur.getCursorId(), bd1.getAllocId(), bd2==null?0:bd2.getAllocId(), bd2==null?null:bd2.getClass().getSimpleName(), 0, null, null, 0, true);
@@ -114,6 +115,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
                 return rs;
             }
         }
+*/
 
         Metrics.get("localTask").start();
         final ArrayList<Object> drs1 = bd1.getFrameEntities(s);

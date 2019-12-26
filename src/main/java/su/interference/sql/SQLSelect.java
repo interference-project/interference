@@ -328,7 +328,7 @@ public class SQLSelect implements SQLStatement {
 
             final Integer[] ns = TransportContext.getInstance().getOnlineNodes();
             for (Integer nodeId : TransportContext.getInstance().getOnlineNodes()) {
-                final TransportEvent transportEvent = new SQLEvent(nodeId, cursor.getCursorId(), 0, 0, null,
+                final TransportEvent transportEvent = new SQLEvent(nodeId, cursor.getCursorId(), null, null,
                         this.join.getTargetId(), cursor.getSql(), this.join.getResultTargetName(), sn.getTransaction().getTransId(), false);
                 TransportContext.getInstance().send(transportEvent);
                 logger.debug("create remote cursor on node " + nodeId);

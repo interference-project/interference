@@ -50,12 +50,14 @@ public class SQLCursor implements FrameIterator {
 
     private final int id;
     private ResultSet target;
-    private boolean done;
     private ExecutorService exec = SQLJoinThreadPool.getThreadPool();
-    private ArrayList<FrameJoinTask> tasks;
+    private List<FrameApiJoin> tasks;
+    private List<FrameApiJoin> tasks_;
+    private Map<Integer, Map<String, FrameApiJoin>> joins;
     private FrameData bdnext;
     private FrameHolder current;
     private int ptr = 0;
+    private boolean sent;
     private Cursor cur;
     private Session s;
     private ArrayList<SQLColumn> rscols;
@@ -66,6 +68,7 @@ public class SQLCursor implements FrameIterator {
     private final FrameIterator lbi;
     private final FrameIterator rbi;
     private final List<Integer> objectIds;
+    private String rightType;
     private boolean leftFS;
     private final boolean furtherUseUC;
     private final SQLColumn joinedCC;
@@ -104,7 +107,9 @@ public class SQLCursor implements FrameIterator {
         }
         current = new FrameHolder(target);
 
-        tasks = new ArrayList<FrameJoinTask>();
+        tasks = new ArrayList<FrameApiJoin>();
+        tasks_ = new ArrayList<FrameApiJoin>();
+        joins = new HashMap<>();
 
         //rebuild column set for sqlcursor iterator
         final SQLCursor cursor_ = lbi.getType() == FrameIterator.TYPE_CURSOR ? (SQLCursor) lbi : rbi != null && rbi.getType() == FrameIterator.TYPE_CURSOR ? (SQLCursor) rbi : null;
@@ -173,29 +178,48 @@ public class SQLCursor implements FrameIterator {
         return target.getObjectId();
     }
 
+    protected FrameJoinTask buildFrameJoinTask(int nodeId, FrameApi bd1, FrameApi bd2) {
+        return new FrameJoinTask(cur, bd1, bd2, target, rscols, nc, id, nodeId, last, lbi.isLeftfs(), hmap, s);
+    }
+
     public void build() throws InternalException, IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         final Integer[] ns = TransportContext.getInstance().getOnlineNodesWithLocal();
+        for (Integer nodeId : ns) {
+            if (nodeId != Config.getConfig().LOCAL_NODE_ID) {
+                joins.put(nodeId, new HashMap<>());
+            }
+        }
         int i = 0;
         //int tnode = 0;
 
         while (lbi.hasNextFrame()) {
-            FrameApi bd1 = lbi.nextFrame();
+            final FrameApi bd1 = lbi.nextFrame();
 
             if (rbi == null) {
-                tasks.add(new FrameJoinTask(cur, bd1, null, target, rscols, nc, id, ns[i], last, lbi.isLeftfs(), null, s));
+                tasks.add(new FrameApiJoin(ns[i], this, bd1, null, joins));
                 i++;
                 if (i == ns.length) { i = 0; }
             } else {
                 while (rbi.hasNextFrame()) {
-                    FrameApi bd2 = rbi.nextFrame();
-                    tasks.add(new FrameJoinTask(cur, bd1, bd2, target, rscols, nc, id, ns[i], last, lbi.isLeftfs(), hmap, s));
+                    final FrameApi bd2 = rbi.nextFrame();
+                    if (rightType == null) {
+                        rightType = bd2.getClass().getSimpleName();
+                    }
+                    tasks.add(new FrameApiJoin(ns[i], this, bd1, bd2, joins));
                     i++;
                     if (i == ns.length) { i = 0; }
                 }
                 rbi.resetIterator();
             }
         }
-        logger.debug("SQL cursor is build: tasks amount = "+tasks.size()+", use NC check = "+last);
+        logger.debug("SQL cursor is build: local tasks amount = "+tasks.size()+", use NC check = "+last);
+        if (!sent) {
+            for (Map.Entry<Integer, Map<String, FrameApiJoin>> entry : joins.entrySet()) {
+                final RemoteTask rt = new RemoteTask(cur, entry.getKey(), entry.getValue(), rightType);
+                exec.submit(rt);
+            }
+            sent = true;
+        }
     }
 
     public void stream() throws Exception {
@@ -241,27 +265,38 @@ public class SQLCursor implements FrameIterator {
     }
 
     private synchronized FrameData nextFrame2() throws InternalException {
-        boolean done = !(ptr<tasks.size());
+        boolean done = !(ptr < tasks.size());
         FrameData ret = current.getFrame(done);
 
-        while (!done&&ret==null) {
+        while (!done && ret==null) {
+            final ArrayList<Future<FrameApiJoin>> flist = new ArrayList<Future<FrameApiJoin>>();
             try {
-                ArrayList<Future<List<Object>>> flist = new ArrayList<Future<List<Object>>>();
-                for (int i=0; i<BATCH_SIZE; i++) {
-                    if ((ptr + i)<tasks.size()) {
-                        FrameJoinTask jt = tasks.get(ptr + i);
-                        flist.add(exec.submit(jt));
+                for (int i=0; i < BATCH_SIZE; i++) {
+                    if ((ptr + i) < tasks.size()) {
+                        final FrameApiJoin j = tasks.get(ptr + i);
+                        flist.add(exec.submit(j));
                     }
                 }
-                for (Future<List<Object>> f : flist) {
-                    List<Object> ol = f.get();
-                    logger.debug("SQL cursor next frame: the jointask call returned " + ol.size() + " records");
-                    for (Object o : ol) {
-                        target.persist(o, s);
+                for (Future<FrameApiJoin> f : flist) {
+                    final FrameApiJoin j = f.get();
+                    final List<Object> ol = j.getResult();
+                    if (ol == null) {
+                        tasks_.add(j);
+                    } else {
+                        logger.debug("SQL cursor next frame: the jointask call returned " + ol.size() + " records");
+                        for (Object o : ol) {
+                            target.persist(o, s);
+                        }
                     }
                 }
                 ptr = ptr + BATCH_SIZE;
-                done = !(ptr<tasks.size());
+                done = !(ptr < tasks.size());
+                if (done && tasks_.size() > 0) {
+                    done = false;
+                    tasks = tasks_;
+                    tasks_ = new ArrayList<>();
+                    ptr = 0;
+                }
                 ret = current.getFrame(done);
             } catch (Exception e) {
                 e.printStackTrace();

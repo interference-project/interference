@@ -24,6 +24,8 @@
 
 package su.interference.transport;
 
+import su.interference.sql.FrameApiJoin;
+
 import java.io.Serializable;
 import java.util.List;
 
@@ -35,10 +37,10 @@ import java.util.List;
 public class EventResult implements Serializable {
     private final int result;
     private final long slaveCursorid;
-    private final List<Object> resultSet;
+    private final List<FrameApiJoin> resultSet;
     private final Exception exception;
 
-    public EventResult(int result, long slaveCursorid, List<Object> resultSet, Exception exception) {
+    public EventResult(int result, long slaveCursorid, List<FrameApiJoin> resultSet, Exception exception) {
         this.result = result;
         this.slaveCursorid = slaveCursorid;
         this.resultSet = resultSet;
@@ -53,7 +55,7 @@ public class EventResult implements Serializable {
         return slaveCursorid;
     }
 
-    public List<Object> getResultSet() {
+    public List<FrameApiJoin> getResultSet() {
         return resultSet;
     }
 
