@@ -1,7 +1,7 @@
 # interference
 
 ##### simple distributed persistent layer for java applications
-##### (c) 2019 head systems, ltd
+##### (c) 2010 - 2020 head systems, ltd
 ##### current revision: 2019.3
 ##### for detailed information see doc/InterferenceManual.pdf
 
