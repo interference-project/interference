@@ -86,6 +86,7 @@ public class SQLSelect implements SQLStatement {
         } catch (Exception e) {
             sqlException = new SQLException(e.getMessage());
             logger.error(e.getClass().getSimpleName()+" thrown during parse of sql statement: "+sql);
+            e.printStackTrace();
         }
     }
 
@@ -132,8 +133,10 @@ public class SQLSelect implements SQLStatement {
 
         try {
             t = this.join.executeJoin(s,0,null); //mode=0 for select, uset is null
-            logger.info("SQL local query returns "+t.getAll(s, 0).size());
-            logger.info("sql executed");
+            if (!stream) {
+                logger.info("SQL local query returns " + t.getAll(s, 0).size());
+                logger.info("sql executed");
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -147,9 +150,6 @@ public class SQLSelect implements SQLStatement {
 
         final String sql = s.trim();
         final String SQL = s.toUpperCase().trim();
-
-        cursor = cur==null?new Cursor(sql, this.stream ? Cursor.STREAM_TYPE : Cursor.MASTER_TYPE):cur;
-        cursor.setSqlStmt(this);
 
         if (!SQL.startsWith(SELECT_CLAUSE)) {
             throw new InvalidSQLStatement();
@@ -166,6 +166,9 @@ public class SQLSelect implements SQLStatement {
         if (sql.substring(SELECT_CLAUSE.length(), SQL.indexOf(" FROM ")).trim().equals("")) {
             throw new MissingFromClause();
         }
+
+        cursor = cur==null?new Cursor(sql, this.stream ? Cursor.STREAM_TYPE : Cursor.MASTER_TYPE):cur;
+        cursor.setSqlStmt(this);
 
         int baselen = sql.length();
 

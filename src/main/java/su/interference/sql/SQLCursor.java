@@ -37,6 +37,7 @@ import java.net.MalformedURLException;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.lang.reflect.InvocationTargetException;
 import java.io.IOException;
@@ -51,9 +52,11 @@ public class SQLCursor implements FrameIterator {
     private final int id;
     private ResultSet target;
     private ExecutorService exec = SQLJoinThreadPool.getThreadPool();
+    private ExecutorService exec2 = SQLJoinThreadPool.getThreadPool2();
+    private ExecutorService remotepool = Executors.newCachedThreadPool();
+    private ExecutorService streampool = Executors.newCachedThreadPool();
     private List<FrameApiJoin> tasks;
     private List<FrameApiJoin> tasks_;
-    private Map<Integer, Map<String, FrameApiJoin>> joins;
     private FrameData bdnext;
     private FrameHolder current;
     private int ptr = 0;
@@ -100,16 +103,16 @@ public class SQLCursor implements FrameIterator {
 
         if (cur.getType() == Cursor.SLAVE_TYPE && cur.getResultTargetName() != null && this.id == 1) {
             target = this.peristent ? s.registerTable(cur.getResultTargetName(), s, rscols, null, null, ixflag && last) : new ResultList(cur.getSqlStmt().getEntityTable());
-        } else if (cur.getType() == Cursor.MASTER_TYPE) {
-            target = this.peristent ? s.registerTable("su.interference.persistent.R$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols, null, null, ixflag && last) : new ResultList(cur.getSqlStmt().getEntityTable());
         } else if (cur.getType() == Cursor.STREAM_TYPE) {
             target = new StreamQueue();
+        } else
+            {
+            target = this.peristent ? s.registerTable("su.interference.persistent.R$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols, null, null, ixflag && last) : new ResultList(cur.getSqlStmt().getEntityTable());
         }
         current = new FrameHolder(target);
 
         tasks = new ArrayList<FrameApiJoin>();
         tasks_ = new ArrayList<FrameApiJoin>();
-        joins = new HashMap<>();
 
         //rebuild column set for sqlcursor iterator
         final SQLCursor cursor_ = lbi.getType() == FrameIterator.TYPE_CURSOR ? (SQLCursor) lbi : rbi != null && rbi.getType() == FrameIterator.TYPE_CURSOR ? (SQLCursor) rbi : null;
@@ -184,11 +187,6 @@ public class SQLCursor implements FrameIterator {
 
     public void build() throws InternalException, IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         final Integer[] ns = TransportContext.getInstance().getOnlineNodesWithLocal();
-        for (Integer nodeId : ns) {
-            if (nodeId != Config.getConfig().LOCAL_NODE_ID) {
-                joins.put(nodeId, new HashMap<>());
-            }
-        }
         int i = 0;
         //int tnode = 0;
 
@@ -196,7 +194,7 @@ public class SQLCursor implements FrameIterator {
             final FrameApi bd1 = lbi.nextFrame();
 
             if (rbi == null) {
-                tasks.add(new FrameApiJoin(ns[i], this, bd1, null, joins));
+                tasks.add(new FrameApiJoin(ns[i], this, bd1, null));
                 i++;
                 if (i == ns.length) { i = 0; }
             } else {
@@ -205,18 +203,26 @@ public class SQLCursor implements FrameIterator {
                     if (rightType == null) {
                         rightType = bd2.getClass().getSimpleName();
                     }
-                    tasks.add(new FrameApiJoin(ns[i], this, bd1, bd2, joins));
+                    tasks.add(new FrameApiJoin(ns[i], this, bd1, bd2));
                     i++;
                     if (i == ns.length) { i = 0; }
                 }
                 rbi.resetIterator();
             }
         }
-        logger.debug("SQL cursor is build: local tasks amount = "+tasks.size()+", use NC check = "+last);
+        logger.debug("SQL cursor is build: tasks amount = "+tasks.size()+", use NC check = "+last);
         if (!sent) {
-            for (Map.Entry<Integer, Map<String, FrameApiJoin>> entry : joins.entrySet()) {
-                final RemoteTask rt = new RemoteTask(cur, entry.getKey(), entry.getValue(), rightType);
-                exec.submit(rt);
+            for (Integer nodeId : ns) {
+                if (nodeId != Config.getConfig().LOCAL_NODE_ID) {
+                    final Map<String, FrameApiJoin> joins = new HashMap<>();
+                    for (FrameApiJoin j : tasks) {
+                        if (j.getNodeId() == nodeId) {
+                            joins.put(j.getKey(), j);
+                        }
+                    }
+                    final RemoteTask rt = new RemoteTask(cur, nodeId, joins, rightType);
+                    remotepool.submit(rt);
+                }
             }
             sent = true;
         }
@@ -224,26 +230,40 @@ public class SQLCursor implements FrameIterator {
 
     public void stream() throws Exception {
         final Queue<FrameApi> q = sfmap.get(lbi.getObjectId());
-        boolean cnue = true;
         if (!cur.isStream()) {
             logger.error("wrong stream method call: SQL statement is not a stream");
         }
         if (q == null) {
             throw new RuntimeException("internal error: queue not exist for object id = "+lbi.getObjectId());
         }
-        while (cnue) {
-            FrameApi f = q.poll();
-            if (f != null) {
-                FrameJoinTask task = new FrameJoinTask(cur, f, null, target, rscols, nc, id, Config.getConfig().LOCAL_NODE_ID, last, lbi.isLeftfs(), null, s);
-                final Future<List<Object>> ft = exec.submit(task);
-                for (Object o : ft.get()) {
-                    target.persist(o, s);
+        if (!(target instanceof StreamQueue)) {
+            throw new RuntimeException("internal error: wrong target type for object id = "+lbi.getObjectId());
+        }
+        s.setStream(true);
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    while (((StreamQueue) target).isRunning()) {
+                        FrameApi f = q.poll();
+                        if (f != null) {
+                            FrameJoinTask task = new FrameJoinTask(cur, f, null, target, rscols, nc, id, Config.getConfig().LOCAL_NODE_ID, last, lbi.isLeftfs(), null, s);
+                            final Future<List<Object>> ft = exec.submit(task);
+                            for (Object o : ft.get()) {
+                                target.persist(o, s);
+                            }
+                        }
+                        if (q.peek() == null) {
+                            Thread.sleep(100);
+                        }
+                    }
+                } catch (Exception e) {
+                    ((StreamQueue) target).stop(s);
+                    throw new RuntimeException(e);
                 }
             }
-            if (q.peek() == null) {
-                Thread.sleep(1000);
-            }
-        }
+        };
+        streampool.submit(r);
     }
 
     public static void addStreamFrame(FrameApi f) {
@@ -270,21 +290,33 @@ public class SQLCursor implements FrameIterator {
 
         while (!done && ret==null) {
             final ArrayList<Future<FrameApiJoin>> flist = new ArrayList<Future<FrameApiJoin>>();
+            final ArrayList<Future<FrameApiJoin>> flist2 = new ArrayList<Future<FrameApiJoin>>();
             try {
                 for (int i=0; i < BATCH_SIZE; i++) {
                     if ((ptr + i) < tasks.size()) {
                         final FrameApiJoin j = tasks.get(ptr + i);
-                        flist.add(exec.submit(j));
+                        if (j.getNodeId() == Config.getConfig().LOCAL_NODE_ID) {
+                            flist.add(exec.submit(j));
+                        } else {
+                            flist2.add(exec2.submit(j));
+                        }
                     }
                 }
                 for (Future<FrameApiJoin> f : flist) {
                     final FrameApiJoin j = f.get();
-                    final List<Object> ol = j.getResult();
-                    if (ol == null) {
-                        tasks_.add(j);
+                    logger.debug("SQL cursor next frame: the jointask call returned " + j.getResult().size() + " records");
+                    for (Object o : j.getResult()) {
+                        target.persist(o, s);
+                    }
+                }
+                for (Future<FrameApiJoin> f : flist2) {
+                    final FrameApiJoin j = f.get();
+                    if (j.isFailed()) {
+                        FrameApiJoin j_ = new FrameApiJoin(Config.getConfig().LOCAL_NODE_ID, this, j.getBd1(), j.getBd2());
+                        tasks_.add(j_);
                     } else {
-                        logger.debug("SQL cursor next frame: the jointask call returned " + ol.size() + " records");
-                        for (Object o : ol) {
+                        logger.debug("SQL cursor next frame: the jointask call returned " + j.getResult().size() + " records");
+                        for (Object o : j.getResult()) {
                             target.persist(o, s);
                         }
                     }

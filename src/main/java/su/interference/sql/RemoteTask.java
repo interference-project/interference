@@ -55,14 +55,15 @@ public class RemoteTask implements Callable<Boolean> {
     }
 
     public Boolean call() throws Exception {
-        Metrics.get("remoteTask").start();
         final TransportEvent transportEvent = new SQLEvent(nodeId, cur.getCursorId(), joins, rightType, 0, null, null, 0, true);
         TransportContext.getInstance().send(transportEvent);
         transportEvent.getLatch().await();
-        Metrics.get("remoteTask").stop();
         if (!transportEvent.isFail()) {
             final List<FrameApiJoin> rs = ((SQLEvent) transportEvent).getCallback().getResult().getResultSet();
             if (rs.size() != joins.size()) {
+                for (Map.Entry<String, FrameApiJoin> entry : joins.entrySet()) {
+                    entry.getValue().setFailed(true);
+                }
                 throw new InternalException();
             }
             Metrics.get("recordRCount").put(rs.size());
@@ -71,7 +72,7 @@ public class RemoteTask implements Callable<Boolean> {
             }
         } else {
             for (Map.Entry<String, FrameApiJoin> entry : joins.entrySet()) {
-                entry.getValue().setNodeId(Config.getConfig().LOCAL_NODE_ID);
+                entry.getValue().setFailed(true);
             }
         }
         return true;

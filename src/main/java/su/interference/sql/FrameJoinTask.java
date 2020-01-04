@@ -117,7 +117,6 @@ public class FrameJoinTask implements Callable<List<Object>> {
         }
 */
 
-        Metrics.get("localTask").start();
         final ArrayList<Object> drs1 = bd1.getFrameEntities(s);
         final ArrayList<Object> drs2 = bd2==null?null:bd2.getFrameEntities(s);
 
@@ -221,7 +220,10 @@ public class FrameJoinTask implements Callable<List<Object>> {
                     } else {
                         //one table loop
                         if (r == null) {
-                            res.add(o1); //target table is null -> result class is null -> returns generic entities
+                            //todo need to cast o1 to RS type
+                            //if (nc.checkNC(o1, sqlcid, last)) {
+                                res.add(o1); //target table is null -> result class is null -> returns generic entities
+                            //}
                         } else {
                             Object j = joinDataRecords(r, c1, c2, t1, t2, o1, null, cols, c1rs, s);
                             if (nc.checkNC(j, sqlcid, last)) {
@@ -240,7 +242,6 @@ public class FrameJoinTask implements Callable<List<Object>> {
                 }
             }
         }
-        Metrics.get("localTask").stop();
         Metrics.get("recordLCount").put(res.size());
         // logger.info(res.size()+" records returns from local node " + nodeId);
         return res;

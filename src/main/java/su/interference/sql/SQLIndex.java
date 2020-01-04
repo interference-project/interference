@@ -89,14 +89,14 @@ public class SQLIndex implements FrameIterator, Finder {
     }
 
     public FrameApi nextFrame() throws InternalException, ClassNotFoundException, MalformedURLException {
-        if (!merged||left) {
+        if (left) {
             if (hasNextFrame()) {
                 FrameData bd = frames.get(framecntr.get());
                 framecntr.incrementAndGet();
                 return new SQLIndexFrame(t, parent, bd, lkey, rkey, vc, left, unique, merged);
             }
         } else {
-            if (merged&&!returned.get()) {
+            if (!returned.get()) {
                 returned.compareAndSet(false, true);
                 return new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged);
             }
@@ -105,23 +105,23 @@ public class SQLIndex implements FrameIterator, Finder {
     }
 
     public void resetIterator() {
-        if (!merged||left) {
+        if (left) {
             if (!hasNextFrame()) {
                 framecntr.set(0);
             }
         }
-        if (merged&&returned.get()) {
+        if (returned.get()) {
             returned.compareAndSet(true, false);
         }
     }
 
     public boolean hasNextFrame() {
-        if (!merged||left) {
+        if (left) {
             if ((this.amount + this.cntrStart) > framecntr.get()) {
                 return true;
             }
         } else {
-            if (merged&&!returned.get()) {
+            if (!returned.get()) {
                 return true;
             }
         }
