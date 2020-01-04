@@ -44,7 +44,7 @@ public class FrameHolder {
     private final boolean persistent;
 
     public FrameHolder(ResultSet t) {
-        if (t.getClass().getName().equals("su.interference.persistent.Table")) {
+        if (t != null && t.getClass().getName().equals("su.interference.persistent.Table")) {
             Table tt = (Table)t;
             cframes = new AtomicReference[tt.getLbs().length];
             for (int i=0; i<tt.getLbs().length; i++) {

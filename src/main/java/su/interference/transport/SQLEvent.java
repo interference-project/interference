@@ -75,9 +75,9 @@ public class SQLEvent extends TransportEventImpl {
             final SQLJoinDispatcher d = c.getHmap();
             final FrameIterator rbi = d == null ? null : d.getRbi();
             final List<FrameApiJoin> res = new ArrayList<>();
-            FrameApi b_ = null;
             for (Map.Entry<String, FrameApiJoin> entry : joins.entrySet()) {
                 final FrameApiJoin j = entry.getValue();
+                FrameApi b_ = null;
                 if (j.getRightAllocId() == 0 && rbi != null && (rightType.equals("SQLHashMapFrame") || rightType.equals("SQLIndexFrame"))) {
                     rbi.resetIterator();
                     try {

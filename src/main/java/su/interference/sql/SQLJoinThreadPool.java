@@ -35,9 +35,13 @@ import java.util.concurrent.Executors;
 public class SQLJoinThreadPool {
 
     private static ExecutorService exec = Executors.newFixedThreadPool(8);
+    private static ExecutorService exec2 = Executors.newFixedThreadPool(8);
 
     public static ExecutorService getThreadPool() {
         return exec;
+    }
+    public static ExecutorService getThreadPool2() {
+        return exec2;
     }
 
 }

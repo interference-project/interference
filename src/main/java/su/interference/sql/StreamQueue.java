@@ -42,6 +42,20 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class StreamQueue implements ResultSet {
     //private final PriorityBlockingQueue<Comparable> q = new PriorityBlockingQueue();
     private final ConcurrentLinkedQueue<Object> q = new ConcurrentLinkedQueue();
+    private boolean running;
+
+    public StreamQueue() {
+        this.running = true;
+    }
+
+    public boolean isRunning() {
+        return running;
+    }
+
+    public void stop(Session s) {
+        this.running = false;
+        s.setStream(false);
+    }
 
     public DataChunk persist(Object o, Session s) throws Exception {
         q.add(o);

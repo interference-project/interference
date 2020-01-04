@@ -25,11 +25,12 @@
 package su.interference.sql;
 
 import su.interference.core.Config;
+import su.interference.metrics.Metrics;
 
 import java.io.Serializable;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * @author Yuriy Glotanov
@@ -37,34 +38,40 @@ import java.util.concurrent.Callable;
  */
 
 public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
-    private int nodeId;
+    private final int nodeId;
     private final transient SQLCursor cur;
     private final transient FrameApi bd1;
     private final transient FrameApi bd2;
     private final transient FrameJoinTask frameJoinTask;
     private final long leftAllocId;
     private final long rightAllocId;
+    private final transient CountDownLatch latch = new CountDownLatch(1);
     private List<Object> result;
+    private boolean failed;
 
-    public FrameApiJoin(int nodeId, SQLCursor cur, FrameApi bd1, FrameApi bd2, Map<Integer, Map<String, FrameApiJoin>> joins) {
+    public FrameApiJoin(int nodeId, SQLCursor cur, FrameApi bd1, FrameApi bd2) {
         this.nodeId = nodeId;
         this.cur = cur;
         this.bd1 = bd1;
         this.bd2 = bd2;
         this.leftAllocId = bd1.getAllocId();
-        this.rightAllocId = bd2 == null ? 0 : bd2.getAllocId();
+        this.rightAllocId = bd2 == null ? 0 : bd2 instanceof SQLIndexFrame ? 0 : bd2.getAllocId();
         if (nodeId == Config.getConfig().LOCAL_NODE_ID) {
             frameJoinTask = cur.buildFrameJoinTask(nodeId, bd1, bd2);
         } else {
             frameJoinTask = null;
-            joins.get(nodeId).put(this.getKey(), this);
         }
     }
 
     public FrameApiJoin call() throws Exception {
         if (nodeId == Config.getConfig().LOCAL_NODE_ID) {
-            final FrameJoinTask frameJoinTask = cur.buildFrameJoinTask(nodeId, bd1, bd2);
+            Metrics.get("localTask").start();
             result = frameJoinTask.call();
+            Metrics.get("localTask").stop();
+        } else {
+            Metrics.get("remoteTask").start();
+            latch.await();
+            Metrics.get("remoteTask").stop();
         }
         return this;
     }
@@ -87,14 +94,6 @@ public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
         return nodeId;
     }
 
-    public void setNodeId(int nodeId) {
-        this.nodeId = nodeId;
-    }
-
-    public FrameJoinTask getFrameJoinTask() {
-        return frameJoinTask;
-    }
-
     public long getLeftAllocId() {
         return leftAllocId;
     }
@@ -103,11 +102,29 @@ public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
         return rightAllocId;
     }
 
+    public FrameApi getBd1() {
+        return bd1;
+    }
+
+    public FrameApi getBd2() {
+        return bd2;
+    }
+
     public List<Object> getResult() {
         return result;
     }
 
     public void setResult(List<Object> result) {
         this.result = result;
+        latch.countDown();
+    }
+
+    public boolean isFailed() {
+        return failed;
+    }
+
+    public void setFailed(boolean failed) {
+        this.failed = failed;
+        latch.countDown();
     }
 }

@@ -111,6 +111,8 @@ public class Session {
 
     @Transient
     private final ExecutorService streampool = Executors.newCachedThreadPool();
+    @Transient
+    private volatile boolean stream;
 
     public static Session getContextSession() {
         return contextSession.get();
@@ -539,4 +541,11 @@ public class Session {
         Session.dntmSession = dntmSession;
     }
 
+    public boolean isStream() {
+        return stream;
+    }
+
+    public void setStream(boolean stream) {
+        this.stream = stream;
+    }
 }
