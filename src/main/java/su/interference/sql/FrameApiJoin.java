@@ -116,6 +116,10 @@ public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
 
     public void setResult(List<Object> result) {
         this.result = result;
+    }
+
+    public void setResultWithCountDown(List<Object> result) {
+        this.result = result;
         latch.countDown();
     }
 

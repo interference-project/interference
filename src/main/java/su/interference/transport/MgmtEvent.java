@@ -33,6 +33,8 @@ import org.slf4j.LoggerFactory;
  */
 
 public class MgmtEvent extends TransportEventImpl {
+
+    private final static long serialVersionUID = 436398796431755011L;
     private final static Logger logger = LoggerFactory.getLogger(MgmtEvent.class);
     public final static int MGMT_STARTUP = 1;
     public final static int MGMT_SHUTDOWN = 2;

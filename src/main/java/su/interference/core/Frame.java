@@ -527,7 +527,7 @@ public class Frame implements Comparable {
         if (dataObject==null) {
             dataObject = Instance.getInstance().getTableById(this.objectId);
         }
-        if (dataObject.isNoTran()) {
+        if (dataObject.isNoTran() || s.isStream()) {
 
             for (Chunk c : data.getChunks()) {
                 if (c.getHeader().getState()==Header.RECORD_NORMAL_STATE) {

@@ -105,8 +105,7 @@ public class SQLCursor implements FrameIterator {
             target = this.peristent ? s.registerTable(cur.getResultTargetName(), s, rscols, null, null, ixflag && last) : new ResultList(cur.getSqlStmt().getEntityTable());
         } else if (cur.getType() == Cursor.STREAM_TYPE) {
             target = new StreamQueue();
-        } else
-            {
+        } else {
             target = this.peristent ? s.registerTable("su.interference.persistent.R$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols, null, null, ixflag && last) : new ResultList(cur.getSqlStmt().getEntityTable());
         }
         current = new FrameHolder(target);

@@ -35,6 +35,7 @@ import su.interference.persistent.Transaction;
 
 public class CommandEvent extends TransportEventImpl implements PersistentEvent {
 
+    private final static long serialVersionUID = 4363987969365366565L;
     public static final int COMMIT = 1;
     public static final int ROLLBACK = 2;
     public static final int MAX_COMMAND = 10;
