@@ -43,6 +43,7 @@ import java.util.Map;
  */
 
 public class SQLEvent extends TransportEventImpl {
+    private final static long serialVersionUID = 436398796004891261L;
     private final static Logger logger = LoggerFactory.getLogger(SQLEvent.class);
     private final long cursorId;
     private final int targetId;

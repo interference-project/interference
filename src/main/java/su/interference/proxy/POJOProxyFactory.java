@@ -215,7 +215,7 @@ public class POJOProxyFactory {
                     sb.append(sparam);
                     sb.append("; }\n");
                 }
-                sb.append("    if (tran==null||(tran!=null&&tran.getTransType()==su.interference.persistent.Transaction.TRAN_THR)||(tran!=null&&tran.getTransId() == ");
+                sb.append("    if (session.isStream()||tran==null||(tran!=null&&tran.getTransType()==su.interference.persistent.Transaction.TRAN_THR)||(tran!=null&&tran.getTransId() == ");
                 sb.append("session.getTransaction().getTransId())) {\n");
                 sb.append("        return super.get");
                 sb.append(f[i].getName().substring(0,1).toUpperCase());

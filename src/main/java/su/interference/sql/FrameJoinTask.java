@@ -152,7 +152,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
                             if (hmap.skipCheckNC()) {
                                 res.add(j);
                             } else {
-                                if (nc.checkNC(j, sqlcid, last)) {
+                                if (nc.checkNC(j, sqlcid, last, s)) {
                                     res.add(j);
                                 }
                             }
@@ -193,7 +193,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
                                 if (hmap.skipCheckNC()) {
                                     res.add(j);
                                 } else {
-                                    if (nc.checkNC(j, sqlcid, last)) {
+                                    if (nc.checkNC(j, sqlcid, last, s)) {
                                         res.add(j);
                                     }
                                 }
@@ -211,7 +211,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
                                 if (hmap.skipCheckNC()) {
                                     res.add(j);
                                 } else {
-                                    if (nc.checkNC(j, sqlcid, last)) {
+                                    if (nc.checkNC(j, sqlcid, last, s)) {
                                         res.add(j);
                                     }
                                 }
@@ -221,12 +221,12 @@ public class FrameJoinTask implements Callable<List<Object>> {
                         //one table loop
                         if (r == null) {
                             //todo need to cast o1 to RS type
-                            //if (nc.checkNC(o1, sqlcid, last)) {
+                            if (nc.checkNC(o1, sqlcid, last, s)) {
                                 res.add(o1); //target table is null -> result class is null -> returns generic entities
-                            //}
+                            }
                         } else {
                             Object j = joinDataRecords(r, c1, c2, t1, t2, o1, null, cols, c1rs, s);
-                            if (nc.checkNC(j, sqlcid, last)) {
+                            if (nc.checkNC(j, sqlcid, last, s)) {
                                 res.add(j);
                             }
                         }
@@ -235,7 +235,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
                     //nested loop
                     for (Object o2 : drs2) {
                         Object j = joinDataRecords(r, c1, c2, t1, t2, o1, o2, cols, c1rs, s);
-                        if (nc.checkNC(j, sqlcid, last)) {
+                        if (nc.checkNC(j, sqlcid, last, s)) {
                             res.add(j);
                         }
                     }

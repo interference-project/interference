@@ -126,11 +126,9 @@ public class ValueCondition extends Condition {
                             } else { //integer
                                 String ct = cc.getColumn().getType().getName();
                                 if (ct.equals(Types.t_int)||ct.equals(Types.p_int)||ct.equals(Types.c_int)) {
-                                    this.values = new Object[1];
-                                    this.values[0] = Integer.parseInt(val);
+                                    this.values[i] = Integer.parseInt(val);
                                 } else if (ct.equals(Types.t_long)||ct.equals(Types.p_long)||ct.equals(Types.c_long)) {
-                                    this.values = new Object[1];
-                                    this.values[0] = Long.parseLong(val);
+                                    this.values[i] = Long.parseLong(val);
                                 } else {
                                     throw new InvalidConditionValue();
                                 }

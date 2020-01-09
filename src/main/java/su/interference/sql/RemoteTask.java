@@ -66,9 +66,9 @@ public class RemoteTask implements Callable<Boolean> {
                 }
                 throw new InternalException();
             }
-            Metrics.get("recordRCount").put(rs.size());
             for (FrameApiJoin j : rs) {
-                joins.get(j.getKey()).setResult(j.getResult());
+                joins.get(j.getKey()).setResultWithCountDown(j.getResult());
+                Metrics.get("recordRCount").put(j.getResult().size());
             }
         } else {
             for (Map.Entry<String, FrameApiJoin> entry : joins.entrySet()) {

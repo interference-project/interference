@@ -42,6 +42,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 
 public class SyncFrameEvent extends TransportEventImpl {
+
+    private final static long serialVersionUID = 436398796234081233L;
     private final static Logger logger = LoggerFactory.getLogger(SyncFrameEvent.class);
     private SyncFrame[] sb;
 
