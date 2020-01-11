@@ -529,10 +529,18 @@ public class Frame implements Comparable {
         }
         if (dataObject.isNoTran() || s.isStream()) {
 
+            final int streamptr = s.isStream() ? s.streamFramePtr(this) : 0;
+
             for (Chunk c : data.getChunks()) {
                 if (c.getHeader().getState()==Header.RECORD_NORMAL_STATE) {
-                    res.add(c);
+                    if (c.getHeader().getPtr() >= streamptr) {
+                        res.add(c);
+                    }
                 }
+            }
+
+            if (s.isStream()) {
+                s.streamFramePtr(this, rowCntr);
             }
 
         } else { //if (local()) {

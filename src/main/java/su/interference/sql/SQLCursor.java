@@ -55,6 +55,7 @@ public class SQLCursor implements FrameIterator {
     private ExecutorService exec2 = SQLJoinThreadPool.getThreadPool2();
     private ExecutorService remotepool = Executors.newCachedThreadPool();
     private ExecutorService streampool = Executors.newCachedThreadPool();
+    private ExecutorService groupspool = Executors.newCachedThreadPool();
     private List<FrameApiJoin> tasks;
     private List<FrameApiJoin> tasks_;
     private FrameData bdnext;
@@ -229,6 +230,7 @@ public class SQLCursor implements FrameIterator {
 
     public void stream() throws Exception {
         final Queue<FrameApi> q = sfmap.get(lbi.getObjectId());
+        final Table gtable = Instance.getInstance().getTableById(lbi.getObjectId());
         if (!cur.isStream()) {
             logger.error("wrong stream method call: SQL statement is not a stream");
         }
@@ -242,14 +244,27 @@ public class SQLCursor implements FrameIterator {
         Runnable r = new Runnable() {
             @Override
             public void run() {
+                Thread.currentThread().setName("Stream SQL thread "+Thread.currentThread().getId());
                 try {
+                    final ConcurrentLinkedQueue<Object> q_in = new ConcurrentLinkedQueue<>();
+                    FrameGroupTask group = null;
                     while (((StreamQueue) target).isRunning()) {
                         FrameApi f = q.poll();
                         if (f != null) {
                             FrameJoinTask task = new FrameJoinTask(cur, f, null, target, rscols, nc, id, Config.getConfig().LOCAL_NODE_ID, last, lbi.isLeftfs(), null, s);
                             final Future<List<Object>> ft = exec.submit(task);
-                            for (Object o : ft.get()) {
-                                target.persist(o, s);
+                            if (cur.getSqlStmt().isGroupedResult()) {
+                                if (group == null) {
+                                    group = new FrameGroupTask(cur, q_in, target, gtable, s);
+                                    groupspool.submit(group);
+                                }
+                                for (Object o : ft.get()) {
+                                    q_in.add(o);
+                                }
+                            } else {
+                                for (Object o : ft.get()) {
+                                    target.persist(o, s);
+                                }
                             }
                         }
                         if (q.peek() == null) {

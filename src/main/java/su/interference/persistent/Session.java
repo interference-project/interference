@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.persistence.*;
@@ -111,6 +112,8 @@ public class Session {
 
     @Transient
     private final ExecutorService streampool = Executors.newCachedThreadPool();
+    @Transient
+    private final Map<Long, Integer> streammap = new ConcurrentHashMap<>();
     @Transient
     private volatile boolean stream;
 
@@ -539,6 +542,14 @@ public class Session {
     public static void setDntmSession(Session dntmSession) {
         logger.info("set downtime session with id = "+dntmSession.getSessionId());
         Session.dntmSession = dntmSession;
+    }
+
+    public void streamFramePtr(Frame f, int ptr) {
+        streammap.put(f.getAllocFile()+f.getAllocPointer(), ptr);
+    }
+
+    public int streamFramePtr(Frame f) {
+        return streammap.get(f.getAllocFile()+f.getAllocPointer()) == null ? 0 : streammap.get(f.getAllocFile()+f.getAllocPointer());
     }
 
     public boolean isStream() {
