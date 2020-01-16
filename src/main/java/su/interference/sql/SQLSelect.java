@@ -383,6 +383,13 @@ public class SQLSelect implements SQLStatement {
         this.entityResult = entityResult;
     }
 
+    public boolean isGroupedResult() {
+        if (cols.getGroupColumns().size() > 0 || cols.getFResultColumns().size() > 0) {
+            return true;
+        }
+        return false;
+    }
+
     public Table getEntityTable() {
         return entityTable;
     }
