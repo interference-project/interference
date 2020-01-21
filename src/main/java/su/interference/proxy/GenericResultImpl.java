@@ -24,6 +24,9 @@
 
 package su.interference.proxy;
 
+import su.interference.core.DataChunk;
+import su.interference.persistent.Session;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
@@ -34,9 +37,37 @@ import java.lang.reflect.Method;
 
 public class GenericResultImpl implements GenericResult {
 
+    private DataChunk dataChunk;
+
+    public DataChunk getDataChunk(Session s) throws Exception {
+        if (dataChunk == null) {
+            dataChunk = new DataChunk(this, s);
+        }
+        return dataChunk;
+    }
+
     public Object getValueByName(String name) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
         Method m = this.getClass().getMethod("get"+name.substring(0,1).toUpperCase()+name.substring(1,name.length()), null);
         return m.invoke(this, null);
+    }
+
+    @Override
+    public String toString() {
+        final Method[] ms = this.getClass().getMethods();
+        final StringBuffer  sb = new StringBuffer();
+        try {
+            for (Method m : ms) {
+                if (m.getName().startsWith("get") && m.getParameterTypes().length == 0) {
+                    sb.append(m.getName().substring(3).substring(0, 1).toLowerCase());
+                    sb.append(m.getName().substring(3).substring(1));
+                    sb.append(":");
+                    sb.append(m.invoke(this, null));
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return sb.toString();
     }
 
 }

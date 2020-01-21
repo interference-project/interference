@@ -24,6 +24,7 @@
 
 package su.interference.sql;
 
+import su.interference.core.Chunk;
 import su.interference.exception.InternalException;
 import su.interference.persistent.Session;
 
@@ -40,11 +41,13 @@ public interface FrameApi {
     public static final int IMPL_DATA = 1;
     public static final int IMPL_INDEX = 2;
     public static final int IMPL_HASH = 3;
+    public static final int IMPL_CONTAINER = 4;
 
     long getFrameId();
     long getAllocId();
     int getObjectId();
     int getImpl();
+    ArrayList<Chunk> getFrameChunks(Session s) throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchMethodException;
     ArrayList<Object> getFrameEntities(Session s) throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchMethodException;
     boolean hasLiveTransaction(long transId);
     boolean hasLocalTransactions();

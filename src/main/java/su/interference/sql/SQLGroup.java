@@ -52,7 +52,7 @@ public class SQLGroup {
         }
     }
 
-    public void add (DataChunk c) throws ClassNotFoundException, IllegalAccessException, InternalException, MalformedURLException {
+    public void add (DataChunk c) throws InternalException {
         Object[] os = c.getDcs().getValueSet();
         if (os.length!=this.cols.size()) { throw new InternalException(); }
         for (int i=0; i<this.cols.size(); i++) {
@@ -62,7 +62,7 @@ public class SQLGroup {
         }
     }
 
-    public DataChunk getDC() throws ClassNotFoundException, IllegalAccessException, InternalException, MalformedURLException {
+    public DataChunk getDC() {
         for (int i=0; i<this.cols.size(); i++) {
             if (this.cols.get(i).getFtype()>0) {
                 this.dc.getDcs().getValueSet()[i] = fset[i].getResult();

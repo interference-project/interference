@@ -29,7 +29,6 @@ import org.slf4j.LoggerFactory;
 import su.interference.core.Config;
 import su.interference.core.Instance;
 import su.interference.exception.InternalException;
-import su.interference.persistent.Table;
 import su.interference.sql.SQLColumn;
 
 import javax.tools.*;
@@ -38,8 +37,8 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URLClassLoader;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -57,7 +56,7 @@ public class RSProxyFactory {
 
     public static RSProxyFactory getInstance() { return instance; }
 
-    public synchronized Class register (ArrayList<SQLColumn> cs, String name, boolean ixflag) throws ClassNotFoundException, InternalException, IOException {
+    public synchronized Class register (List<SQLColumn> cs, String name, boolean ixflag) throws ClassNotFoundException, InternalException, IOException {
         final ClassLoader cl = Thread.currentThread().getContextClassLoader();
         final String p = "su.interference.persistent";
 

@@ -28,6 +28,7 @@ import su.interference.core.Chunk;
 import su.interference.core.DataChunk;
 import su.interference.exception.InternalException;
 import su.interference.persistent.Session;
+import su.interference.persistent.Table;
 
 import java.net.MalformedURLException;
 import java.util.ArrayList;
@@ -41,11 +42,35 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class StreamQueue implements ResultSet {
     //private final PriorityBlockingQueue<Comparable> q = new PriorityBlockingQueue();
+    private final List<SQLColumn> rscols;
+    private final Table rstable;
     private final ConcurrentLinkedQueue<Object> q = new ConcurrentLinkedQueue();
+    private SQLColumn windowColumn;
+    private int windowInterval;
     private boolean running;
 
-    public StreamQueue() {
+    public StreamQueue(List<SQLColumn> rscols, Table rstable, SQLColumn windowColumn) {
+        this.rscols = rscols;
+        this.rstable = rstable;
+        this.windowColumn = windowColumn;
+        this.windowInterval = windowColumn.getWindowInterval();
         this.running = true;
+    }
+
+    public List<SQLColumn> getRscols() {
+        return rscols;
+    }
+
+    public Table getRstable() {
+        return rstable;
+    }
+
+    public SQLColumn getWindowColumn() {
+        return windowColumn;
+    }
+
+    public int getWindowInterval() {
+        return windowInterval;
     }
 
     public boolean isRunning() {

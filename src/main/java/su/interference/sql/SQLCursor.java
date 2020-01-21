@@ -64,7 +64,7 @@ public class SQLCursor implements FrameIterator {
     private boolean sent;
     private Cursor cur;
     private Session s;
-    private ArrayList<SQLColumn> rscols;
+    private List<SQLColumn> rscols;
     private NestedCondition nc;
     private boolean last;
     private boolean peristent;
@@ -82,7 +82,7 @@ public class SQLCursor implements FrameIterator {
     private static final int BATCH_SIZE = 4;
     private final static Logger logger = LoggerFactory.getLogger(SQLCursor.class);
 
-    public SQLCursor (int id, FrameIterator lbi, FrameIterator rbi, NestedCondition nc, ArrayList<SQLColumn> rscols, boolean ixflag, boolean last, Cursor cur, Session s) throws Exception {
+    public SQLCursor (int id, FrameIterator lbi, FrameIterator rbi, NestedCondition nc, List<SQLColumn> rscols, boolean ixflag, boolean last, Cursor cur, Session s) throws Exception {
         this.id = id;
         this.objectIds = new ArrayList<>();
         this.objectIds.addAll(lbi.getObjectIds());
@@ -105,7 +105,9 @@ public class SQLCursor implements FrameIterator {
         if (cur.getType() == Cursor.SLAVE_TYPE && cur.getResultTargetName() != null && this.id == 1) {
             target = this.peristent ? s.registerTable(cur.getResultTargetName(), s, rscols, null, null, ixflag && last) : new ResultList(cur.getSqlStmt().getEntityTable());
         } else if (cur.getType() == Cursor.STREAM_TYPE) {
-            target = new StreamQueue();
+            final List<SQLColumn> rscols_ = getIOTCList();
+            final Table rstable = this.peristent ? s.registerTable("su.interference.persistent.R$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols_, null, null, ixflag && last) : cur.getSqlStmt().getEntityTable();
+            target = new StreamQueue(rscols_, rstable, cur.getSqlStmt().getCols().getWindowColumn());
         } else {
             target = this.peristent ? s.registerTable("su.interference.persistent.R$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols, null, null, ixflag && last) : new ResultList(cur.getSqlStmt().getEntityTable());
         }
@@ -121,7 +123,7 @@ public class SQLCursor implements FrameIterator {
             for (SQLColumn sqlc : rscols) {
                 if (cursor_.getObjectIds().contains(sqlc.getObjectId())) {
                     final Table t_ = (Table) cursor_.getTarget();
-                    final SQLColumn sqlc_ = new SQLColumn(t_, sqlc.getId(), getTargetColumn(sqlc), sqlc.getAlias(), sqlc.getFtype(), sqlc.getLoc(), sqlc.getOrderOrd(), sqlc.getGroupOrd(), true, cursor_.isFurtherUseUC());
+                    final SQLColumn sqlc_ = new SQLColumn(t_, sqlc.getId(), getTargetColumn(sqlc), sqlc.getAlias(), sqlc.getFtype(), sqlc.getLoc(), sqlc.getOrderOrd(), sqlc.getGroupOrd(), sqlc.getWindowInterval(), true, cursor_.isFurtherUseUC());
                     rscols_.add(sqlc_);
                 } else {
                     rscols_.add(sqlc);
@@ -230,7 +232,6 @@ public class SQLCursor implements FrameIterator {
 
     public void stream() throws Exception {
         final Queue<FrameApi> q = sfmap.get(lbi.getObjectId());
-        final Table gtable = Instance.getInstance().getTableById(lbi.getObjectId());
         if (!cur.isStream()) {
             logger.error("wrong stream method call: SQL statement is not a stream");
         }
@@ -241,6 +242,7 @@ public class SQLCursor implements FrameIterator {
             throw new RuntimeException("internal error: wrong target type for object id = "+lbi.getObjectId());
         }
         s.setStream(true);
+        final Table gtable = ((StreamQueue) target).getRstable();
         Runnable r = new Runnable() {
             @Override
             public void run() {
@@ -251,7 +253,7 @@ public class SQLCursor implements FrameIterator {
                     while (((StreamQueue) target).isRunning()) {
                         FrameApi f = q.poll();
                         if (f != null) {
-                            FrameJoinTask task = new FrameJoinTask(cur, f, null, target, rscols, nc, id, Config.getConfig().LOCAL_NODE_ID, last, lbi.isLeftfs(), null, s);
+                            FrameJoinTask task = new FrameJoinTask(cur, f, null, target, ((StreamQueue) target).getRscols(), nc, id, Config.getConfig().LOCAL_NODE_ID, last, lbi.isLeftfs(), null, s);
                             final Future<List<Object>> ft = exec.submit(task);
                             if (cur.getSqlStmt().isGroupedResult()) {
                                 if (group == null) {
@@ -363,6 +365,23 @@ public class SQLCursor implements FrameIterator {
 
     public synchronized void resetIterator() {
         
+    }
+
+    private List<SQLColumn> getIOTCList() {
+        final List<SQLColumn> sl = cur.getSqlStmt().getCols().getColumns();
+        final List<SQLColumn> ml = cur.getSqlStmt().getCols().getGroupColumns();
+        final List<SQLColumn> res = new ArrayList<SQLColumn>();
+        res.addAll(ml); //first, add index columns
+        for (SQLColumn c : sl) {
+            boolean chk = true;
+            for (SQLColumn mc : ml) {
+                if (mc.getId()==c.getId()) {
+                    chk = false;
+                }
+            }
+            if (chk) res.add(c);
+        }
+        return res;
     }
 
     private Field getTargetColumn(SQLColumn c) throws NoSuchFieldException {

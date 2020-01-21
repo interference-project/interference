@@ -194,17 +194,20 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return (IndexFrame) frame;
     }
 
-    public synchronized ArrayList<Object> getFrameEntities(Session s)
-        throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchMethodException {
-        final ArrayList<Object> res = new ArrayList<Object>();
+    public synchronized ArrayList<Chunk> getFrameChunks(Session s)
+            throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException {
         if (getDataObject().isIndex()) {
-            for (Chunk c : getIndexFrame().getFrameChunks(s)) {
-                res.add(((DataChunk)c).getEntity());
-            }
+            return getIndexFrame().getFrameChunks(s);
         } else {
-            for (Chunk c : getDataFrame().getFrameChunks(s)) {
-                res.add(((DataChunk)c).getEntity());
-            }
+            return getDataFrame().getFrameChunks(s);
+        }
+    }
+
+    public synchronized ArrayList<Object> getFrameEntities(Session s)
+        throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException {
+        final ArrayList<Object> res = new ArrayList<>();
+        for (Chunk c : getFrameChunks(s)) {
+            res.add(((DataChunk)c).getEntity());
         }
         return res;
     }

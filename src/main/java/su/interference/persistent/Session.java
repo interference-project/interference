@@ -176,7 +176,7 @@ public class Session {
         return registerTable (n, s, null, null, null, false);
     }
 
-    public Table registerTable (String n, Session s, ArrayList<SQLColumn> cols, java.lang.reflect.Field[] flds, Table pt, boolean ixflag) throws Exception {
+    public Table registerTable (String n, Session s, List<SQLColumn> cols, java.lang.reflect.Field[] flds, Table pt, boolean ixflag) throws Exception {
         final ClassLoader cl = this.getClass().getClassLoader();
         final POJOProxyFactory ppf = POJOProxyFactory.getInstance();
         final RSProxyFactory rpf = RSProxyFactory.getInstance();

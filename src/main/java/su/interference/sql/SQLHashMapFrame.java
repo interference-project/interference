@@ -24,6 +24,7 @@
 
 package su.interference.sql;
 
+import su.interference.core.Chunk;
 import su.interference.exception.InternalException;
 import su.interference.persistent.Session;
 import su.interference.persistent.Table;
@@ -93,6 +94,10 @@ public class SQLHashMapFrame implements FrameApi, Finder {
 
     public int getObjectId() {
         return t.getObjectId();
+    }
+
+    public ArrayList<Chunk> getFrameChunks(Session s) {
+        return null;
     }
 
     public ArrayList<Object> getFrameEntities(Session s) {

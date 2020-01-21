@@ -25,6 +25,7 @@
 package su.interference.sql;
 
 import su.interference.persistent.Table;
+import su.interference.sqlexception.InvalidWindowByPart;
 import su.interference.sqlexception.MissingTablesDescription;
 import su.interference.sqlexception.AmbiguousColumnName;
 import su.interference.sqlexception.InvalidColumnDescription;
@@ -35,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.lang.reflect.Field;
 import java.net.MalformedURLException;
+import java.util.List;
 
 /**
  * @author Yuriy Glotanov
@@ -46,6 +48,7 @@ public class CList {
     public static final int LOC_WHERE = 2;
     public static final int LOC_ORDER = 3;
     public static final int LOC_GROUP = 4;
+    public static final int LOC_WINDOW = 5;
 
     private final ArrayList<SQLTable> tables;
     private final ArrayList<SQLColumn> columns;
@@ -84,14 +87,34 @@ public class CList {
         Field dbcolumn = null;
         int dbcolumnId = 0;
         Table dbtable = null;
-        if ((cf>0)&&(c.substring(c.length()-1,c.length()).equals(")"))) {
+        int windowInterval = 0;
+
+        if (cf>0 && c.substring(c.length()-1,c.length()).equals(")")) {
             column = c.trim().substring(c.indexOf("(")+1,c.length()-1);
             if (c.equals(alias)) {
                 alias = c.trim().substring(0,c.indexOf("("))+c.trim().substring(c.indexOf("(")+1,c.length()-1);
             }
         } else {
-            column = c.trim();
+            if (loc == LOC_WINDOW) {
+                if (c.toUpperCase().indexOf(SQLSelect.INTERVAL_CLAUSE)<=0) {
+                    throw new InvalidWindowByPart();
+                }
+                String[] intd = c.substring(c.toUpperCase().indexOf(SQLSelect.INTERVAL_CLAUSE)+SQLSelect.INTERVAL_CLAUSE.length()).split("=");
+                if (intd.length != 2) {
+                    throw new InvalidWindowByPart();
+                }
+                try {
+                    windowInterval = Integer.valueOf(intd[1].trim());
+                } catch (Exception e) {
+                    throw new InvalidWindowByPart();
+                }
+                column = c.trim().substring(0,c.toUpperCase().indexOf(SQLSelect.INTERVAL_CLAUSE)).trim();
+                alias = column;
+            } else {
+                column = c.trim();
+            }
         }
+
         String[] cldss = column.trim().split("\\.");
         if (cldss.length==1) { //column without prefix
             for (SQLTable st : this.tables) {
@@ -138,10 +161,14 @@ public class CList {
             for (SQLColumn cl : this.columns) {
                 if (cl.getId()==dbcolumnId) {
                     exists = true;
-                    if (loc==LOC_RESULT) { cl.setResult(true); }
-                    if (loc==LOC_WHERE)  { cl.setWhere (true); }
-                    if (loc==LOC_ORDER)  { cl.setOrder (true); cl.setOrderOrd(ord); }
-                    if (loc==LOC_GROUP)  { cl.setGroup (true); cl.setGroupOrd(ord); }
+                    if (loc==LOC_RESULT) { cl.setResult (true); }
+                    if (loc==LOC_WHERE) { cl.setWhere (true); }
+                    if (loc==LOC_ORDER) { cl.setOrder (true); cl.setOrderOrd(ord); }
+                    if (loc==LOC_GROUP) { cl.setGroup (true); cl.setGroupOrd(ord); }
+                    if (loc==LOC_WINDOW)  {
+                        cl.setWindow(true);
+                        cl.setWindowInterval(windowInterval);
+                    }
                     return cl;
                 }
             }
@@ -151,7 +178,9 @@ public class CList {
                 if (aldss.length==2) { //remove . from alias
                     al = aldss[0]+aldss[1];
                 }
-                SQLColumn sqlc = new SQLColumn(dbtable, dbcolumnId, dbcolumn, al, cf, loc, 0, 0, false, true);
+
+                SQLColumn sqlc = new SQLColumn(dbtable, dbcolumnId, dbcolumn, al, cf, loc, 0, 0, windowInterval, false, true);
+
                 this.columns.add(sqlc);
                 return sqlc;
             }
@@ -164,12 +193,12 @@ public class CList {
         Collections.sort(this.columns);
     }
 
-    public ArrayList<SQLColumn> getColumns() {
+    public List<SQLColumn> getColumns() {
         return columns;
     }
 
-    public ArrayList<Field> getResultColumns() {
-        final ArrayList<Field> res = new ArrayList<Field>();
+    public List<Field> getResultColumns() {
+        final List<Field> res = new ArrayList<Field>();
         for (SQLColumn sqlc : this.columns) {
             if (sqlc.isResult()) {
                 res.add(sqlc.getColumn());
@@ -178,8 +207,8 @@ public class CList {
         return res;
     }
 
-    public ArrayList<SQLColumn> getFResultColumns() {
-        final ArrayList<SQLColumn> res = new ArrayList<SQLColumn>();
+    public List<SQLColumn> getFResultColumns() {
+        final List<SQLColumn> res = new ArrayList<SQLColumn>();
         for (SQLColumn sqlc : this.columns) {
             if (sqlc.isResult()&&sqlc.getFtype()>0) {
                 res.add(sqlc);
@@ -188,8 +217,8 @@ public class CList {
         return res;
     }
 
-    public ArrayList<SQLColumn> getNoFResultColumns() {
-        final ArrayList<SQLColumn> res = new ArrayList<SQLColumn>();
+    public List<SQLColumn> getNoFResultColumns() {
+        final List<SQLColumn> res = new ArrayList<SQLColumn>();
         for (SQLColumn sqlc : this.columns) {
             if (sqlc.isResult()&&sqlc.getFtype()==0) {
                 res.add(sqlc);
@@ -198,8 +227,8 @@ public class CList {
         return res;
     }
 
-    public ArrayList<SQLColumn> getOrderColumns() {
-        final ArrayList<SQLColumn> res = new ArrayList<SQLColumn>();
+    public List<SQLColumn> getOrderColumns() {
+        final List<SQLColumn> res = new ArrayList<SQLColumn>();
         for (SQLColumn sqlc : this.columns) {
             if (sqlc.isOrder()) {
                 res.add(sqlc);
@@ -209,8 +238,8 @@ public class CList {
         return res;
     }
 
-    public ArrayList<SQLColumn> getGroupColumns() {
-        final ArrayList<SQLColumn> res = new ArrayList<SQLColumn>();
+    public List<SQLColumn> getGroupColumns() {
+        final List<SQLColumn> res = new ArrayList<SQLColumn>();
         for (SQLColumn sqlc : this.columns) {
             if (sqlc.isGroup()) {
                 res.add(sqlc);
@@ -218,6 +247,15 @@ public class CList {
         }
         Collections.sort(res, new ColumnGroupComparator());
         return res;
+    }
+
+    public SQLColumn getWindowColumn() {
+        for (SQLColumn sqlc : this.columns) {
+            if (sqlc.isWindow()) {
+                return sqlc;
+            }
+        }
+        return null;
     }
 
 }

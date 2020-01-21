@@ -97,6 +97,10 @@ public class SQLIndexFrame implements FrameApi, Finder {
         return parent.getObjectId();
     }
 
+    public ArrayList<Chunk> getFrameChunks(Session s) {
+        return null;
+    }
+
     public ArrayList<Object> getFrameEntities(Session s)
             throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchMethodException {
         //todo wrong condition???

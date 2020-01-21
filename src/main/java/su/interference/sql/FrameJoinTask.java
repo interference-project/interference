@@ -54,7 +54,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
     private final FrameApi bd1;
     private final FrameApi bd2;
     private final ResultSet target;
-    private final ArrayList<SQLColumn> cols;
+    private final List<SQLColumn> cols;
     private final NestedCondition nc;
     private final Session s;
     private final int nodeId;
@@ -73,7 +73,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
         cache.put("double", double.class);
     }
 
-    public FrameJoinTask(Cursor cur, FrameApi bd1, FrameApi bd2, ResultSet target, ArrayList<SQLColumn> cols, NestedCondition nc, int sqlcid, int nodeId, boolean last, boolean leftfs, SQLJoinDispatcher hmap, Session s) {
+    public FrameJoinTask(Cursor cur, FrameApi bd1, FrameApi bd2, ResultSet target, List<SQLColumn> cols, NestedCondition nc, int sqlcid, int nodeId, boolean last, boolean leftfs, SQLJoinDispatcher hmap, Session s) {
         this.cur = cur;
         this.bd1 = bd1;
         this.bd2 = bd2;
@@ -93,7 +93,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
     public List<Object> call() throws Exception {
         final Thread thread = Thread.currentThread();
         thread.setName("SQL join task " + thread.getId());
-        final Class r = target.getClass().getName().equals("su.interference.persistent.Table")?((Table)target).getSc():null;
+        final Class r = target instanceof Table ? ((Table)target).getSc() : target instanceof StreamQueue ? ((StreamQueue) target).getRstable().getSc() : null;
         final int t1 = bd1.getObjectId();
         final int t2 = bd2==null?0:bd2.getObjectId();
         final Class c1 = Instance.getInstance().getTableById(t1).getTableClass();
@@ -247,7 +247,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
         return res;
     }
 
-    public Object joinDataRecords (Class r, Class c1, Class c2, int t1, int t2, Object o1, Object o2, ArrayList<SQLColumn> cols, boolean isrs, Session s)
+    public Object joinDataRecords (Class r, Class c1, Class c2, int t1, int t2, Object o1, Object o2, List<SQLColumn> cols, boolean isrs, Session s)
         throws NoSuchMethodException, IllegalAccessException, InstantiationException, InvocationTargetException, MalformedURLException, ClassNotFoundException {
         final GenericResult ret = (GenericResult)r.newInstance();
         if (isrs) {
