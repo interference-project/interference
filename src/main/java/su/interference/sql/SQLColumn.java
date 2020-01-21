@@ -54,8 +54,10 @@ public class SQLColumn implements Comparable {
     private boolean where;
     private boolean order;
     private boolean group;
+    private boolean window;
     private int orderOrd;
     private int groupOrd;
+    private int windowInterval;
     //private Index   index;
     private final int ftype;
     private final int loc;
@@ -65,10 +67,10 @@ public class SQLColumn implements Comparable {
 
     // group function
     public static final int F_COUNT = 100;
-    public static final int F_SUM   = 101;
-    public static final int F_MIN   = 102;
-    public static final int F_MAX   = 103;
-    public static final int F_AVG   = 104;
+    public static final int F_SUM = 101;
+    public static final int F_MIN = 102;
+    public static final int F_MAX = 103;
+    public static final int F_AVG = 104;
 
     // other function
     public static final int F_GENERIC = 1;
@@ -76,18 +78,20 @@ public class SQLColumn implements Comparable {
     public static final int F_TO_CHAR = 3;
     public static final int F_TO_DATE = 4;
 
-    public SQLColumn (Table table, int columnid, Field c, String alias, int ftype, int loc, int orderOrd, int groupOrd, boolean cursor, boolean useUC) {
-        this.table    = table;
+    public SQLColumn (Table table, int columnid, Field c, String alias, int ftype, int loc, int orderOrd, int groupOrd, int windowInterval, boolean cursor, boolean useUC) {
+        this.table = table;
         this.objectId = table.getObjectId();
-        this.id       = columnid;
-        this.column   = c;
-        this.alias    = alias;
-        this.ftype    = ftype;
-        this.loc      = loc;
+        this.id = columnid;
+        this.column = c;
+        this.alias = alias;
+        this.ftype = ftype;
+        this.loc = loc;
         if (loc==CList.LOC_RESULT) { this.result = true; }
-        if (loc==CList.LOC_WHERE)  { this.where  = true; } 
-        if (loc==CList.LOC_ORDER)  { this.order  = true; }
-        if (loc==CList.LOC_GROUP)  { this.group  = true; }
+        if (loc==CList.LOC_WHERE) { this.where = true; }
+        if (loc==CList.LOC_ORDER) { this.order = true; }
+        if (loc==CList.LOC_GROUP) { this.group = true; }
+        if (loc==CList.LOC_WINDOW)  { this.window = true; }
+        this.windowInterval = windowInterval;
         this.cursor = cursor;
         this.useUC = useUC;
     }
@@ -217,6 +221,22 @@ public class SQLColumn implements Comparable {
 
     public void setGroup(boolean group) {
         this.group = group;
+    }
+
+    public boolean isWindow() {
+        return window;
+    }
+
+    public void setWindow(boolean window) {
+        this.window = window;
+    }
+
+    public int getWindowInterval() {
+        return windowInterval;
+    }
+
+    public void setWindowInterval(int windowInterval) {
+        this.windowInterval = windowInterval;
     }
 
     public int getOrderOrd() {

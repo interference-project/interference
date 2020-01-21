@@ -31,6 +31,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.persistent.*;
 import su.interference.exception.*;
+import su.interference.sql.ContainerFrame;
+import su.interference.sql.FrameApi;
 import su.interference.sql.SQLCursor;
 import su.interference.transport.TransportSyncTask;
 
@@ -60,20 +62,30 @@ public class SyncQueue implements Runnable, ManageProcess {
         final int famt = Storage.getStorage().getFiles()==null?0:Storage.getStorage().getFiles().size();
         logger.debug("sync procedure was started with frames amount="+LLT.getFrames().size());
 
-        final ArrayList<SyncFrame> frames = new ArrayList<SyncFrame>();
-        final ArrayList<FreeFrame> fframes = new ArrayList<FreeFrame>();
+        final ArrayList<SyncFrame> frames = new ArrayList<>();
+        final Map<Integer, List<FrameApi>> frames_ = new HashMap<>();
+        final ArrayList<FreeFrame> fframes = new ArrayList<>();
         final Session s = Session.getDntmSession();
-        for (Map.Entry entry : LLT.getFrames().entrySet()) {
+
+        for (Map.Entry<Long, Frame> entry : LLT.getFrames().entrySet()) {
             FreeFrame fb = null;
             try {
-                frames.add(new SyncFrame((Frame) entry.getValue(), s, fb));
-                SQLCursor.addStreamFrame(((Frame) entry.getValue()).getFrameData());
+                final Frame f = entry.getValue();
+                frames.add(new SyncFrame(f, s, fb));
+                if (frames_.get(f.getObjectId()) == null) {
+                    frames_.put(f.getObjectId(), new ArrayList<>());
+                }
+                frames_.get(f.getObjectId()).add(f.getFrameData());
             } catch (MissingSyncFrameException e) {
                 logger.debug("Unable to sync frame "+((Frame) entry.getValue()).getPtr()+" because removed by freeing");
             }
             if (fb!=null) {
                 fframes.add(fb);
             }
+        }
+
+        for (Map.Entry<Integer, List<FrameApi>> entry: frames_.entrySet()) {
+            SQLCursor.addStreamFrame(new ContainerFrame(entry.getKey(), entry.getValue()));
         }
 
         SyncTask[] tasklist = new SyncTask[famt];

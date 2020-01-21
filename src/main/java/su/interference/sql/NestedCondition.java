@@ -593,7 +593,7 @@ public class NestedCondition extends Condition {
         return res;
     }
 
-    public SQLJoinDispatcher getJoinDispatcher(FrameIterator lbi, FrameIterator rbi, ArrayList<SQLColumn> rscols, Session s) throws IOException, ClassNotFoundException, InternalException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    public SQLJoinDispatcher getJoinDispatcher(FrameIterator lbi, FrameIterator rbi, List<SQLColumn> rscols, Session s) throws IOException, ClassNotFoundException, InternalException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         ArrayList<Condition> cs = this.conditions;
         int ctype = this.type;
         //in cursor we can not guaranteed uniqueness of base unique field
@@ -663,7 +663,7 @@ public class NestedCondition extends Condition {
         return null;
     }
 
-    private SQLColumn getSQLColumnByAlias(ArrayList<SQLColumn> rscols, String alias) {
+    private SQLColumn getSQLColumnByAlias(List<SQLColumn> rscols, String alias) {
         for (SQLColumn sqlc : rscols) {
             if (sqlc.getAlias().equals(alias)) {
                 return sqlc;

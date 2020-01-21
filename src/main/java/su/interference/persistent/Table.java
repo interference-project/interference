@@ -1400,7 +1400,7 @@ public class Table implements DataObject, ResultSet {
                     final List<FrameData> bds = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
                     for (FrameData b : bds) {
                         for (Chunk dc : b.getDataFrame().getFrameChunks(s)) {
-                            if (Arrays.equals(id, ((DataChunk)dc).getId(s))) {
+                            if (Arrays.equals(id, ((DataChunk)dc).getSerializedId(s))) {
                                 return (DataChunk)dc;
                             }
                         }
@@ -1430,7 +1430,7 @@ public class Table implements DataObject, ResultSet {
                         final List<FrameData> bds = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
                         for (FrameData b : bds) {
                             for (Chunk dc : b.getDataFrame().getFrameChunks(s)) {
-                                if (Arrays.equals(id, ((DataChunk) dc).getId(s))) {
+                                if (Arrays.equals(id, ((DataChunk) dc).getSerializedId(s))) {
                                     return (DataChunk) dc;
                                 }
                             }
@@ -1476,7 +1476,7 @@ public class Table implements DataObject, ResultSet {
                 List<FrameData> bds = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
                 for (FrameData b : bds) {
                     for (Chunk c : b.getDataFrame().getFrameChunks(s)) {
-                        if (Arrays.equals(iid, ((DataChunk) c).getId(s))) {
+                        if (Arrays.equals(iid, ((DataChunk) c).getSerializedId(s))) {
                             return (DataChunk) c;
                         }
                     }

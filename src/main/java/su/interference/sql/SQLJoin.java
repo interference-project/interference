@@ -42,12 +42,12 @@ public class SQLJoin {
     private final NestedCondition nc;
     private final Cursor cur;
     private int resultId;
-    private ArrayList<SQLColumn> rscols;
+    private List<SQLColumn> rscols;
     private ArrayList<SQLCursor> preparedCursors;
     private int targetId;
-    private final ArrayList<SQLColumn> ocs;
-    private final ArrayList<SQLColumn> gcs;
-    private final ArrayList<SQLColumn> fcs;
+    private final List<SQLColumn> ocs;
+    private final List<SQLColumn> gcs;
+    private final List<SQLColumn> fcs;
     private Table gtemp;
 
     public SQLJoin (ArrayList<SQLTable> tables, CList columns, NestedCondition nc, Cursor cur, Session s) throws Exception {
@@ -203,8 +203,8 @@ public class SQLJoin {
         return res;
     }
 
-    public ArrayList<SQLColumn> getIOTCList(ArrayList<SQLColumn> ml, ArrayList<SQLColumn> sl) {
-        final ArrayList<SQLColumn> res = new ArrayList<SQLColumn>();
+    public List<SQLColumn> getIOTCList(List<SQLColumn> ml, List<SQLColumn> sl) {
+        final List<SQLColumn> res = new ArrayList<>();
         res.addAll(ml); //first, add index columns
         for (SQLColumn c : sl) {
             boolean chk = true;

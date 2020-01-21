@@ -47,6 +47,9 @@ public class SQLSelect implements SQLStatement {
     private static final String WHERE_CLAUSE = " WHERE ";
     private static final String ORDERBY_CLAUSE = " ORDER BY ";
     private static final String GROUPBY_CLAUSE = " GROUP BY ";
+    private static final String HAVING_CLAUSE = " HAVING ";
+    private static final String WINDOWBY_CLAUSE = " WINDOW BY ";
+    public static final String INTERVAL_CLAUSE = "INTERVAL";
 
     private final static Logger logger = LoggerFactory.getLogger(SQLSelect.class);
     private Cursor              cursor;
@@ -175,16 +178,19 @@ public class SQLSelect implements SQLStatement {
         if (SQL.indexOf(WHERE_CLAUSE)>=0) {
             baselen = SQL.indexOf(WHERE_CLAUSE);
         }
-        if ((SQL.indexOf(ORDERBY_CLAUSE)>=0)&&(baselen>SQL.indexOf(ORDERBY_CLAUSE))) {
+        if (SQL.indexOf(ORDERBY_CLAUSE)>=0 && baselen>SQL.indexOf(ORDERBY_CLAUSE)) {
             baselen = SQL.indexOf(ORDERBY_CLAUSE);
         }
-        if ((SQL.indexOf(GROUPBY_CLAUSE)>=0)&&(baselen>SQL.indexOf(GROUPBY_CLAUSE))) {
+        if (SQL.indexOf(GROUPBY_CLAUSE)>=0 && baselen>SQL.indexOf(GROUPBY_CLAUSE)) {
             baselen = SQL.indexOf(GROUPBY_CLAUSE);
         }
-        if (baselen<SQL.indexOf(FROM_CLAUSE)+6) {
+        if (SQL.indexOf(WINDOWBY_CLAUSE)>=0 && baselen>SQL.indexOf(WINDOWBY_CLAUSE)) {
+            baselen = SQL.indexOf(WINDOWBY_CLAUSE);
+        }
+        if (baselen < SQL.indexOf(FROM_CLAUSE) + 6) {
             throw new MissingTablesDescription();
         } else {
-            if (sql.substring(SQL.indexOf(FROM_CLAUSE)+6, baselen).trim().equals("")) {
+            if (sql.substring(SQL.indexOf(FROM_CLAUSE) + 6, baselen).trim().equals("")) {
                 throw new MissingTablesDescription();
             }
         }
@@ -198,30 +204,44 @@ public class SQLSelect implements SQLStatement {
         final int wpos = SQL.indexOf(WHERE_CLAUSE);
         final int opos = SQL.indexOf(ORDERBY_CLAUSE);
         final int gpos = SQL.indexOf(GROUPBY_CLAUSE);
+        final int xpos = SQL.indexOf(WINDOWBY_CLAUSE);
 
-        if ((wpos>=0)&&(opos>=0)) {
-            if (wpos>opos) {
+        if (wpos>=0 && opos>=0) {
+            if (wpos > opos) {
                 throw new InvalidSQLStatement();
             }
         }
-        if ((wpos>=0)&&(gpos>=0)) {
-            if (wpos>gpos) {
+        if (wpos>=0 && gpos>=0) {
+            if (wpos > gpos) {
                 throw new InvalidSQLStatement();
             }
         }
-        if ((opos>=0)&&(gpos>=0)) {
-            if (opos<gpos) {
+        if (wpos>=0 && xpos>=0) {
+            if (wpos > xpos) {
+                throw new InvalidSQLStatement();
+            }
+        }
+        if (opos>=0 && gpos>=0) {
+            if (opos < gpos) {
+                throw new InvalidSQLStatement();
+            }
+        }
+        if (opos>=0 || gpos>=0) {
+            if (xpos > 0) {
                 throw new InvalidSQLStatement();
             }
         }
 
         baselen = sql.length();
 
-        if ((SQL.indexOf(ORDERBY_CLAUSE)>=0)&&(baselen>SQL.indexOf(ORDERBY_CLAUSE))) {
+        if (SQL.indexOf(ORDERBY_CLAUSE)>=0 && baselen>SQL.indexOf(ORDERBY_CLAUSE)) {
             baselen = SQL.indexOf(ORDERBY_CLAUSE);
         }
-        if ((SQL.indexOf(GROUPBY_CLAUSE)>=0)&&(baselen>SQL.indexOf(GROUPBY_CLAUSE))) {
+        if (SQL.indexOf(GROUPBY_CLAUSE)>=0 && baselen>SQL.indexOf(GROUPBY_CLAUSE)) {
             baselen = SQL.indexOf(GROUPBY_CLAUSE);
+        }
+        if (SQL.indexOf(WINDOWBY_CLAUSE)>=0 && baselen>SQL.indexOf(WINDOWBY_CLAUSE)) {
+            baselen = SQL.indexOf(WINDOWBY_CLAUSE);
         }
 
         // parsing tables
@@ -261,8 +281,9 @@ public class SQLSelect implements SQLStatement {
 
         final String ord = opos>=0?sql.substring(opos+10, baselen):"";
         final String grd = gpos>=0?sql.substring(gpos+10):"";
+        final String wnd = xpos>=0?sql.substring(xpos+11):"";
 
-        if (!(ord.trim().equals(""))) {
+        if (!ord.trim().equals("")) {
             String[] ords = ord.trim().split(",");
             int ord_ = 1;
             for (String ordr : ords) {
@@ -275,7 +296,7 @@ public class SQLSelect implements SQLStatement {
             }
         }
 
-        if (!(grd.trim().equals(""))) {
+        if (!grd.trim().equals("")) {
             String[] grds = grd.trim().split(",");
             int ord_ = 1;
             for (String grp : grds) {
@@ -288,19 +309,27 @@ public class SQLSelect implements SQLStatement {
             }
         }
 
+        if (!wnd.trim().equals("")) {
+            try {
+                cols.check(wnd.trim(), wnd.trim(), CList.LOC_WINDOW, 1);
+            } catch (SQLException e) {
+                throw new InvalidGroupByPart();
+            }
+        }
+
         //group checks
-        final ArrayList<SQLColumn> rscl = this.cols.getNoFResultColumns();
-        final ArrayList<SQLColumn> frcl = this.cols.getFResultColumns();
-        final ArrayList<SQLColumn> grcl = this.cols.getGroupColumns();
+        final List<SQLColumn> rscl = this.cols.getNoFResultColumns();
+        final List<SQLColumn> frcl = this.cols.getFResultColumns();
+        final List<SQLColumn> grcl = this.cols.getGroupColumns();
 
         //check group functions
-        if (frcl.size()==0&&grcl.size()>0) {
+        if (frcl.size()==0 && grcl.size()>0) {
             throw new InvalidGroupColumnSet();
         }
 
         //check group functions
-        if (frcl.size()>0&&grcl.size()==0) {
-            if (rscl.size()>0) {
+        if (frcl.size()>0 && grcl.size()==0) {
+            if (rscl.size() > 0) {
                 throw new InvalidGroupColumnSet();
             }
         }

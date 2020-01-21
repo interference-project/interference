@@ -57,7 +57,8 @@ public class DataChunk implements Chunk {
     //cache-dependency parameters
     private volatile byte[] chunk;
     private volatile ValueSet dcs; //datacolumn set
-    private byte[] id;
+    private Comparable id;
+    private byte[] serializedId;
     private Object entity;
     private Object undoentity;
     private DataChunk source;
@@ -111,8 +112,8 @@ public class DataChunk implements Chunk {
         return t;
     }
 
-    public byte[] getId (Session s) throws InvocationTargetException, NoSuchMethodException, ClassNotFoundException, InstantiationException, IllegalAccessException, UnsupportedEncodingException, InternalException {
-        if (id==null) {
+    public Comparable getId (Session s) throws InvocationTargetException, NoSuchMethodException, IllegalAccessException {
+        if (serializedId==null) {
             if (entity==null) {
                 getEntity();
             }
@@ -130,16 +131,49 @@ public class DataChunk implements Chunk {
                     if (sa!=null) {
                         Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), null);
                         Object v = z.invoke(entity, null);
-                        id = sr.serialize(f[i].getType().getName(), v);
+                        id = (Comparable) v;
                     } else {
                         Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), new Class<?>[]{Session.class});
                         Object v = z.invoke(entity, new Object[]{s});
-                        id = sr.serialize(f[i].getType().getName(), v);
+                        id = (Comparable) v;
                     }
                 }
             }
         }
         return id;
+    }
+
+    public byte[] getSerializedId (Session s) throws InvocationTargetException, NoSuchMethodException, ClassNotFoundException, InstantiationException, IllegalAccessException, UnsupportedEncodingException, InternalException {
+        if (serializedId==null) {
+            if (entity==null) {
+                getEntity();
+            }
+            Class c = entity.getClass();
+            final TransEntity ta = (TransEntity)c.getAnnotation(TransEntity.class);
+            final SystemEntity sa = (SystemEntity)c.getAnnotation(SystemEntity.class);
+            if (ta!=null) {
+                //for Transactional Wrapper Entity we must get superclass (original Entity class)
+                c = c.getSuperclass();
+            }
+            Field[] f = c.getDeclaredFields();
+            for (int i=0; i<f.length; i++) {
+                final Id a = f[i].getAnnotation(Id.class);
+                if (a!=null) {
+                    if (sa!=null) {
+                        Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), null);
+                        Object v = z.invoke(entity, null);
+                        id = (Comparable) v;
+                        serializedId = sr.serialize(f[i].getType().getName(), v);
+                    } else {
+                        Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), new Class<?>[]{Session.class});
+                        Object v = z.invoke(entity, new Object[]{s});
+                        id = (Comparable) v;
+                        serializedId = sr.serialize(f[i].getType().getName(), v);
+                    }
+                }
+            }
+        }
+        return serializedId;
     }
     
     public int getBytesAmount() {
@@ -243,11 +277,13 @@ public class DataChunk implements Chunk {
                 if (sa!=null) {
                     final Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), null);
                     final Object v = z.invoke(o, null);
-                    id = sr.serialize(f[i].getType().getName(), v);
+                    id = (Comparable) v;
+                    serializedId = sr.serialize(f[i].getType().getName(), v);
                 } else {
                     final Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), new Class<?>[]{Session.class});
                     final Object v = z.invoke(o, new Object[]{s});
-                    id = sr.serialize(f[i].getType().getName(), v);
+                    id = (Comparable) v;
+                    serializedId = sr.serialize(f[i].getType().getName(), v);
                 }
             }
         }
@@ -322,13 +358,16 @@ public class DataChunk implements Chunk {
             //All var length types is non-primitive
             final byte[] data = bs.substring(s+v, s+v+(Types.isVarType(cs[i])?bs.getIntFromBytes(bs.substring(s,s+v)):Types.getLength(cs[i])));
             if (a!=null) {
-                id = data;
+                serializedId = data;
             }
             try {
                 if (Modifier.isPrivate(m)) {
                     cs[i].setAccessible(true);
                 }
                 dcs.getValueSet()[i] = sr.deserialize(data, cs[i]);
+                if (a!=null) {
+                    id = (Comparable) dcs.getValueSet()[i];
+                }
             } catch (UnsupportedEncodingException e) {
                 dcs.getValueSet()[i] = "UnsupportedEncodingException";
             }
@@ -353,13 +392,16 @@ public class DataChunk implements Chunk {
             //All var length types is non-primitive
             final byte[] data = bs.substring(s+v, s+v+(Types.isVarType(cs[i])?bs.getIntFromBytes(bs.substring(s,s+v)):Types.getLength(cs[i])));
             if (a!=null) {
-                id = data;
+                serializedId = data;
             }
             try {
                 if (Modifier.isPrivate(m)) {
                     cs[i].setAccessible(true);
                 }
                 dcs.getValueSet()[i] = sr.deserialize(data, cs[i]);
+                if (a!=null) {
+                    id = (Comparable) dcs.getValueSet()[i];
+                }
             } catch (UnsupportedEncodingException e) {
                 dcs.getValueSet()[i] = "UnsupportedEncodingException";
             }
@@ -387,13 +429,16 @@ public class DataChunk implements Chunk {
             //All var length types is non-primitive
             final byte[] data = bs.substring(s+v, s+v+(Types.isVarType(cs[i])?bs.getIntFromBytes(bs.substring(s,s+v)):Types.getLength(cs[i])));
             if (a!=null) {
-                id = data;
+                serializedId = data;
             }
             try {
                 if (Modifier.isPrivate(m)) {
                     cs[i].setAccessible(true);
                 }
                 dcs.getValueSet()[i] = sr.deserialize(data, cs[i]);
+                if (a!=null) {
+                    id = (Comparable) dcs.getValueSet()[i];
+                }
             } catch (UnsupportedEncodingException e) {
                 dcs.getValueSet()[i] = "UnsupportedEncodingException";
             }
@@ -450,11 +495,13 @@ public class DataChunk implements Chunk {
                 if (sa!=null) {
                     final Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), null);
                     final Object v = z.invoke(this.entity, null);
-                    id = sr.serialize(f[i].getType().getName(), v);
+                    id = (Comparable) v;
+                    serializedId = sr.serialize(f[i].getType().getName(), v);
                 } else {
                     final Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), new Class<?>[]{Session.class});
                     final Object v = z.invoke(this.entity, new Object[]{s});
-                    id = sr.serialize(f[i].getType().getName(), v);
+                    id = (Comparable) v;
+                    serializedId = sr.serialize(f[i].getType().getName(), v);
                 }
             }
         }
