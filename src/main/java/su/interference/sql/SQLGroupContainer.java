@@ -117,9 +117,6 @@ public class SQLGroupContainer {
     private DataChunk add2Window(DataChunk c) throws InternalException {
         if (c != null) {
             w_.add(c);
-            if (dc == null) {
-                dc = c;
-            }
         }
         if (w_.size() < wcolumnInterval) {
             return null;
@@ -129,6 +126,9 @@ public class SQLGroupContainer {
             }
             if (w_.size() != wcolumnInterval) {
                 throw new InternalException();
+            }
+            if (dc == null) {
+                dc = w_.get(0);
             }
             for (DataChunk c_ : w_) {
                 final Object[] os = c_.getDcs().getValueSet();
