@@ -36,6 +36,9 @@ import su.interference.persistent.Table;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 
 /**
@@ -45,27 +48,86 @@ import java.util.concurrent.PriorityBlockingQueue;
 
 public class ResultSetImpl implements ResultSet {
     private final static Logger logger = LoggerFactory.getLogger(ResultSetImpl.class);
+    public static final int RS_QUEUE_SIZE = 1000;
     private final Table target;
-    private final PriorityBlockingQueue q = new PriorityBlockingQueue(1000);
+    private final boolean persistent;
+    private final LinkedBlockingQueue q = new LinkedBlockingQueue(RS_QUEUE_SIZE);
+    private boolean started;
+    private boolean done;
+    private CountDownLatch latch;
+    private final SQLCursor sqlc;
+    private Queue<Chunk> q_;
 
-    public ResultSetImpl(Table target) {
+    public ResultSetImpl(Table target, SQLCursor sqlc, boolean persistent) {
         this.target = target;
+        this.persistent = persistent;
+        this.sqlc = sqlc;
     }
 
+    //todo may produce critical side effects after latch release
+    //todo need refactoring
     public DataChunk persist(Object o, Session s) throws Exception {
+        if (persistent) {
+            return target.persist(o, s);
+        } else {
+            final boolean success = q.offer(o);
+            if (!success) {
+                latch.countDown();
+                q.put(o);
+            }
+        }
         return null;
     }
 
-    public Object poll() {
-        return null;
+    public Object poll(Session s) throws Exception {
+        if (!started) {
+            if (sqlc != null) {
+                sqlc.flushTarget();
+                latch = new CountDownLatch(1);
+            }
+            if (latch != null) {
+                latch.await();
+            }
+            started = true;
+        }
+        if (persistent) {
+            return target.poll(s);
+        } else {
+            return q.poll();
+        }
     }
 
-    public List<Chunk> getAll(Session s) throws Exception {
-        return null;
+    public Chunk cpoll(Session s) throws Exception {
+        if (!started) {
+            if (sqlc != null) {
+                sqlc.flushTarget();
+                latch = new CountDownLatch(1);
+            }
+            if (latch != null) {
+                latch.await();
+            }
+            started = true;
+        }
+        if (persistent) {
+            return target.cpoll(s);
+        } else {
+            return null;
+        }
     }
 
-    public ArrayList<Object> getAll(Session s, int ptr) throws Exception {
-        return null;
+    public Table getTarget() {
+        return target;
+    }
+
+    public boolean isDone() {
+        return done;
+    }
+
+    public void setDone(boolean done) {
+        if (latch != null) {
+            latch.countDown();
+        }
+        this.done = done;
     }
 
     public int getObjectId() {

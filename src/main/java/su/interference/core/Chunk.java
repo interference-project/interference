@@ -45,6 +45,8 @@ public interface Chunk extends Comparable {
     int getBytesAmount();
     Comparable getId (Session s) throws InvocationTargetException, NoSuchMethodException, IllegalAccessException;
     ValueSet getDcs();
+    boolean isTerminate();
+    void setTerminate(boolean terminate);
     Object getEntity() throws ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException;
     Object getUndoEntity() throws ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException;
     void updateEntity(Object o) throws InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException, MalformedURLException;

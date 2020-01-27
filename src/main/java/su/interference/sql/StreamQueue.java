@@ -53,7 +53,7 @@ public class StreamQueue implements ResultSet {
         this.rscols = rscols;
         this.rstable = rstable;
         this.windowColumn = windowColumn;
-        this.windowInterval = windowColumn.getWindowInterval();
+        this.windowInterval = windowColumn == null ? 0 : windowColumn.getWindowInterval();
         this.running = true;
     }
 
@@ -87,15 +87,11 @@ public class StreamQueue implements ResultSet {
         return null;
     }
 
-    public Object poll() {
+    public Object poll(Session s) {
         return q.poll();
     }
 
-    public List<Chunk> getAll(Session s) throws Exception {
-        return null;
-    }
-
-    public ArrayList<Object> getAll(Session s, int ptr) throws Exception {
+    public Chunk cpoll(Session s) {
         return null;
     }
 

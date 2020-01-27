@@ -51,11 +51,12 @@ public class SQLCursor implements FrameIterator {
 
     private final int id;
     private ResultSet target;
-    private ExecutorService exec = SQLJoinThreadPool.getThreadPool();
-    private ExecutorService exec2 = SQLJoinThreadPool.getThreadPool2();
-    private ExecutorService remotepool = Executors.newCachedThreadPool();
-    private ExecutorService streampool = Executors.newCachedThreadPool();
-    private ExecutorService groupspool = Executors.newCachedThreadPool();
+    private static ExecutorService exec = SQLJoinThreadPool.getThreadPool();
+    private static ExecutorService exec2 = SQLJoinThreadPool.getThreadPool2();
+    private static ExecutorService remotepool = Executors.newCachedThreadPool();
+    private static ExecutorService streampool = Executors.newCachedThreadPool();
+    private static ExecutorService groupspool = Executors.newCachedThreadPool();
+    private static ExecutorService rspool = Executors.newCachedThreadPool();
     private List<FrameApiJoin> tasks;
     private List<FrameApiJoin> tasks_;
     private FrameData bdnext;
@@ -68,6 +69,7 @@ public class SQLCursor implements FrameIterator {
     private NestedCondition nc;
     private boolean last;
     private boolean peristent;
+    private boolean flush;
     private final SQLJoinDispatcher hmap;
     private final FrameIterator lbi;
     private final FrameIterator rbi;
@@ -93,7 +95,9 @@ public class SQLCursor implements FrameIterator {
         this.cur = cur;
         this.nc = nc;
         this.last = last;
-        this.peristent = !cur.getSqlStmt().isEntityResult();
+
+        //ordered sets should be persistent
+        this.peristent = cur.getSqlStmt().isEntityResult() ? false : ixflag || !last;
 
         if (cur.isStream()) {
             sfmap.put(lbi.getObjectId(), new ConcurrentLinkedQueue<FrameApi>());
@@ -103,13 +107,13 @@ public class SQLCursor implements FrameIterator {
         //todo need to refactor SQLJoin - extJoinedCC must be set on construct time
 
         if (cur.getType() == Cursor.SLAVE_TYPE && cur.getResultTargetName() != null && this.id == 1) {
-            target = this.peristent ? s.registerTable(cur.getResultTargetName(), s, rscols, null, null, ixflag && last) : new ResultList(cur.getSqlStmt().getEntityTable());
+            target = new ResultSetImpl(cur.getSqlStmt().isEntityResult() ? cur.getSqlStmt().getEntityTable() : s.registerTable(cur.getResultTargetName(), s, rscols, null, null, ixflag && last), this, this.peristent);
         } else if (cur.getType() == Cursor.STREAM_TYPE) {
             final List<SQLColumn> rscols_ = getIOTCList();
             final Table rstable = this.peristent ? s.registerTable("su.interference.persistent.R$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols_, null, null, ixflag && last) : cur.getSqlStmt().getEntityTable();
             target = new StreamQueue(rscols_, rstable, cur.getSqlStmt().getCols().getWindowColumn());
         } else {
-            target = this.peristent ? s.registerTable("su.interference.persistent.R$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols, null, null, ixflag && last) : new ResultList(cur.getSqlStmt().getEntityTable());
+            target = new ResultSetImpl(cur.getSqlStmt().isEntityResult() ? cur.getSqlStmt().getEntityTable() : s.registerTable("su.interference.persistent.R$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols, null, null, ixflag && last), this, this.peristent);
         }
         current = new FrameHolder(target);
 
@@ -122,7 +126,7 @@ public class SQLCursor implements FrameIterator {
             ArrayList<SQLColumn> rscols_ = new ArrayList<>();
             for (SQLColumn sqlc : rscols) {
                 if (cursor_.getObjectIds().contains(sqlc.getObjectId())) {
-                    final Table t_ = (Table) cursor_.getTarget();
+                    final Table t_ = ((ResultSetImpl) cursor_.getTarget()).getTarget();
                     final SQLColumn sqlc_ = new SQLColumn(t_, sqlc.getId(), getTargetColumn(sqlc), sqlc.getAlias(), sqlc.getFtype(), sqlc.getLoc(), sqlc.getOrderOrd(), sqlc.getGroupOrd(), sqlc.getWindowInterval(), true, cursor_.isFurtherUseUC());
                     rscols_.add(sqlc_);
                 } else {
@@ -385,14 +389,28 @@ public class SQLCursor implements FrameIterator {
     }
 
     private Field getTargetColumn(SQLColumn c) throws NoSuchFieldException {
-        final Table t = (Table)target;
+        final Table t = ((ResultSetImpl) target).getTarget();
         return t.getSc().getDeclaredField(c.getAlias());
     }
 
     public ResultSet flushTarget() throws InternalException {
-        while (hasNextFrame()) {
-            nextFrame();
+        if (!flush) {
+            Runnable r = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        while (hasNextFrame()) {
+                            nextFrame();
+                        }
+                        ((ResultSetImpl)target).setDone(true);
+                    } catch (Exception e) {
+                        logger.error("Exception thrown during flush target operation", e);
+                    }
+                }
+            };
+            rspool.submit(r);
         }
+        flush = true;
         return target;
     }
 

@@ -28,14 +28,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.core.Config;
 import su.interference.core.Instance;
-import su.interference.core.ManageProcess;
-import su.interference.persistent.Node;
-import su.interference.persistent.Session;
+import su.interference.core.ManagedProcess;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -44,7 +40,7 @@ import java.util.concurrent.TimeUnit;
  * @since 1.0
  */
 
-public final class HeartBeatProcess implements Runnable, ManageProcess {
+public final class HeartBeatProcess implements Runnable, ManagedProcess {
 
     private volatile boolean f = true;
     private volatile CountDownLatch latch;

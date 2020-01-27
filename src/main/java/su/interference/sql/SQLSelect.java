@@ -137,7 +137,6 @@ public class SQLSelect implements SQLStatement {
         try {
             t = this.join.executeJoin(s,0,null); //mode=0 for select, uset is null
             if (!stream) {
-                logger.info("SQL local query returns " + t.getAll(s, 0).size());
                 logger.info("sql executed");
             }
 

@@ -41,7 +41,7 @@ import su.interference.transport.TransportSyncTask;
  * @since 1.0
  */
 
-public class SyncQueue implements Runnable, ManageProcess {
+public class SyncQueue implements Runnable, ManagedProcess {
 
     private volatile boolean f = true;
     private volatile boolean running = false;
