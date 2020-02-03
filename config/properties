@@ -1,5 +1,5 @@
 ###########################################
-# init storage time parameters:
+# init storage parameters:
 ###########################################
 
 # node identifier of the current instance
@@ -55,6 +55,7 @@ retrieve.queue.size=20000
 
 cluster.nodes=
 auto.register.classes=su.interference.test.entity.Dept,su.interference.test.entity.Emp,su.interference.test.entity.StreamTable
+
 
 #-Dlogback.configurationFile=config/app-log-config.xml
 #-Dsu.interference.config=properties
