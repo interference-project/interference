@@ -49,11 +49,12 @@ dateformat=dd.MM.yyyy
 # disk write mode: write through = sync/write back = async
 diskio.mode=sync
 
-sync.period=10
+sync.period=1000
 sync.lock.enable=true
+retrieve.queue.size=20000
 
-cluster.nodes=localhost:8069
-auto.register.classes=su.interference.test.Dept,su.interference.test.Emp
+cluster.nodes=
+auto.register.classes=su.interference.test.entity.Dept,su.interference.test.entity.Emp,su.interference.test.entity.StreamTable
 
 #-Dlogback.configurationFile=config/app-log-config.xml
 #-Dsu.interference.config=properties
