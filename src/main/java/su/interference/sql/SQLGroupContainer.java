@@ -27,7 +27,6 @@ package su.interference.sql;
 import su.interference.core.DataChunk;
 import su.interference.exception.InternalException;
 
-import javax.persistence.criteria.CriteriaBuilder;
 import java.util.ArrayList;
 import java.util.List;
 

@@ -30,9 +30,6 @@ import su.interference.core.*;
 import su.interference.metrics.Metrics;
 import su.interference.persistent.*;
 import su.interference.proxy.GenericResult;
-import su.interference.transport.SQLEvent;
-import su.interference.transport.TransportContext;
-import su.interference.transport.TransportEvent;
 
 import java.util.List;
 import java.util.concurrent.Callable;

@@ -27,19 +27,16 @@ package su.interference.sql;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.core.Chunk;
+import su.interference.core.Config;
 import su.interference.core.DataChunk;
-import su.interference.core.LLT;
 import su.interference.exception.InternalException;
 import su.interference.persistent.Session;
 import su.interference.persistent.Table;
 
 import java.net.MalformedURLException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.PriorityBlockingQueue;
 
 /**
  * @author Yuriy Glotanov
@@ -48,12 +45,10 @@ import java.util.concurrent.PriorityBlockingQueue;
 
 public class ResultSetImpl implements ResultSet {
     private final static Logger logger = LoggerFactory.getLogger(ResultSetImpl.class);
-    public static final int RS_QUEUE_SIZE = 1000;
     private final Table target;
     private final boolean persistent;
-    private final LinkedBlockingQueue q = new LinkedBlockingQueue(RS_QUEUE_SIZE);
+    private final LinkedBlockingQueue q = new LinkedBlockingQueue(Config.getConfig().RETRIEVE_QUEUE_SIZE);
     private boolean started;
-    private boolean done;
     private CountDownLatch latch;
     private final SQLCursor sqlc;
     private Queue<Chunk> q_;
@@ -64,8 +59,6 @@ public class ResultSetImpl implements ResultSet {
         this.sqlc = sqlc;
     }
 
-    //todo may produce critical side effects after latch release
-    //todo need refactoring
     public DataChunk persist(Object o, Session s) throws Exception {
         if (persistent) {
             return target.persist(o, s);
@@ -93,7 +86,15 @@ public class ResultSetImpl implements ResultSet {
         if (persistent) {
             return target.poll(s);
         } else {
-            return q.poll();
+            final Object o = q.take();
+            if (o instanceof ResultSetTerm) {
+                started = false;
+            }
+            if (started) {
+                return o;
+            } else {
+                return null;
+            }
         }
     }
 
@@ -119,15 +120,14 @@ public class ResultSetImpl implements ResultSet {
         return target;
     }
 
-    public boolean isDone() {
-        return done;
+    public boolean isPersistent() {
+        return persistent;
     }
 
-    public void setDone(boolean done) {
+    public void release() {
         if (latch != null) {
             latch.countDown();
         }
-        this.done = done;
     }
 
     public int getObjectId() {

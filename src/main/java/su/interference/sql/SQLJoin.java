@@ -178,10 +178,15 @@ public class SQLJoin {
                 if (sqlg != null) {
                     DataChunk gdc = sqlg.getDC();
                     Object oo = gdc.getEntity(((ResultSetImpl)gtemp).getTarget());
+
                     gtemp.persist(oo, s);
+
+                    if (!((ResultSetImpl)gtemp).isPersistent()) {
+                        gtemp.persist(new ResultSetTerm(), s);
+                    }
                 }
 
-                ((ResultSetImpl)gtemp).setDone(true);
+                ((ResultSetImpl)gtemp).release();
             }
         }
 

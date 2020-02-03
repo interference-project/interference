@@ -22,15 +22,12 @@
 
  */
 
-package su.interference.core;
-
-import java.util.concurrent.Callable;
+package su.interference.sql;
 
 /**
  * @author Yuriy Glotanov
  * @since 1.0
  */
 
-public interface ManagedCallable<T> extends Callable<T> {
-    void stop();
+public class ResultSetTerm {
 }

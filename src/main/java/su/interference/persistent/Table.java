@@ -1291,7 +1291,7 @@ public class Table implements DataObject, ResultSet {
     protected synchronized RetrieveQueue getTableContentQueue(Session s) {
         final Table t = this;
         final int ptr = 0;
-        final LinkedBlockingQueue<Chunk> q = new LinkedBlockingQueue<>();
+        final LinkedBlockingQueue<Chunk> q = new LinkedBlockingQueue<>(Config.getConfig().RETRIEVE_QUEUE_SIZE);
         final AtomicBoolean stopped = new AtomicBoolean();
         final Chunk tc = new DataChunk();
         tc.setTerminate(true);
@@ -1330,7 +1330,7 @@ public class Table implements DataObject, ResultSet {
     protected synchronized RetrieveQueue getIndexContentQueue(Session s) {
         final Table t = this;
         final int ptr = 0;
-        final LinkedBlockingQueue<Chunk> q = new LinkedBlockingQueue<>();
+        final LinkedBlockingQueue<Chunk> q = new LinkedBlockingQueue<>(Config.getConfig().RETRIEVE_QUEUE_SIZE);
         final AtomicBoolean stopped = new AtomicBoolean();
         final Chunk tc = new DataChunk();
         tc.setTerminate(true);
@@ -1506,11 +1506,6 @@ public class Table implements DataObject, ResultSet {
                 }
             }
         } else {
-            if (this.idfield!=null&&this.generatedfield!=null) {
-                if (this.idfield.equals(this.generatedfield)) {
-                    return null;
-                }
-            }
             final EntityContainer to = (EntityContainer)o;
             final Table idt = getFirstIndexByIdColumn();
             if (to.getDataChunk()==null) {

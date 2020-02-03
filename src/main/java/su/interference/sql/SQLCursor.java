@@ -35,10 +35,7 @@ import su.interference.transport.TransportContext;
 import java.lang.reflect.Field;
 import java.net.MalformedURLException;
 import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.lang.reflect.InvocationTargetException;
 import java.io.IOException;
 
@@ -80,7 +77,7 @@ public class SQLCursor implements FrameIterator {
     private final SQLColumn joinedCC;
     private SQLColumn extJoinedCC;
 
-    private static Map<Integer, ConcurrentLinkedQueue<FrameApi>> sfmap = new HashMap();
+    private static Map<Integer, Map<Long, ConcurrentLinkedQueue<FrameApi>>> sfmap = new ConcurrentHashMap<>();
     private static final int BATCH_SIZE = 4;
     private final static Logger logger = LoggerFactory.getLogger(SQLCursor.class);
 
@@ -100,7 +97,14 @@ public class SQLCursor implements FrameIterator {
         this.peristent = cur.getSqlStmt().isEntityResult() ? false : ixflag || !last;
 
         if (cur.isStream()) {
-            sfmap.put(lbi.getObjectId(), new ConcurrentLinkedQueue<FrameApi>());
+            final Map<Long, ConcurrentLinkedQueue<FrameApi>> sfmap_ = sfmap.get(lbi.getObjectId());
+            if (sfmap_ == null) {
+                final Map<Long, ConcurrentLinkedQueue<FrameApi>> sfmap__ = new ConcurrentHashMap<>();
+                sfmap__.put(s.getId(), new ConcurrentLinkedQueue<>());
+                sfmap.put(lbi.getObjectId(), sfmap__);
+            } else {
+                sfmap_.put(s.getId(), new ConcurrentLinkedQueue<>());
+            }
         }
 
         //todo wrong case - column set must be rebuilded for prevent bad indexes intersect cases
@@ -110,8 +114,8 @@ public class SQLCursor implements FrameIterator {
             target = new ResultSetImpl(cur.getSqlStmt().isEntityResult() ? cur.getSqlStmt().getEntityTable() : s.registerTable(cur.getResultTargetName(), s, rscols, null, null, ixflag && last), this, this.peristent);
         } else if (cur.getType() == Cursor.STREAM_TYPE) {
             final List<SQLColumn> rscols_ = getIOTCList();
-            final Table rstable = this.peristent ? s.registerTable("su.interference.persistent.R$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols_, null, null, ixflag && last) : cur.getSqlStmt().getEntityTable();
-            target = new StreamQueue(rscols_, rstable, cur.getSqlStmt().getCols().getWindowColumn());
+            final Table rstable = cur.getSqlStmt().isEntityResult() ? cur.getSqlStmt().getEntityTable() : s.registerTable("su.interference.persistent.R$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols_, null, null, ixflag && last);
+            target = new StreamQueue(rscols_, rstable, cur.getSqlStmt().getCols().getWindowColumn(), s);
         } else {
             target = new ResultSetImpl(cur.getSqlStmt().isEntityResult() ? cur.getSqlStmt().getEntityTable() : s.registerTable("su.interference.persistent.R$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols, null, null, ixflag && last), this, this.peristent);
         }
@@ -235,7 +239,8 @@ public class SQLCursor implements FrameIterator {
     }
 
     public void stream() throws Exception {
-        final Queue<FrameApi> q = sfmap.get(lbi.getObjectId());
+        final Queue<FrameApi> q = sfmap.get(lbi.getObjectId()).get(s.getId());
+
         if (!cur.isStream()) {
             logger.error("wrong stream method call: SQL statement is not a stream");
         }
@@ -254,16 +259,43 @@ public class SQLCursor implements FrameIterator {
                 try {
                     final ConcurrentLinkedQueue<Object> q_in = new ConcurrentLinkedQueue<>();
                     FrameGroupTask group = null;
+                    if (cur.getSqlStmt().isGroupedResult()) {
+                        if (group == null) {
+                            group = new FrameGroupTask(cur, q_in, target, gtable, s);
+                            groupspool.submit(group);
+                        }
+                    }
+
+                    //todo FrameContainer should use indexes
+                    List<FrameApi> flist = new ArrayList<>();
+                    while (lbi.hasNextFrame()) {
+                        final FrameApi bd1 = lbi.nextFrame();
+                        flist.add(bd1);
+                    }
+
+                    if (flist.size() > 0) {
+                        final ContainerFrame cf = new ContainerFrame(lbi.getObjectId(), flist);
+                        final FrameJoinTask task = new FrameJoinTask(cur, cf, null, target, ((StreamQueue) target).getRscols(), nc, id, Config.getConfig().LOCAL_NODE_ID, last, lbi.isLeftfs(), null, s);
+                        final Future<List<Object>> ft = exec.submit(task);
+
+                        if (cur.getSqlStmt().isGroupedResult()) {
+                            for (Object o : ft.get()) {
+                                q_in.add(o);
+                            }
+                        } else {
+                            for (Object o : ft.get()) {
+                                target.persist(o, s);
+                            }
+                        }
+                    }
+
                     while (((StreamQueue) target).isRunning()) {
                         FrameApi f = q.poll();
                         if (f != null) {
-                            FrameJoinTask task = new FrameJoinTask(cur, f, null, target, ((StreamQueue) target).getRscols(), nc, id, Config.getConfig().LOCAL_NODE_ID, last, lbi.isLeftfs(), null, s);
+                            final FrameJoinTask task = new FrameJoinTask(cur, f, null, target, ((StreamQueue) target).getRscols(), nc, id, Config.getConfig().LOCAL_NODE_ID, last, lbi.isLeftfs(), null, s);
                             final Future<List<Object>> ft = exec.submit(task);
+
                             if (cur.getSqlStmt().isGroupedResult()) {
-                                if (group == null) {
-                                    group = new FrameGroupTask(cur, q_in, target, gtable, s);
-                                    groupspool.submit(group);
-                                }
                                 for (Object o : ft.get()) {
                                     q_in.add(o);
                                 }
@@ -278,8 +310,8 @@ public class SQLCursor implements FrameIterator {
                         }
                     }
                 } catch (Exception e) {
-                    ((StreamQueue) target).stop(s);
-                    throw new RuntimeException(e);
+                    ((StreamQueue) target).stop();
+                    e.printStackTrace();
                 }
             }
         };
@@ -287,9 +319,21 @@ public class SQLCursor implements FrameIterator {
     }
 
     public static void addStreamFrame(FrameApi f) {
-        final Queue<FrameApi> q = sfmap.get(f.getObjectId());
-        if (q != null) {
-            q.add(f);
+        final Map<Long, ConcurrentLinkedQueue<FrameApi>> sfmap_ = sfmap.get(f.getObjectId());
+        if (sfmap_ != null) {
+            for (Map.Entry<Long, ConcurrentLinkedQueue<FrameApi>> entry : sfmap_.entrySet()) {
+                final Queue<FrameApi> q = entry.getValue();
+                if (q != null) {
+                    q.add(f);
+                }
+            }
+        }
+    }
+
+    public static void removeStreamQueue(Session s) {
+        for (Map.Entry<Integer, Map<Long, ConcurrentLinkedQueue<FrameApi>>> entry : sfmap.entrySet()) {
+            final Map<Long, ConcurrentLinkedQueue<FrameApi>> sfmap_ = entry.getValue();
+            sfmap_.remove(s.getId());
         }
     }
 
@@ -323,21 +367,37 @@ public class SQLCursor implements FrameIterator {
                     }
                 }
                 for (Future<FrameApiJoin> f : flist) {
-                    final FrameApiJoin j = f.get();
-                    logger.debug("SQL cursor next frame: the jointask call returned " + j.getResult().size() + " records");
-                    for (Object o : j.getResult()) {
-                        target.persist(o, s);
-                    }
-                }
-                for (Future<FrameApiJoin> f : flist2) {
-                    final FrameApiJoin j = f.get();
-                    if (j.isFailed()) {
-                        FrameApiJoin j_ = new FrameApiJoin(Config.getConfig().LOCAL_NODE_ID, this, j.getBd1(), j.getBd2());
-                        tasks_.add(j_);
-                    } else {
+                    try {
+                        final FrameApiJoin j = f.get();
                         logger.debug("SQL cursor next frame: the jointask call returned " + j.getResult().size() + " records");
                         for (Object o : j.getResult()) {
                             target.persist(o, s);
+                        }
+                    } catch (Exception e) {
+                        if (e instanceof ExecutionException) {
+                            e.getCause().printStackTrace();
+                        } else {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+                for (Future<FrameApiJoin> f : flist2) {
+                    try {
+                        final FrameApiJoin j = f.get();
+                        if (j.isFailed()) {
+                            FrameApiJoin j_ = new FrameApiJoin(Config.getConfig().LOCAL_NODE_ID, this, j.getBd1(), j.getBd2());
+                            tasks_.add(j_);
+                        } else {
+                            logger.debug("SQL cursor next frame: the jointask call returned " + j.getResult().size() + " records");
+                            for (Object o : j.getResult()) {
+                                target.persist(o, s);
+                            }
+                        }
+                    } catch (Exception e) {
+                        if (e instanceof ExecutionException) {
+                            e.getCause().printStackTrace();
+                        } else {
+                            e.printStackTrace();
                         }
                     }
                 }
@@ -402,7 +462,12 @@ public class SQLCursor implements FrameIterator {
                         while (hasNextFrame()) {
                             nextFrame();
                         }
-                        ((ResultSetImpl)target).setDone(true);
+
+                        ((ResultSetImpl)target).release();
+
+                        if (!((ResultSetImpl)target).isPersistent()) {
+                            target.persist(new ResultSetTerm(), s);
+                        }
                     } catch (Exception e) {
                         logger.error("Exception thrown during flush target operation", e);
                     }

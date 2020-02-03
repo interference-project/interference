@@ -35,6 +35,7 @@ import su.interference.proxy.POJOProxyFactory;
 import su.interference.proxy.RSProxyFactory;
 import su.interference.sql.ResultSet;
 import su.interference.sql.SQLColumn;
+import su.interference.sql.SQLCursor;
 import su.interference.sql.SQLSelect;
 
 import java.util.*;
@@ -42,10 +43,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import javax.persistence.*;
 
 /**
@@ -285,9 +283,18 @@ public class Session {
 
     protected synchronized RetrieveQueue getContentQueue(Table t) {
         if (t != null) {
-            retrieveQueue = t.getContentQueue(this);
-            Future f = rqpool.submit(retrieveQueue.getR());
-            return retrieveQueue;
+            try {
+                retrieveQueue = t.getContentQueue(this);
+                Future f = rqpool.submit(retrieveQueue.getR());
+                Object o = f.get();
+                return retrieveQueue;
+            } catch (Exception e) {
+                if (e instanceof ExecutionException) {
+                    e.getCause().printStackTrace();
+                } else {
+                    e.printStackTrace();
+                }
+            }
         }
         return null;
     }
@@ -297,6 +304,10 @@ public class Session {
             retrieveQueue.stop();
         }
         retrieveQueue = null;
+    }
+
+    public void closeStreamQueue() {
+        SQLCursor.removeStreamQueue(this);
     }
 
     public void close() {

@@ -141,7 +141,7 @@ public class SyncQueue implements Runnable, ManagedProcess {
             }
 
             try {
-                final int period = Config.getConfig().SYNC_PERIOD*1000;
+                final int period = Config.getConfig().SYNC_PERIOD;
                 Thread.sleep(period);
             } catch (InterruptedException e) {
                 e.printStackTrace();

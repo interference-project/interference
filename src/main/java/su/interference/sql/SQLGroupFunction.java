@@ -42,12 +42,14 @@ public class SQLGroupFunction {
     private long avg;
     private Comparable min;
     private Comparable max;
+    private Object last;
 
     public static final int F_COUNT  = 100;
     public static final int F_SUM    = 101;
     public static final int F_MIN    = 102;
     public static final int F_MAX    = 103;
     public static final int F_AVG    = 104;
+    public static final int F_LAST   = 104;
     public static final int F_CUSTOM = 199;
 
     public SQLGroupFunction (int f) {
@@ -63,9 +65,10 @@ public class SQLGroupFunction {
     public void add (Object o) {
         if (f==F_COUNT || f==F_AVG) { cnt++; }
         if (f==F_SUM || f==F_AVG)   { sum = sum + checkNum(o); }
-        if (f==F_MIN)   { if (min==null) { min = checkComparable(o); } else { min = min.compareTo(checkComparable(o))<0?min:checkComparable(o); }}
-        if (f==F_MAX)   { if (max==null) { max = checkComparable(o); } else { max = max.compareTo(checkComparable(o))>0?max:checkComparable(o); }}
-        if (f==F_AVG)   { avg = sum/cnt; }
+        if (f==F_MIN)  { if (min==null) { min = checkComparable(o); } else { min = min.compareTo(checkComparable(o))<0?min:checkComparable(o); }}
+        if (f==F_MAX)  { if (max==null) { max = checkComparable(o); } else { max = max.compareTo(checkComparable(o))>0?max:checkComparable(o); }}
+        if (f==F_AVG)  { avg = sum/cnt; }
+        if (f==F_LAST) { last = o; }
         //fos.add(o);
     }
 
@@ -75,6 +78,7 @@ public class SQLGroupFunction {
         if (f==F_MIN)   { return min; }
         if (f==F_MAX)   { return max; }
         if (f==F_AVG)   { return avg; }
+        if (f==F_LAST)  { return last; }
         return null;
     }
 
@@ -84,6 +88,7 @@ public class SQLGroupFunction {
         avg = 0;
         min = null;
         max = null;
+        last = null;
     }
 
     private long checkNum(Object o) {

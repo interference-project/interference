@@ -29,6 +29,9 @@ import org.slf4j.LoggerFactory;
 import su.interference.core.*;
 import su.interference.exception.InternalException;
 import su.interference.persistent.*;
+import su.interference.sql.ContainerFrame;
+import su.interference.sql.FrameApi;
+import su.interference.sql.SQLCursor;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -214,6 +217,17 @@ public class SyncFrameEvent extends TransportEventImpl {
                 e.printStackTrace();
             }
             //b.getBd().setFrame(null);
+        }
+
+        final Map<Integer, List<FrameApi>> frames_ = new HashMap<>();
+        for (SyncFrame f : sb) {
+            if (frames_.get(f.getObjectId()) == null) {
+                frames_.put(f.getObjectId(), new ArrayList<>());
+            }
+            frames_.get(f.getObjectId()).add(f.getBd());
+        }
+        for (Map.Entry<Integer, List<FrameApi>> entry: frames_.entrySet()) {
+            SQLCursor.addStreamFrame(new ContainerFrame(entry.getKey(), entry.getValue()));
         }
 
         logger.info(sb.length + " frame(s) were received and synced");

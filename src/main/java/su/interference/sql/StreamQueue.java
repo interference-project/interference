@@ -31,7 +31,6 @@ import su.interference.persistent.Session;
 import su.interference.persistent.Table;
 
 import java.net.MalformedURLException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -45,13 +44,15 @@ public class StreamQueue implements ResultSet {
     private final List<SQLColumn> rscols;
     private final Table rstable;
     private final ConcurrentLinkedQueue<Object> q = new ConcurrentLinkedQueue();
+    private final Session s;
     private SQLColumn windowColumn;
     private int windowInterval;
     private boolean running;
 
-    public StreamQueue(List<SQLColumn> rscols, Table rstable, SQLColumn windowColumn) {
+    public StreamQueue(List<SQLColumn> rscols, Table rstable, SQLColumn windowColumn, Session s) {
         this.rscols = rscols;
         this.rstable = rstable;
+        this.s = s;
         this.windowColumn = windowColumn;
         this.windowInterval = windowColumn == null ? 0 : windowColumn.getWindowInterval();
         this.running = true;
@@ -77,8 +78,9 @@ public class StreamQueue implements ResultSet {
         return running;
     }
 
-    public void stop(Session s) {
+    public void stop() {
         this.running = false;
+        s.closeStreamQueue();
         s.setStream(false);
     }
 
