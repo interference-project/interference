@@ -2,7 +2,7 @@
 
 ##### simple distributed persistent layer for java applications
 ##### (c) 2010 - 2020 head systems, ltd
-##### current revision: 2019.3
+##### current revision: 2020.1 beta (unstable)
 ##### for detailed information see doc/InterferenceManual.pdf
 
 ##### contacts: info@inteference.su
@@ -13,6 +13,7 @@
 
 - supports Base JPA annotations
 - supports local & distributed SQL queries
+- supports complex event processing and streaming SQL
 - supports transactions
 - supports unique constraints
 - supports persistent indexes
@@ -25,7 +26,7 @@
   included in the cluster
 - does not contain any coordination nodes and does not require 
   the launch of any additional coordinators. All cluster nodes are equivalent.
-- supports complex event processing and streaming SQL (in next release)
+
 
 ## NOTE:
 
@@ -53,7 +54,7 @@ like this:
     <dependency>
         <groupId>su.interference</groupId>
         <artifactId>interference</artifactId>
-        <version>2019.3</version>
+        <version>2020.1</version>
     </dependency>
     ...
 </dependencies>
