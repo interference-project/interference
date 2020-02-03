@@ -63,6 +63,7 @@ public class DataChunk implements Chunk {
     private Object undoentity;
     private DataChunk source;
     private UndoChunk uc;
+    private boolean terminate;
     private final CustomSerializer sr = new CustomSerializer();
 
     //returns datacolumn set
@@ -880,6 +881,14 @@ public class DataChunk implements Chunk {
             uc = new UndoChunk(cc, s.getTransaction(), rw.getFileId(), rw.getFramePointer(), rw.getRowPointer());
             insertUC(bd, uc, s, llt);
         }
+    }
+
+    public boolean isTerminate() {
+        return terminate;
+    }
+
+    public void setTerminate(boolean terminate) {
+        this.terminate = terminate;
     }
 
     private byte[] getBytesFromHexString(String s) {

@@ -29,13 +29,11 @@ import su.interference.sqlexception.InvalidWindowByPart;
 import su.interference.sqlexception.MissingTablesDescription;
 import su.interference.sqlexception.AmbiguousColumnName;
 import su.interference.sqlexception.InvalidColumnDescription;
-import su.interference.core.Instance;
 import su.interference.exception.InternalException;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.lang.reflect.Field;
-import java.net.MalformedURLException;
 import java.util.List;
 
 /**

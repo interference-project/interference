@@ -41,7 +41,7 @@ import su.interference.transport.TransportSyncTask;
  * @since 1.0
  */
 
-public class SyncQueue implements Runnable, ManageProcess {
+public class SyncQueue implements Runnable, ManagedProcess {
 
     private volatile boolean f = true;
     private volatile boolean running = false;
@@ -141,7 +141,7 @@ public class SyncQueue implements Runnable, ManageProcess {
             }
 
             try {
-                final int period = Config.getConfig().SYNC_PERIOD*1000;
+                final int period = Config.getConfig().SYNC_PERIOD;
                 Thread.sleep(period);
             } catch (InterruptedException e) {
                 e.printStackTrace();

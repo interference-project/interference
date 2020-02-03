@@ -26,13 +26,10 @@ package su.interference.sql;
 
 import su.interference.core.Chunk;
 import su.interference.core.DataChunk;
-import su.interference.core.LLT;
 import su.interference.exception.InternalException;
 import su.interference.persistent.Session;
 
 import java.net.MalformedURLException;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * @author Yuriy Glotanov
@@ -41,9 +38,8 @@ import java.util.List;
 
 public interface ResultSet {
     DataChunk persist(Object o, Session s) throws Exception;
-    Object poll();
-    List<Chunk> getAll(Session s) throws Exception;
-    ArrayList<Object> getAll(Session s, int ptr) throws Exception;
+    Object poll(Session s) throws Exception;
+    Chunk cpoll(Session s) throws Exception;
     int getObjectId();
     boolean isIndex() throws ClassNotFoundException, MalformedURLException;
     Class getTableClass() throws ClassNotFoundException, MalformedURLException;

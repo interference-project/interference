@@ -59,6 +59,7 @@ public class Config {
     private static final String P_DISKIO_MODE = "diskio.mode";
     private static final String P_SYNC_LOCK_ENABLE = "sync.lock.enable";
     private static final String P_SYNC_PERIOD = "sync.period";
+    private static final String P_RETRIEVE_QUEUE_SIZE = "retrieve.queue.size";
     private static final String P_CODEPAGE = "codepage";
     private static final String P_DATEFORMAT = "dateformat";
     private static final int MAX_NODE_ID = 64;
@@ -80,7 +81,8 @@ public class Config {
     private static final int FILES_AMOUNT_DEFAULT=4;
     private static final String DISKIO_MODE_DEFAULT="rws";
     private static final boolean SYNC_LOCK_ENABLE_DEFAULT=false;
-    private static final int SYNC_PERIOD_DEFAULT=5;
+    private static final int SYNC_PERIOD_DEFAULT=2000;
+    private static final int RETRIEVE_QUEUE_SIZE_DEFAULT=10000;
     private static final String CODEPAGE_DEFAULT="UTF-8";
     private static final String DATEFORMAT_DEFAULT="dd.MM.yyyy";
 
@@ -101,6 +103,7 @@ public class Config {
     public final String DISKIO_MODE;
     public final boolean SYNC_LOCK_ENABLE;
     public final int SYNC_PERIOD;
+    public final int RETRIEVE_QUEUE_SIZE;
     public final String CODEPAGE;
     public final String DATEFORMAT;
 
@@ -158,6 +161,7 @@ public class Config {
             DISKIO_MODE = validateDiskioMode(p.getProperty(P_DISKIO_MODE));
             SYNC_LOCK_ENABLE = validateSyncLock(p.getProperty(P_SYNC_LOCK_ENABLE));
             SYNC_PERIOD = validateSyncPeriod(p.getProperty(P_SYNC_PERIOD));
+            RETRIEVE_QUEUE_SIZE = validateQueueSize(p.getProperty(P_RETRIEVE_QUEUE_SIZE));
         } else {
             DB_PATH = DB_PATH_DEFAULT;
             JOURNAL_PATH = JOURNAL_PATH_DEFAULT;
@@ -178,6 +182,7 @@ public class Config {
             DISKIO_MODE = DISKIO_MODE_DEFAULT;
             SYNC_LOCK_ENABLE = SYNC_LOCK_ENABLE_DEFAULT;
             SYNC_PERIOD = SYNC_PERIOD_DEFAULT;
+            RETRIEVE_QUEUE_SIZE = RETRIEVE_QUEUE_SIZE_DEFAULT;
         }
         System.setProperty("com.sun.management.jmxremote.port","8111");
         System.setProperty("com.sun.management.jmxremote.authenticate","false");
@@ -324,7 +329,19 @@ public class Config {
     private static int validateSyncPeriod(String value) {
         try {
             int p = Integer.valueOf(value);
-            if (p > 0 && p < 10000) {
+            if (p > 9 && p < 60001) {
+                return p;
+            }
+        } catch(NumberFormatException e) {
+            logger.error("sync period value is not valid - use default value");
+        }
+        return SYNC_PERIOD_DEFAULT;
+    }
+
+    private static int validateQueueSize(String value) {
+        try {
+            int p = Integer.valueOf(value);
+            if (p > 0 && p < 100000000) {
                 return p;
             }
         } catch(NumberFormatException e) {

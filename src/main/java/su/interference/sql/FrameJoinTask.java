@@ -30,9 +30,6 @@ import su.interference.core.*;
 import su.interference.metrics.Metrics;
 import su.interference.persistent.*;
 import su.interference.proxy.GenericResult;
-import su.interference.transport.SQLEvent;
-import su.interference.transport.TransportContext;
-import su.interference.transport.TransportEvent;
 
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -93,7 +90,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
     public List<Object> call() throws Exception {
         final Thread thread = Thread.currentThread();
         thread.setName("SQL join task " + thread.getId());
-        final Class r = target instanceof Table ? ((Table)target).getSc() : target instanceof StreamQueue ? ((StreamQueue) target).getRstable().getSc() : null;
+        final Class r = target instanceof ResultSetImpl ? ((ResultSetImpl)target).getTableClass() : target instanceof StreamQueue ? ((StreamQueue) target).getRstable().getSc() : null;
         final int t1 = bd1.getObjectId();
         final int t2 = bd2==null?0:bd2.getObjectId();
         final Class c1 = Instance.getInstance().getTableById(t1).getTableClass();

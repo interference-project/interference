@@ -94,7 +94,7 @@ public class Process implements Comparable {
 
     public void stop () throws InterruptedException {
         if (th!=null&&ro!=null) {
-            ((ManageProcess)ro).stop();
+            ((ManagedProcess)ro).stop();
             th.join();
         }
     }

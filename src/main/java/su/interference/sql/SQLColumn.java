@@ -26,14 +26,10 @@ package su.interference.sql;
 
 import su.interference.core.IndexDescript;
 import su.interference.persistent.Table;
-import su.interference.sqlexception.InvalidColumnDescription;
-import su.interference.sqlexception.AmbiguousColumnName;
 import su.interference.exception.InternalException;
 
 import javax.persistence.Id;
-import javax.persistence.Index;
 import java.net.MalformedURLException;
-import java.util.ArrayList;
 import java.lang.reflect.Field;
 
 /**
@@ -66,11 +62,12 @@ public class SQLColumn implements Comparable {
     private boolean mergeIX;
 
     // group function
-    public static final int F_COUNT = 100;
-    public static final int F_SUM = 101;
-    public static final int F_MIN = 102;
-    public static final int F_MAX = 103;
-    public static final int F_AVG = 104;
+    public static final int F_COUNT = SQLGroupFunction.F_COUNT;
+    public static final int F_SUM = SQLGroupFunction.F_SUM;
+    public static final int F_MIN = SQLGroupFunction.F_MIN;
+    public static final int F_MAX = SQLGroupFunction.F_MAX;
+    public static final int F_AVG = SQLGroupFunction.F_AVG;
+    public static final int F_LAST = SQLGroupFunction.F_LAST;
 
     // other function
     public static final int F_GENERIC = 1;
@@ -152,6 +149,9 @@ public class SQLColumn implements Comparable {
         }
         if (c.toUpperCase().indexOf("AVG(")==0) {
             return F_AVG;
+        }
+        if (c.toUpperCase().indexOf("LAST(")==0) {
+            return F_LAST;
         }
 
         if (c.toUpperCase().indexOf("TO_NUMBER(")==0) {

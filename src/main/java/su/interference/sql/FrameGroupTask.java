@@ -81,15 +81,17 @@ public class FrameGroupTask implements Runnable {
                 }
             }
             //return last group after stop
+/*
             final DataChunk gdc = sqlg.add(null);
             if (gdc != null) {
                 Object oo = gdc.getEntity(gtable);
                 target.persist(oo, s);
             }
+*/
 
 
         } catch (Exception e) {
-            ((StreamQueue) target).stop(s);
+            ((StreamQueue) target).stop();
             logger.error("", e);
         }
     }

@@ -62,6 +62,7 @@ public class GenericResultImpl implements GenericResult {
                     sb.append(m.getName().substring(3).substring(1));
                     sb.append(":");
                     sb.append(m.invoke(this, null));
+                    sb.append(" ");
                 }
             }
         } catch (Exception e) {

@@ -435,8 +435,7 @@ public class Instance implements Interference {
     }
 
     private void stopProcesses(Session s) throws Exception {
-        final Table t = getTableByName("su.interference.persistent.Process");
-        final ArrayList<Object> pss = t.getAll(s, 0);
+        final List<Process> pss = getProcesses();
         for (Object p : pss) {
             final Process ps = (Process) p;
             ps.stop();

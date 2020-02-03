@@ -48,13 +48,13 @@ public class SQLJoin {
     private final List<SQLColumn> ocs;
     private final List<SQLColumn> gcs;
     private final List<SQLColumn> fcs;
-    private Table gtemp;
+    private ResultSet gtemp;
 
     public SQLJoin (ArrayList<SQLTable> tables, CList columns, NestedCondition nc, Cursor cur, Session s) throws Exception {
         this.tables   = tables;
         this.columns  = columns;
-        this.nc       = nc;
-        this.cur      = cur;
+        this.nc = nc;
+        this.cur = cur;
         this.ocs = this.columns.getOrderColumns();
         this.gcs = this.columns.getGroupColumns();
         this.fcs = this.columns.getFResultColumns();
@@ -116,8 +116,7 @@ public class SQLJoin {
 
         this.cur.setState(Cursor.STATE_RUNNING);
 
-        //initialize temporary result table
-        ResultSet temp = null;
+        ResultSet temp;
 
         if (mode==0) { //pessimistic check
 
@@ -131,7 +130,7 @@ public class SQLJoin {
                 }
             }
 
-            temp = last.flushTarget();
+            temp = last.getTarget();
 
             this.cur.setState(Cursor.STATE_COMPLETED);
 
@@ -146,20 +145,25 @@ public class SQLJoin {
                 boolean ixflag = ocs.size() > 0 ? true : false;
 
                 //todo getall
-                List<Chunk> dcs = temp.getAll(s);
-                if (dcs.size() > 0) {
-                    //warning! use rscols set for both 1st table (ordered by group columns) and 2nd (group records)
-                    //warning! use 2 tables with SAME value sets - use dc.getEntity(Table) method
-                    gtemp = s.registerTable("su.interference.persistent.G$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols, null, null, ixflag);
-                    DataChunk cdc = null;
-                    SQLGroup sqlg = null;
-                    for (Chunk c : dcs) {
+                gtemp = new ResultSetImpl(s.registerTable("su.interference.persistent.G$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols, null, null, ixflag), null, false);
+                final Table gtarget = ((ResultSetImpl)gtemp).getTarget();
+                //warning! use rscols set for both 1st table (ordered by group columns) and 2nd (group records)
+                //warning! use 2 tables with SAME value sets - use dc.getEntity(Table) method
+                DataChunk cdc = null;
+                SQLGroup sqlg = null;
+                boolean cnue = true;
+
+                while (cnue) {
+                    Chunk c = temp.cpoll(s);
+                    if (c == null) {
+                        cnue = false;
+                    } else {
                         if (cdc != null) {
                             if (((DataChunk) c).compare(cdc, gcs.size()) == 0) { //cdc & c chunks grouped
                                 sqlg.add((DataChunk) c);
                             } else {                                          //c start next group
                                 DataChunk gdc = sqlg.getDC();
-                                Object oo = gdc.getEntity(gtemp);
+                                Object oo = gdc.getEntity(gtarget);
                                 gtemp.persist(oo, s);
                                 sqlg = new SQLGroup((DataChunk) c, rscols);
                                 sqlg.add((DataChunk) c);
@@ -170,10 +174,19 @@ public class SQLJoin {
                         }
                         cdc = (DataChunk) c;
                     }
-                    DataChunk gdc = sqlg.getDC();
-                    Object oo = gdc.getEntity(gtemp);
-                    gtemp.persist(oo, s);
                 }
+                if (sqlg != null) {
+                    DataChunk gdc = sqlg.getDC();
+                    Object oo = gdc.getEntity(((ResultSetImpl)gtemp).getTarget());
+
+                    gtemp.persist(oo, s);
+
+                    if (!((ResultSetImpl)gtemp).isPersistent()) {
+                        gtemp.persist(new ResultSetTerm(), s);
+                    }
+                }
+
+                ((ResultSetImpl)gtemp).release();
             }
         }
 
@@ -219,7 +232,7 @@ public class SQLJoin {
     }
 
     public String getResultTargetName() {
-        return ((Table)preparedCursors.get(preparedCursors.size()-1).getTarget()).getName();
+        return ((ResultSetImpl)preparedCursors.get(preparedCursors.size()-1).getTarget()).getTarget().getName();
     }
 
     public void deallocate(Session s) throws Exception {

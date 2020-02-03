@@ -35,6 +35,7 @@ import su.interference.proxy.POJOProxyFactory;
 import su.interference.proxy.RSProxyFactory;
 import su.interference.sql.ResultSet;
 import su.interference.sql.SQLColumn;
+import su.interference.sql.SQLCursor;
 import su.interference.sql.SQLSelect;
 
 import java.util.*;
@@ -42,9 +43,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import javax.persistence.*;
 
 /**
@@ -111,7 +110,11 @@ public class Session {
     private static ThreadLocal<Session> contextSession = new ThreadLocal<Session>();
 
     @Transient
-    private final ExecutorService streampool = Executors.newCachedThreadPool();
+    private static final ExecutorService rqpool = Executors.newCachedThreadPool();
+    @Transient
+    private volatile RetrieveQueue retrieveQueue;
+    @Transient
+    private static final ExecutorService streampool = Executors.newCachedThreadPool();
     @Transient
     private final Map<Long, Integer> streammap = new ConcurrentHashMap<>();
     @Transient
@@ -168,7 +171,7 @@ public class Session {
         //this.getTransaction().startStatement(this, llt);
     }
 
-    public void setTransaction(Transaction transaction) {
+    protected void setTransaction(Transaction transaction) {
         this.transaction = transaction;
     }
 
@@ -269,18 +272,6 @@ public class Session {
         return new EntityFactory(c, this);
     }
 
-    public List<Object> getAll (Class c) throws Exception {
-        final Table t = Instance.getInstance().getTableByName(c.getName());
-        if (t != null) {
-            this.startStatement();
-//            t.lockTable(this);
-            final List<Object> r = t.getAll(this, 0);
-//            t.unlockTable(this);
-            return r;
-        }
-        return null;
-    }
-
     public Object find (Class c, long id) throws Exception {
         final Table t = Instance.getInstance().getTableByName(c.getName());
         if (t != null) {
@@ -288,6 +279,40 @@ public class Session {
             return t.getChunkById(id, this).getEntity();
         }
         return null;
+    }
+
+    protected synchronized RetrieveQueue getContentQueue(Table t) {
+        if (t != null) {
+            try {
+                retrieveQueue = t.getContentQueue(this);
+                Future f = rqpool.submit(retrieveQueue.getR());
+                Object o = f.get();
+                return retrieveQueue;
+            } catch (Exception e) {
+                if (e instanceof ExecutionException) {
+                    e.getCause().printStackTrace();
+                } else {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return null;
+    }
+
+    public void closeQueue() {
+        if (this.retrieveQueue != null) {
+            retrieveQueue.stop();
+        }
+        retrieveQueue = null;
+    }
+
+    public void closeStreamQueue() {
+        SQLCursor.removeStreamQueue(this);
+    }
+
+    public void close() {
+        rqpool.shutdownNow();
+        streampool.isShutdown();
     }
 
     //todo uncommitted data not retrieved
@@ -318,17 +343,7 @@ public class Session {
         });
     }
 
-    public List<Object> ngetAll (Class c) throws Exception {
-        final Table t = Instance.getInstance().getTableByName(c.getName());
-        if (t != null) {
-//            t.lockTable(this);
-            final List<Object> r = t.getAll(this, 0);
-//            t.unlockTable(this);
-            return r;
-        }
-        return null;
-    }
-
+    @Deprecated
     public Object nfind (Class c, long id) throws InternalException, NoSuchMethodException, InvocationTargetException, IOException, InvalidFrameHeader, InvalidFrame, EmptyFrameHeaderFound, IncorrectUndoChunkFound, ClassNotFoundException, InstantiationException, IllegalAccessException {
         final Table t = Instance.getInstance().getTableByName(c.getName());
         if (t != null) {
@@ -542,6 +557,10 @@ public class Session {
     public static void setDntmSession(Session dntmSession) {
         logger.info("set downtime session with id = "+dntmSession.getSessionId());
         Session.dntmSession = dntmSession;
+    }
+
+    public RetrieveQueue getRetrieveQueue() {
+        return retrieveQueue;
     }
 
     public void streamFramePtr(Frame f, int ptr) {

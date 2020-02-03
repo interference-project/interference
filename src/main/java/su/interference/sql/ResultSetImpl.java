@@ -27,16 +27,16 @@ package su.interference.sql;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.core.Chunk;
+import su.interference.core.Config;
 import su.interference.core.DataChunk;
-import su.interference.core.LLT;
 import su.interference.exception.InternalException;
 import su.interference.persistent.Session;
 import su.interference.persistent.Table;
 
 import java.net.MalformedURLException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.PriorityBlockingQueue;
+import java.util.Queue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * @author Yuriy Glotanov
@@ -46,26 +46,88 @@ import java.util.concurrent.PriorityBlockingQueue;
 public class ResultSetImpl implements ResultSet {
     private final static Logger logger = LoggerFactory.getLogger(ResultSetImpl.class);
     private final Table target;
-    private final PriorityBlockingQueue q = new PriorityBlockingQueue(1000);
+    private final boolean persistent;
+    private final LinkedBlockingQueue q = new LinkedBlockingQueue(Config.getConfig().RETRIEVE_QUEUE_SIZE);
+    private boolean started;
+    private CountDownLatch latch;
+    private final SQLCursor sqlc;
+    private Queue<Chunk> q_;
 
-    public ResultSetImpl(Table target) {
+    public ResultSetImpl(Table target, SQLCursor sqlc, boolean persistent) {
         this.target = target;
+        this.persistent = persistent;
+        this.sqlc = sqlc;
     }
 
     public DataChunk persist(Object o, Session s) throws Exception {
+        if (persistent) {
+            return target.persist(o, s);
+        } else {
+            final boolean success = q.offer(o);
+            if (!success) {
+                latch.countDown();
+                q.put(o);
+            }
+        }
         return null;
     }
 
-    public Object poll() {
-        return null;
+    public Object poll(Session s) throws Exception {
+        if (!started) {
+            if (sqlc != null) {
+                sqlc.flushTarget();
+                latch = new CountDownLatch(1);
+            }
+            if (latch != null) {
+                latch.await();
+            }
+            started = true;
+        }
+        if (persistent) {
+            return target.poll(s);
+        } else {
+            final Object o = q.take();
+            if (o instanceof ResultSetTerm) {
+                started = false;
+            }
+            if (started) {
+                return o;
+            } else {
+                return null;
+            }
+        }
     }
 
-    public List<Chunk> getAll(Session s) throws Exception {
-        return null;
+    public Chunk cpoll(Session s) throws Exception {
+        if (!started) {
+            if (sqlc != null) {
+                sqlc.flushTarget();
+                latch = new CountDownLatch(1);
+            }
+            if (latch != null) {
+                latch.await();
+            }
+            started = true;
+        }
+        if (persistent) {
+            return target.cpoll(s);
+        } else {
+            return null;
+        }
     }
 
-    public ArrayList<Object> getAll(Session s, int ptr) throws Exception {
-        return null;
+    public Table getTarget() {
+        return target;
+    }
+
+    public boolean isPersistent() {
+        return persistent;
+    }
+
+    public void release() {
+        if (latch != null) {
+            latch.countDown();
+        }
     }
 
     public int getObjectId() {
