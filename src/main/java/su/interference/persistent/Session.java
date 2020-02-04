@@ -286,7 +286,6 @@ public class Session {
             try {
                 retrieveQueue = t.getContentQueue(this);
                 Future f = rqpool.submit(retrieveQueue.getR());
-                Object o = f.get();
                 return retrieveQueue;
             } catch (Exception e) {
                 if (e instanceof ExecutionException) {
