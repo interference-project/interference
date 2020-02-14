@@ -674,7 +674,7 @@ public class Frame implements Comparable {
         return used;
     }
 
-    private boolean local() {
+    public boolean isLocal() {
         return this.file+this.pointer == this.allocFile+this.allocPointer;
     }
 

@@ -71,7 +71,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
             //throw new MissingSyncFrameException();
         }
 
-        allowR = !t.isNoTran() || t.getName().equals("su.interference.persistent.UndoChunk");
+        allowR = frame.isLocal() ? !t.isNoTran() || t.getName().equals("su.interference.persistent.UndoChunk") : false;
         className = t.getName();
         rtran = frame.getLiveTransactions();
         tframes = frame.getLiveTransFrames();
