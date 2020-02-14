@@ -63,7 +63,7 @@ public class TransportSyncTask implements Runnable {
                 final TransportChannel channel = entry.getValue();
                 if (channel.isStarted() && channel.isConnected()) {
                     final List<FrameSync> lbs = Instance.getInstance().getSyncFrames(channel.getChannelId());
-                    logger.debug(lbs.size() + " persisted sync frame(s) found (node id = " + channel.getChannelId() + ")");
+                    logger.info(lbs.size() + " persisted sync frame(s) found (node id = " + channel.getChannelId() + ")");
                     final List<SyncFrame> psb_ = new ArrayList<>();
                     for (FrameSync bs : lbs) {
                         if (bs.getAllocId() == CommandEvent.COMMIT || bs.getAllocId() == CommandEvent.ROLLBACK) { //command
@@ -72,7 +72,7 @@ public class TransportSyncTask implements Runnable {
                             final boolean sent = command.getLatch().await(REMOTE_SYNC_TIMEOUT, TimeUnit.MILLISECONDS);
                             if (!command.isFail() && sent) {
                                 s.delete(bs);
-                                logger.debug("sent persisted command sync to node " + channel.getChannelId());
+                                logger.info("sent persisted command sync to node " + channel.getChannelId());
                             }
                         } else {
                             FreeFrame fb = null;
@@ -89,7 +89,7 @@ public class TransportSyncTask implements Runnable {
                             TransportContext.getInstance().send(event);
                             final boolean sent = event.getLatch().await(REMOTE_SYNC_TIMEOUT, TimeUnit.MILLISECONDS);
                             if (!event.isFail() && sent) {
-                                logger.debug(psb.length + " persisted sync frame(s) were sent and synced (node id = " + channel.getChannelId() + ")");
+                                logger.info(psb.length + " persisted sync frame(s) were sent and synced (node id = " + channel.getChannelId() + ")");
                             }
                         }
                     } catch (Exception e) {
@@ -100,7 +100,7 @@ public class TransportSyncTask implements Runnable {
                         for (FrameSync bs : lbs) {
                             if (bs.getAllocId() > CommandEvent.MAX_COMMAND) { //command
                                 s.delete(bs);
-                                logger.debug("sent persisted framesync with allocId = " + bs.getAllocId() + " to node " + channel.getChannelId());
+                                logger.info("sent persisted framesync with allocId = " + bs.getAllocId() + " to node " + channel.getChannelId());
                             }
                         }
                     }
@@ -130,14 +130,14 @@ public class TransportSyncTask implements Runnable {
                             if (persist) {
                                 FrameSync bs = new FrameSync(b.getAllocId(), channel.getChannelId(), b.getFrameId());
                                 s.persist(bs);
-                                logger.debug("persist framesync with allocId = "+b.getAllocId()+" for channel " + channel.getChannelId());
+                                logger.info("persist framesync with allocId = "+b.getAllocId()+" for channel " + channel.getChannelId());
                             }
                             Metrics.get("syncQueue").put(1);
                         }
                         logger.error(sb.length+" frame(s) were not sync due to channel failure (channel id = " + channel.getChannelId() + ")");
                     }
                 } else {
-                    logger.debug("node "+channel.getChannelId()+" unavailable");
+                    logger.info("node "+channel.getChannelId()+" unavailable");
                     for (SyncFrame b : sb) {
                         final ArrayList<FrameSync> sbs = Instance.getInstance().getSyncFramesById(b.getFrameId());
                         boolean persist = true;
@@ -150,10 +150,10 @@ public class TransportSyncTask implements Runnable {
                         if (persist) {
                             FrameSync bs = new FrameSync(b.getAllocId(), channel.getChannelId(), b.getFrameId());
                             s.persist(bs);
-                            logger.debug("persist framesync with allocId = "+b.getAllocId()+" for channel " + channel.getChannelId());
+                            logger.info("persist framesync with allocId = "+b.getAllocId()+" for channel " + channel.getChannelId());
                         }
                     }
-                    logger.debug(sb.length+" frame(s) were not sync due to node unavailable (channel id = " + channel.getChannelId() + ")");
+                    logger.info(sb.length+" frame(s) were not sync due to node unavailable (channel id = " + channel.getChannelId() + ")");
                 }
             }
         } catch (Exception e) {

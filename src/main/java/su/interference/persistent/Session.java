@@ -359,7 +359,7 @@ public class Session {
         return persist(o, null);
     }
 
-    protected DataChunk persist (Object o, LLT llt) throws Exception {
+    public DataChunk persist (Object o, LLT llt) throws Exception {
         final Table t = Instance.getInstance().getTableByName(o.getClass().getName());
         if (t != null) {
             return t.persist(o, this, llt);
@@ -378,7 +378,7 @@ public class Session {
         return ds.getTable();
     }
 
-    protected void delete (Object o, LLT llt) throws Exception {
+    public void delete (Object o, LLT llt) throws Exception {
         final Table t = Instance.getInstance().getTableByName(o.getClass().getName());
         if (t != null) {
             t.delete(o, this, llt);

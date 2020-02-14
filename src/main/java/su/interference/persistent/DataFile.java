@@ -232,13 +232,16 @@ public class DataFile implements Serializable {
             dc.setFrameData(bd);
             t.addIndexValue(dc);
         } else {
-            //fix deadlock by reorder access
-            //if current object is not DATAFILE, then locks DATAFILE first
-            if (this.getFileId() == bd.getFile()) {
-                s.persist(bd, llt);
-            } else {
-                DataFile df = Instance.getInstance().getDataFileById(bd.getFile());
-                df.persist(bd, s, llt);
+            //syncframe event should not persist new frame
+            if (!external) {
+                //fix deadlock by reorder access
+                //if current object is not DATAFILE, then locks DATAFILE first
+                if (this.getFileId() == bd.getFile()) {
+                    s.persist(bd, llt);
+                } else {
+                    DataFile df = Instance.getInstance().getDataFileById(bd.getFile());
+                    df.persist(bd, s, llt);
+                }
             }
         }
 
@@ -453,7 +456,26 @@ public class DataFile implements Serializable {
 
         this.file.seek(ptr);
         this.file.write(b);
+    }
 
+    public synchronized void writeFrame(FrameData bd, final long ptr, final byte[] b, LLT llt, Session s) throws Exception {
+        final ByteString bs = new ByteString(b);
+        final int file_ = bs.getIntFromBytes(0);
+        final long ptr_ = bs.getLongFromBytes(4);
+        final int id_ = bs.getIntFromBytes(12);
+
+        if (this.fileId != file_) {
+            logger.error("Wrong write frame operation with file = " + this.file + ", internal file = " + file_ + " ptr = " + ptr_);
+        }
+
+        if (ptr != ptr) {
+            logger.error("Wrong write frame operation with file = " + this.file + " ptr = " + ptr + ", internal file = " + file_ + " ptr = " + ptr_);
+        }
+
+        this.file.seek(ptr);
+        this.file.write(b);
+
+        s.persist(bd, llt);
     }
 
     public int getMaxMemoryCache() {
