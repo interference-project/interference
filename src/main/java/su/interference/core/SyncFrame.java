@@ -24,6 +24,8 @@
 
 package su.interference.core;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import su.interference.exception.InternalException;
 import su.interference.persistent.*;
 
@@ -38,6 +40,7 @@ import java.util.HashMap;
 
 public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
 
+    private final static Logger logger = LoggerFactory.getLogger(SyncFrame.class);
     private final byte[] b;
     private final long frameId;
     private final long allocId;
@@ -64,6 +67,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
         if (bd == null) {
             final FreeFrame fframe = Instance.getInstance().getFreeFrameById(frame.getPtr());
             if (fframe == null) {
+                logger.error(frame.getClass().getSimpleName()+" does not match any system objects");
                 throw new InternalException();
             }
             fframe.setPassed(1);

@@ -120,7 +120,6 @@ public class SyncFrameEvent extends TransportEventImpl {
                 //tframes.addAll(b.getTframes());
             }
         }
-        llt.commit();
         //updateTransFrames(tframes, hmap2, s);
 
         final Map<Long, List<Chunk>> umap = new ConcurrentHashMap<>();
@@ -188,6 +187,8 @@ public class SyncFrameEvent extends TransportEventImpl {
             //b.getBd().setFrame(null);
         }
 
+        List<SyncFrame> nframes = new ArrayList<>();
+        List<SyncFrame> lframes = new ArrayList<>();
         for (SyncFrame b : sb) {
             try {
                 if (b.isAllowR()) {
@@ -208,8 +209,14 @@ public class SyncFrameEvent extends TransportEventImpl {
                             frame.setRes05(lcF);
                             frame.setRes06(parentB);
                             frame.setRes07(lcB);
-                            b.getDf().writeFrame(b.getBd(), b.getBd().getPtr(), frame.getFrame(), llt, s);
+                            //b.getDf().writeFrame(b.getBd(), b.getBd().getPtr(), frame.getFrame(), llt, s);
                             b.getBd().setFrame(frame);
+                            if (b.getFrameType() == 1) {
+                                lframes.add(b);
+                            }
+                            if (b.getFrameType() == 2) {
+                                nframes.add(b);
+                            }
                             logger.info("write index frame with allocId "+b.getAllocId()+" ptr "+b.getBd().getPtr());
                         }
                     }
@@ -219,6 +226,15 @@ public class SyncFrameEvent extends TransportEventImpl {
             }
             //b.getBd().setFrame(null);
         }
+
+        for (SyncFrame b : lframes) {
+            b.getDf().writeFrame(b.getBd(), b.getBd().getPtr(), b.getBd().getFrame().getFrame(), llt, s);
+        }
+        for (SyncFrame b : nframes) {
+            b.getDf().writeFrame(b.getBd(), b.getBd().getPtr(), b.getBd().getFrame().getFrame(), llt, s);
+        }
+
+        llt.commit();
 
         final Map<Integer, List<FrameApi>> frames_ = new HashMap<>();
         for (SyncFrame f : sb) {
