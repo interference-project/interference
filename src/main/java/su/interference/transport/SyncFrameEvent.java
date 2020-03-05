@@ -70,7 +70,6 @@ public class SyncFrameEvent extends TransportEventImpl {
         Session s = Session.getDntmSession();
         HashMap<Long, Long> hmap = new HashMap<Long, Long>();
         HashMap<Long, Long> hmap2 = new HashMap<Long, Long>();
-        //ArrayList<TransFrame> tframes = new ArrayList<>();
         LLT llt = LLT.getLLT();
         for (SyncFrame b : sb) {
             if (b.isAllowR()) {
@@ -84,10 +83,7 @@ public class SyncFrameEvent extends TransportEventImpl {
                     for (DataFile f : dfs) {
                         final int order = (f.getFileId() % Storage.MAX_NODES) % Config.getConfig().FILES_AMOUNT;
                         if (order == allocOrder) {
-                            //final LLT llt = LLT.getLLT();
-                            bd = t.createNewFrame(null, f.getFileId(), b.getFrameType(), b.getAllocId(), b.isStarted(), false, true, s, llt);
-                            //llt.commit();
-                            //bd.setAllocId(b.getAllocId());
+                            bd = t.createNewFrame(null, f.getFileId(), b.getFrameType(), b.getAllocId(), false, false, true, s, llt);
                             bd.setFrame(null);
                             b.setDf(f);
                         }
@@ -95,8 +91,6 @@ public class SyncFrameEvent extends TransportEventImpl {
                     logger.info("create replicated frame with allocId "+b.getAllocId()+" ptr "+bd.getPtr());
                 } else {
                     if (b.getObjectId() == bd.getObjectId()) {
-                        bd.setStarted(b.isStarted()?1:0);
-                        //s.persist(bd, llt);
                         b.setDf(Instance.getInstance().getDataFileById(bd.getFile()));
                         logger.info("rframe bd found with allocId=" + b.getAllocId());
                     } else {
@@ -106,9 +100,7 @@ public class SyncFrameEvent extends TransportEventImpl {
                             b.setDf(Instance.getInstance().getDataFileById(bd.getFile()));
                             s.delete(bd);
                         } else {
-                            bd.setStarted(b.isStarted()?1:0);
                             bd.setObjectId(b.getObjectId());
-                            //s.persist(bd, llt);
                             b.setDf(Instance.getInstance().getDataFileById(bd.getFile()));
                         }
                     }
@@ -117,7 +109,6 @@ public class SyncFrameEvent extends TransportEventImpl {
                 b.setBd(bd);
                 hmap.put(b.getAllocId(), bd.getFrameId());
                 hmap2.put(b.getFrameId(), bd.getFrameId());
-                //tframes.addAll(b.getTframes());
             }
         }
         //updateTransFrames(tframes, hmap2, s);
@@ -187,8 +178,8 @@ public class SyncFrameEvent extends TransportEventImpl {
             //b.getBd().setFrame(null);
         }
 
-        List<SyncFrame> nframes = new ArrayList<>();
-        List<SyncFrame> lframes = new ArrayList<>();
+        final Map<Integer, List<SyncFrame>> storemap = new HashMap<>();
+
         for (SyncFrame b : sb) {
             try {
                 if (b.isAllowR()) {
@@ -209,17 +200,14 @@ public class SyncFrameEvent extends TransportEventImpl {
                             frame.setRes05(lcF);
                             frame.setRes06(parentB);
                             frame.setRes07(lcB);
-                            //b.getDf().writeFrame(b.getBd(), b.getBd().getPtr(), frame.getFrame(), llt, s);
                             b.getBd().setFrame(frame);
-                            if (b.getFrameType() == 1) {
-                                lframes.add(b);
-                            }
-                            if (b.getFrameType() == 2) {
-                                nframes.add(b);
-                            }
                             logger.info("write index frame with allocId "+b.getAllocId()+" ptr "+b.getBd().getPtr());
                         }
                     }
+                    if (storemap.get(t.getObjectId()) == null) {
+                        storemap.put(t.getObjectId(), new ArrayList<>());
+                    }
+                    storemap.get(t.getObjectId()).add(b);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -227,11 +215,9 @@ public class SyncFrameEvent extends TransportEventImpl {
             //b.getBd().setFrame(null);
         }
 
-        for (SyncFrame b : lframes) {
-            b.getDf().writeFrame(b.getBd(), b.getBd().getPtr(), b.getBd().getFrame().getFrame(), llt, s);
-        }
-        for (SyncFrame b : nframes) {
-            b.getDf().writeFrame(b.getBd(), b.getBd().getPtr(), b.getBd().getFrame().getFrame(), llt, s);
+        for (Map.Entry<Integer, List<SyncFrame>> entry : storemap.entrySet()) {
+            final Table t = Instance.getInstance().getTableById(entry.getKey());
+            t.storeFrames(entry.getValue(), this.getCallbackNodeId(), llt, s);
         }
 
         llt.commit();

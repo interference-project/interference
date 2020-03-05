@@ -27,6 +27,7 @@ package su.interference.persistent;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -102,6 +103,8 @@ public class Table implements DataObject, ResultSet {
     @Column
     private AtomicLong incValue;
 
+    @Transient
+    private Map<Integer, Long> ixstartfs = new HashMap<>();
     @Transient
     private AtomicLong idValue2;
     @Transient
@@ -1212,6 +1215,7 @@ public class Table implements DataObject, ResultSet {
         if (extllt == null) { llt.commit(); }
     }
 
+    //todo deprecated started param
     public synchronized FrameData createNewFrame(final FrameData frame, final int fileId, final int frameType, final long allocId, final boolean started, final boolean setlbs, final boolean external, final Session s, final LLT llt) throws Exception {
         final DataFile df = Storage.getStorage().getDataFileById(fileId);
         final FrameData bd = df.createNewFrame(frame, frameType, allocId, started, external, this, s, llt);
@@ -1354,7 +1358,7 @@ public class Table implements DataObject, ResultSet {
                     List<FrameData> bb = Instance.getInstance().getTableById(getObjectId()).getFrames();
 
                     for (FrameData b : bb) {
-                        if (b.getStarted()==1) {
+                        if (b.getStarted() > 0) {
                             startframes.add(b.getFrameId());
                         }
                     }
@@ -1368,7 +1372,7 @@ public class Table implements DataObject, ResultSet {
                             throw new InternalException();
                         }
                         //frame must be local or remote chain started (RCS)
-                        if (bd.getFrameId() != bd.getAllocId() && bd.getStarted() != 1) {
+                        if (bd.getFrameId() != bd.getAllocId() && bd.getStarted() == 0) {
                             throw new InternalException();
                         }
                         IndexFrame el = bd.getIndexFrame();
@@ -1705,6 +1709,16 @@ public class Table implements DataObject, ResultSet {
         removeObjects(key, o, s, llt);
     }
 
+    public synchronized void storeFrames(List<SyncFrame> frames, int sourceNodeId, LLT llt, Session s) throws Exception {
+        for (SyncFrame b : frames) {
+            if (b.isStarted()) {
+                ixstartfs.put(sourceNodeId, b.getBd().getFrameId());
+                b.getBd().setStarted(sourceNodeId);
+            }
+            b.getDf().writeFrame(b.getBd(), b.getBd().getPtr(), b.getBd().getFrame().getFrame(), llt, s);
+        }
+    }
+
     @Deprecated
     public synchronized List<Chunk> getContent(Session s) throws IOException, InternalException,  NoSuchMethodException, InvocationTargetException, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException {
         ArrayList<Chunk> res = new ArrayList<Chunk>();
@@ -1712,7 +1726,7 @@ public class Table implements DataObject, ResultSet {
         //todo need performance optimizing
         List<FrameData> bb = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
         for (FrameData b : bb) {
-            if (b.getStarted()==1) {
+            if (b.getStarted() > 0) {
                 res.addAll(getLocalContent(b.getFrameId(), s));
             }
         }
@@ -1729,7 +1743,7 @@ public class Table implements DataObject, ResultSet {
             return res;
         }
         //frame must be local or remote chain started (RCS)
-        if (bd.getFrameId() != bd.getAllocId() && bd.getStarted() != 1) {
+        if (bd.getFrameId() != bd.getAllocId() && bd.getStarted() == 0) {
             return res;
         }
         IndexFrame el = bd.getIndexFrame();
@@ -1770,7 +1784,7 @@ public class Table implements DataObject, ResultSet {
         //todo need performance optimizing
         List<FrameData> bb = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
         for (FrameData b : bb) {
-            if (b.getStarted()==1) {
+            if (b.getStarted() > 0) {
                 res.addAll(getLocalLeafFrames(b.getFrameId(), s));
             }
         }
@@ -1783,7 +1797,7 @@ public class Table implements DataObject, ResultSet {
         boolean cnue = true;
         FrameData bd = Instance.getInstance().getFrameById(start);
         //frame must be local or remote chain started (RCS)
-        if (bd.getFrameId() != bd.getAllocId() && bd.getStarted() != 1) {
+        if (bd.getFrameId() != bd.getAllocId() && bd.getStarted() == 0) {
             return res;
         }
         IndexFrame el = bd.getIndexFrame();
@@ -1866,7 +1880,7 @@ public class Table implements DataObject, ResultSet {
             //todo need performance optimizing
             final List<FrameData> bb = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
             for (FrameData b : bb) {
-                if (b.getStarted() == 1) {
+                if (b.getStarted() > 0) {
                     final DataChunk dc_ = getLocalObjectByKey(b.getFrameId(), key);
                     if (dc_ != null) {
                         return dc_;
@@ -1883,7 +1897,7 @@ public class Table implements DataObject, ResultSet {
         //todo need performance optimizing
         final List<FrameData> bb = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
         for (FrameData b : bb) {
-            if (b.getStarted() == 1) {
+            if (b.getStarted() > 0) {
                 r.addAll(getLocalObjectsByKey(b.getFrameId(), key));
             }
         }
