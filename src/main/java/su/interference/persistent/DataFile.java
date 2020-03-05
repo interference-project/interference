@@ -178,6 +178,7 @@ public class DataFile implements Serializable {
     //normal order of access - lock datafile, then lock table<framedata>
     //but, in case of allocate undo space this may looks as:
     //lock datafile<undo> - lock table<framedata> - try lock datafile
+    //todo deprecated started param
     public synchronized FrameData createNewFrame(FrameData frame, int frameType, long allocId, boolean started, boolean external, DataObject t, Session s, LLT llt) throws Exception {
         //deadlock bug fix
         //instead this.allocateFrame we lock Table<FrameData> first
@@ -185,7 +186,10 @@ public class DataFile implements Serializable {
         final boolean setcurrenable = external?false:t.getName().equals("su.interference.persistent.UndoChunk")?false:true;
         //allocated for rframe
         if (allocId>0) { bd.setAllocId(allocId); }
+
+        //todo deprecated
         if (started) { bd.setStarted(1); }
+
         final Frame db = frameType == 0 ? new DataFrame(bd, t) : new IndexFrame(bd, frameType, t);
         db.setObjectId(t.getObjectId());
         bd.setFrame(db);
