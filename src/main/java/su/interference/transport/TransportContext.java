@@ -127,6 +127,7 @@ public class TransportContext implements TransportApi {
             processCallback(transportMessage.getTransportCallback());
         } else {
             logger.debug("transport message received with UUID: " + transportMessage.getUuid() + ", type = " + transportMessage.getTransportEvent().getClass());
+            transportMessage.getTransportEvent().setCallbackNodeId(transportMessage.getSender());
             final EventResult result = transportMessage.getTransportEvent().process();
             TransportCallback transportCallback = new TransportCallback(Config.getConfig().LOCAL_NODE_ID, transportMessage.getUuid(), result);
             sendCallback(transportMessage.getSender(), new TransportMessage(TransportMessage.CALLBACK_MESSAGE, Config.getConfig().LOCAL_NODE_ID, null, transportCallback));

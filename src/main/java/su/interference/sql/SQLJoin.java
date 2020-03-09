@@ -181,9 +181,9 @@ public class SQLJoin {
 
                     gtemp.persist(oo, s);
 
-                    if (!((ResultSetImpl)gtemp).isPersistent()) {
-                        gtemp.persist(new ResultSetTerm(), s);
-                    }
+                }
+                if (!((ResultSetImpl)gtemp).isPersistent()) {
+                    gtemp.persist(new ResultSetTerm(), s);
                 }
 
                 ((ResultSetImpl)gtemp).release();

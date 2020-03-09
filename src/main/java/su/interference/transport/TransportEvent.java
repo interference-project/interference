@@ -39,6 +39,8 @@ public interface TransportEvent extends Serializable {
     void setMessageUUID(String uuid);
     CountDownLatch getLatch();
     void setLatch(CountDownLatch latch);
+    int getCallbackNodeId();
+    void setCallbackNodeId(int callbackNodeId);
     boolean isSent();
     void sent();
     boolean isFail();

@@ -1711,6 +1711,7 @@ public class Table implements DataObject, ResultSet {
 
     public synchronized void storeFrames(List<SyncFrame> frames, int sourceNodeId, LLT llt, Session s) throws Exception {
         for (SyncFrame b : frames) {
+            b.getBd().setStarted(0);
             if (b.isStarted()) {
                 ixstartfs.put(sourceNodeId, b.getBd().getFrameId());
                 b.getBd().setStarted(sourceNodeId);
