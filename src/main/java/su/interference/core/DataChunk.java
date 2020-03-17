@@ -527,9 +527,11 @@ public class DataChunk implements Chunk {
                     final DataChunk dc = (DataChunk) Instance.getInstance().getChunkByPointer(this.getHeader().getFramePtr(), this.getHeader().getFramePtrRowId().getRowPointer());
                     ((IndexChunk)o).setDataChunk(dc);
                     if (dc == null) {
-                        final long allocId = Instance.getInstance().getFrameById(this.header.getRowID().getFileId()+this.header.getRowID().getFramePointer()).getAllocId();
-                        final long allocId2 = Instance.getInstance().getFrameById(this.getHeader().getFramePtr()).getAllocId();
-                        logger.error("null datachunk found for indexframe allocId = " + allocId + " indexptr allocId = " + allocId2);
+// todo during rframe.IndexFrame.init system directory not yet contains replicated FrameData objects
+//                        final long allocId = Instance.getInstance().getFrameById(this.header.getRowID().getFileId()+this.header.getRowID().getFramePointer()).getAllocId();
+//                        final long allocId2 = Instance.getInstance().getFrameById(this.getHeader().getFramePtr()).getAllocId();
+//                        logger.error("null datachunk found for indexframe allocId = " + allocId + " indexptr allocId = " + allocId2);
+                        logger.error("null datachunk found");
                     }
                 }
                 if (!t.isNoTran()) {

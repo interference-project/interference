@@ -96,11 +96,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @Column
     private AtomicInteger current;
     @Column
-    @IndexColumn
     private volatile int started;
-    @Column
-    @IndexColumn
-    private AtomicInteger allocated;
     @Id
     @MapColumn
     @Transient
@@ -153,19 +149,6 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     public void clearCurrent() {
         if (this.current!=null) {
             this.current.compareAndSet(1, 0);
-        }
-    }
-
-    public void allocate() {
-        if (this.allocated==null) {
-            this.allocated = new AtomicInteger(0);
-        }
-        this.allocated.compareAndSet(0, 1);
-    }
-
-    public void deallocate() {
-        if (this.allocated!=null) {
-            this.allocated.compareAndSet(1, 0);
         }
     }
 
@@ -225,10 +208,6 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     public void setFrame(Frame b) {
         this.frame = b;
-    }
-
-    public FrameData() {
-        this.allocated = new AtomicInteger();
     }
 
     public long getFrameId() {
@@ -322,6 +301,10 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return nodeId;
     }
 
+    public FrameData() {
+
+    }
+
     public FrameData(int file, long ptr, int size, DataObject tt) {
         this.dataObject = tt;
         this.objectId = tt.getObjectId();
@@ -329,7 +312,23 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         this.file = file;
         this.ptr  = ptr;
         this.size = size;
-        this.allocated = new AtomicInteger();
+    }
+
+    public FrameData(FrameData bd, DataObject tt) {
+        this.dataObject = tt;
+        this.objectId = tt.getObjectId();
+        this.allocId = bd.getFile()+bd.getPtr();
+        this.file = bd.getFile();
+        this.ptr  = bd.getPtr();
+        this.size = bd.getSize();
+        this.allocId = bd.getAllocId();
+        this.started = bd.getStarted();
+        this.current = bd.getCurrent();
+        this.used = bd.getUsed();
+        this.prevFrame = bd.getPrevFrame();
+        this.prevFile = bd.getPrevFile();
+        this.nextFrame = bd.getNextFrame();
+        this.nextFile = bd.getNextFile();
     }
 
     public int compareTo(Object obj) {
@@ -369,10 +368,6 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     public int getObjectId() {
         return objectId;
-    }
-
-    public void setObjectId(int objectId) {
-        this.objectId = objectId;
     }
 
     public int getFile() {
@@ -489,13 +484,5 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     public void setStarted(int started) {
         this.started = started;
-    }
-
-    public AtomicInteger getAllocated() {
-        return allocated;
-    }
-
-    public void setAllocated(AtomicInteger allocated) {
-        this.allocated = allocated;
     }
 }

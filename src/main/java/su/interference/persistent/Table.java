@@ -656,6 +656,7 @@ public class Table implements DataObject, ResultSet {
         this.genericClass = Instance.getUCL().loadClass(name);
         final SystemEntity sa = (SystemEntity)this.genericClass.getAnnotation(SystemEntity.class);
         final IndexEntity xa = (IndexEntity)this.genericClass.getAnnotation(IndexEntity.class);
+        final ResultSetEntity rsa = (ResultSetEntity)this.genericClass.getAnnotation(ResultSetEntity.class);
         this.notran = sa!=null;
         this.index = xa!=null;
         this.idfield = getTableIdField();
@@ -681,38 +682,31 @@ public class Table implements DataObject, ResultSet {
             }
             getMapFieldByColumn("frameId").setMap(ixlb);
             getMapFieldByColumn("allocId").setMap(ixla);
-            getIndexFieldByColumn("started").setIndex(ixls);
         } else if (this.name.equals("su.interference.persistent.UndoChunk")) {
             //none
         } else {
-            Class cc = this.getTableClass();
             try {
-                java.lang.reflect.Field fc = null;
-                Constructor ccc = null;
-                try {
-                    fc = cc.getField("CLASS_ID");
-                } catch (NoSuchFieldException e) { logger.info("NoSuchFieldException: CLASS_ID during Table construct");; }
-                try {
-                    ccc = cc.getConstructor(DataChunk.class);
-                } catch (NoSuchMethodException e) { logger.info("NoSuchMethodException: <init>(DataChunk) during Table:"+cc.getName()+" construct"); }
-                if (fc != null && ccc != null) {
-                    final List<Object> bds = ixl.getObjectsByKey(fc.getInt(this));
-                    for (Object b : bds) {
-                        final FrameData bd = (FrameData)((DataChunk)b).getEntity();
-                        bd.setDataObject(this); //todo must be refactored, FrameData->new DataFrame->new DataChunk->t.getFields() possibly may be simply
-                        DataFrame db = null;
+                final List<Object> bds = ixl.getObjectsByKey(this.getObjectId());
+                for (Object b : bds) {
+                    final FrameData bd = (FrameData)((DataChunk)b).getEntity();
+                    bd.setDataObject(this); //todo must be refactored, FrameData->new DataFrame->new DataChunk->t.getFields() possibly may be simply
+
+                    if (sa != null && rsa == null && this.objectId != Table.CLASS_ID) {
+                        Frame db = null;
                         try {
-                            db = bd.getDataFrame();
+                            db = bd.getFrame();
                         } catch (Exception e) {
+                            logger.error("internal Table.<init>");
                         }
-                        for (Chunk ck : db.getChunks()) {
-                            if (ck.getHeader().getState()==Header.RECORD_NORMAL_STATE) {  //miss deleted or archived records
-                                //Object to;
-                                //to = ccc.newInstance((DataChunk)ck);
-                                //this.addIndexValue(to);
-                                this.addIndexValue((DataChunk)ck);
+                        for (Chunk ck : ((DataFrame)db).getChunks()) {
+                            if (ck.getHeader().getState() == Header.RECORD_NORMAL_STATE) {  //miss deleted or archived records
+                                this.addIndexValue((DataChunk) ck);
                             }
                         }
+                    }
+                    //set start frames for remote indexes
+                    if (bd.getStarted() > 0) {
+                        ixstartfs.put(bd.getStarted(), bd.getFrameId());
                     }
                 }
             } catch (Exception e) {
@@ -1355,12 +1349,8 @@ public class Table implements DataObject, ResultSet {
                 synchronized (t) {
                     List<Long> startframes = new ArrayList<>();
                     startframes.add(t.fileStart + t.frameStart);
-                    List<FrameData> bb = Instance.getInstance().getTableById(getObjectId()).getFrames();
-
-                    for (FrameData b : bb) {
-                        if (b.getStarted() > 0) {
-                            startframes.add(b.getFrameId());
-                        }
+                    for (Map.Entry<Integer, Long> entry : ixstartfs.entrySet()) {
+                        startframes.add(entry.getValue());
                     }
 
                     //todo need to implement merge algorithm for multinode indexes
@@ -1712,6 +1702,7 @@ public class Table implements DataObject, ResultSet {
     public synchronized void storeFrames(List<SyncFrame> frames, int sourceNodeId, LLT llt, Session s) throws Exception {
         for (SyncFrame b : frames) {
             b.getBd().setStarted(0);
+            b.getBd().setFrame(b.getRFrame());
             if (b.isStarted()) {
                 ixstartfs.put(sourceNodeId, b.getBd().getFrameId());
                 b.getBd().setStarted(sourceNodeId);
@@ -1724,12 +1715,8 @@ public class Table implements DataObject, ResultSet {
     public synchronized List<Chunk> getContent(Session s) throws IOException, InternalException,  NoSuchMethodException, InvocationTargetException, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException {
         ArrayList<Chunk> res = new ArrayList<Chunk>();
         res.addAll(getLocalContent(this.fileStart+this.frameStart, s));
-        //todo need performance optimizing
-        List<FrameData> bb = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
-        for (FrameData b : bb) {
-            if (b.getStarted() > 0) {
-                res.addAll(getLocalContent(b.getFrameId(), s));
-            }
+        for (Map.Entry<Integer, Long> entry : ixstartfs.entrySet()) {
+            res.addAll(getLocalContent(entry.getValue(), s));
         }
         return res;
     }
@@ -1782,12 +1769,8 @@ public class Table implements DataObject, ResultSet {
     private synchronized ArrayList<FrameData> getLeafFrames (Session s) throws IOException, InternalException,  NoSuchMethodException, InvocationTargetException, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException {
         ArrayList<FrameData> res = new ArrayList<FrameData>();
         res.addAll(getLocalLeafFrames(this.fileStart+this.frameStart, s));
-        //todo need performance optimizing
-        List<FrameData> bb = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
-        for (FrameData b : bb) {
-            if (b.getStarted() > 0) {
-                res.addAll(getLocalLeafFrames(b.getFrameId(), s));
-            }
+        for (Map.Entry<Integer, Long> entry : ixstartfs.entrySet()) {
+            res.addAll(getLocalLeafFrames(entry.getValue(), s));
         }
         return res;
     }
@@ -1878,14 +1861,10 @@ public class Table implements DataObject, ResultSet {
         if (dc != null) {
             return dc;
         } else {
-            //todo need performance optimizing
-            final List<FrameData> bb = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
-            for (FrameData b : bb) {
-                if (b.getStarted() > 0) {
-                    final DataChunk dc_ = getLocalObjectByKey(b.getFrameId(), key);
-                    if (dc_ != null) {
-                        return dc_;
-                    }
+            for (Map.Entry<Integer, Long> entry : ixstartfs.entrySet()) {
+                final DataChunk dc_ = getLocalObjectByKey(entry.getValue(), key);
+                if (dc_ != null) {
+                    return dc_;
                 }
             }
         }
@@ -1895,12 +1874,8 @@ public class Table implements DataObject, ResultSet {
     public synchronized List<DataChunk> getObjectsByKey (ValueSet key) throws IOException, InternalException,  NoSuchMethodException, InvocationTargetException, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException {
         final long start = this.fileStart+this.frameStart;
         final List<DataChunk> r = getLocalObjectsByKey(start, key);
-        //todo need performance optimizing
-        final List<FrameData> bb = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
-        for (FrameData b : bb) {
-            if (b.getStarted() > 0) {
-                r.addAll(getLocalObjectsByKey(b.getFrameId(), key));
-            }
+        for (Map.Entry<Integer, Long> entry : ixstartfs.entrySet()) {
+            r.addAll(getLocalObjectsByKey(entry.getValue(), key));
         }
         return r;
     }

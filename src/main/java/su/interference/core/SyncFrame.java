@@ -56,6 +56,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
     private final boolean started;
     private FrameData bd;
     private DataFile df;
+    private Frame rFrame;
     private final HashMap<Long, Long> imap;
     private final HashMap<Long, Transaction> rtran;
     private final ArrayList<TransFrame> tframes;
@@ -126,6 +127,14 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
         frameId = frame.getPtr();
         this.allocId = frame.getAllocFile()+ frame.getAllocPointer();
         objectId = bd == null ? 0 : frame.getObjectId();
+    }
+
+    public Frame getRFrame() {
+        return rFrame;
+    }
+
+    public void setRFrame(Frame rFrame) {
+        this.rFrame = rFrame;
     }
 
     public byte[] getBytes() {

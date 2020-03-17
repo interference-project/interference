@@ -100,8 +100,11 @@ public class SyncFrameEvent extends TransportEventImpl {
                             b.setDf(Instance.getInstance().getDataFileById(bd.getFile()));
                             s.delete(bd);
                         } else {
-                            bd.setObjectId(b.getObjectId());
-                            b.setDf(Instance.getInstance().getDataFileById(bd.getFile()));
+                            Table t_ = Instance.getInstance().getTableById(b.getObjectId());
+                            FrameData bd_ = new FrameData(bd, t_);
+                            s.delete(bd);
+                            s.persist(bd_);
+                            b.setDf(Instance.getInstance().getDataFileById(bd_.getFile()));
                         }
                     }
                 }
@@ -200,14 +203,14 @@ public class SyncFrameEvent extends TransportEventImpl {
                             frame.setRes05(lcF);
                             frame.setRes06(parentB);
                             frame.setRes07(lcB);
-                            b.getBd().setFrame(frame);
+                            b.setRFrame(frame);
+                            if (storemap.get(t.getObjectId()) == null) {
+                                storemap.put(t.getObjectId(), new ArrayList<>());
+                            }
+                            storemap.get(t.getObjectId()).add(b);
                             logger.info("write index frame with allocId "+b.getAllocId()+" ptr "+b.getBd().getPtr());
                         }
                     }
-                    if (storemap.get(t.getObjectId()) == null) {
-                        storemap.put(t.getObjectId(), new ArrayList<>());
-                    }
-                    storemap.get(t.getObjectId()).add(b);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
