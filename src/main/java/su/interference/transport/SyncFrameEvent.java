@@ -75,33 +75,32 @@ public class SyncFrameEvent extends TransportEventImpl {
             if (b.isAllowR()) {
                 updateTransactions(b.getRtran(), s);
                 FrameData bd = Instance.getInstance().getFrameByAllocId(b.getAllocId());
-                if (bd == null) {
-                    final Table t = Instance.getInstance().getTableByName(b.getClassName());
-                    final int allocFileId = (int) b.getAllocId() % 4096;
-                    final int allocOrder = (allocFileId % Storage.MAX_NODES) % Config.getConfig().FILES_AMOUNT;
-                    ArrayList<DataFile> dfs = Instance.getInstance().getDataFilesByType(b.getFileType());
-                    for (DataFile f : dfs) {
-                        final int order = (f.getFileId() % Storage.MAX_NODES) % Config.getConfig().FILES_AMOUNT;
-                        if (order == allocOrder) {
-                            bd = t.createNewFrame(null, f.getFileId(), b.getFrameType(), b.getAllocId(), false, false, true, s, llt);
-                            bd.setFrame(null);
-                            b.setDf(f);
-                        }
-                    }
-                    logger.info("create replicated frame with allocId "+b.getAllocId()+" ptr "+bd.getPtr());
+                final Table t = Instance.getInstance().getTableByName(b.getClassName());
+                if (t == null) {
+                    final FreeFrame fb = new FreeFrame(0, bd.getFrameId(), bd.getSize());
+                    s.persist(fb, llt);
+                    b.setDf(Instance.getInstance().getDataFileById(bd.getFile()));
+                    s.delete(bd);
                 } else {
-                    if (b.getObjectId() == bd.getObjectId()) {
-                        b.setDf(Instance.getInstance().getDataFileById(bd.getFile()));
-                        logger.info("rframe bd found with allocId=" + b.getAllocId());
+                    if (bd == null) {
+                        final int allocFileId = (int) b.getAllocId() % 4096;
+                        final int allocOrder = (allocFileId % Storage.MAX_NODES) % Config.getConfig().FILES_AMOUNT;
+                        ArrayList<DataFile> dfs = Instance.getInstance().getDataFilesByType(b.getFileType());
+                        for (DataFile f : dfs) {
+                            final int order = (f.getFileId() % Storage.MAX_NODES) % Config.getConfig().FILES_AMOUNT;
+                            if (order == allocOrder) {
+                                bd = t.createNewFrame(null, f.getFileId(), b.getFrameType(), b.getAllocId(), false, false, true, s, llt);
+                                bd.setFrame(null);
+                                b.setDf(f);
+                            }
+                        }
+                        logger.info("create replicated frame with allocId " + b.getAllocId() + " ptr " + bd.getFrameId());
                     } else {
-                        if (b.getObjectId() == 0) {
-                            final FreeFrame fb = new FreeFrame(0, bd.getFrameId(), bd.getSize());
-                            s.persist(fb, llt);
+                        if (t.getObjectId() == bd.getObjectId()) {
                             b.setDf(Instance.getInstance().getDataFileById(bd.getFile()));
-                            s.delete(bd);
+                            logger.info("rframe bd found with allocId=" + b.getAllocId());
                         } else {
-                            Table t_ = Instance.getInstance().getTableById(b.getObjectId());
-                            FrameData bd_ = new FrameData(bd, t_);
+                            final FrameData bd_ = new FrameData(bd, t);
                             s.delete(bd);
                             s.persist(bd_);
                             b.setDf(Instance.getInstance().getDataFileById(bd_.getFile()));
@@ -140,7 +139,7 @@ public class SyncFrameEvent extends TransportEventImpl {
                             frame.setRes07(nextB);
                             b.getDf().writeFrame(b.getBd(), b.getBd().getPtr(), frame.getFrame(), llt, s);
                             b.getBd().setFrame(null);
-                            logger.info("write undo frame with allocId "+b.getAllocId()+" ptr "+b.getBd().getPtr());
+                            logger.info("write undo frame with allocId "+b.getAllocId()+" ptr "+b.getBd().getFrameId());
                         }
                     }
                 }
@@ -171,7 +170,7 @@ public class SyncFrameEvent extends TransportEventImpl {
                             frame.setRes07(nextB);
                             b.getDf().writeFrame(b.getBd(), b.getBd().getPtr(), frame.getFrame(), llt, s);
                             b.getBd().setFrame(frame);
-                            logger.info("write data frame with allocId "+b.getAllocId()+" ptr "+b.getBd().getPtr());
+                            logger.info("write data frame with allocId "+b.getAllocId()+" ptr "+b.getBd().getFrameId());
                         }
                     }
                 }
@@ -208,7 +207,7 @@ public class SyncFrameEvent extends TransportEventImpl {
                                 storemap.put(t.getObjectId(), new ArrayList<>());
                             }
                             storemap.get(t.getObjectId()).add(b);
-                            logger.info("write index frame with allocId "+b.getAllocId()+" ptr "+b.getBd().getPtr());
+                            logger.info("write index frame with allocId "+b.getAllocId()+" ptr "+b.getBd().getFrameId());
                         }
                     }
                 }
@@ -220,6 +219,9 @@ public class SyncFrameEvent extends TransportEventImpl {
 
         for (Map.Entry<Integer, List<SyncFrame>> entry : storemap.entrySet()) {
             final Table t = Instance.getInstance().getTableById(entry.getKey());
+            if (this.getCallbackNodeId() == 0) {
+                throw new RuntimeException("wrong callback node id");
+            }
             t.storeFrames(entry.getValue(), this.getCallbackNodeId(), llt, s);
         }
 
@@ -227,10 +229,11 @@ public class SyncFrameEvent extends TransportEventImpl {
 
         final Map<Integer, List<FrameApi>> frames_ = new HashMap<>();
         for (SyncFrame f : sb) {
-            if (frames_.get(f.getObjectId()) == null) {
-                frames_.put(f.getObjectId(), new ArrayList<>());
+            final Table t = Instance.getInstance().getTableByName(f.getClassName());
+            if (frames_.get(t.getObjectId()) == null) {
+                frames_.put(t.getObjectId(), new ArrayList<>());
             }
-            frames_.get(f.getObjectId()).add(f.getBd());
+            frames_.get(t.getObjectId()).add(f.getBd());
         }
         for (Map.Entry<Integer, List<FrameApi>> entry: frames_.entrySet()) {
             SQLCursor.addStreamFrame(new ContainerFrame(entry.getKey(), entry.getValue()));
