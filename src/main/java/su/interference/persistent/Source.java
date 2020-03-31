@@ -34,7 +34,6 @@ import javax.persistence.*;
  */
 
 @Entity
-@SystemEntity
 public class Source {
     @Column
     @Id

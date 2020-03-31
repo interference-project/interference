@@ -46,7 +46,6 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
     private final long allocId;
     private final int fileType;
     private final int frameType;
-    private final int objectId;
     private final String className;
     private long prevId;
     private long nextId;
@@ -56,6 +55,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
     private final boolean started;
     private FrameData bd;
     private DataFile df;
+    private Frame rFrame;
     private final HashMap<Long, Long> imap;
     private final HashMap<Long, Transaction> rtran;
     private final ArrayList<TransFrame> tframes;
@@ -64,19 +64,21 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
     public SyncFrame(Frame frame, Session s, FreeFrame fb) throws Exception {
         final Table t = Instance.getInstance().getTableById(frame.getObjectId());
         final FrameData bd = Instance.getInstance().getFrameById(frame.getPtr());
-        if (bd == null) {
+        allowR = frame.isLocal() ? !t.isNoTran() || t.getName().equals("su.interference.persistent.UndoChunk") : false;
+
+        if (bd == null && allowR) {
             final FreeFrame fframe = Instance.getInstance().getFreeFrameById(frame.getPtr());
             if (fframe == null) {
                 logger.error(frame.getClass().getSimpleName()+" does not match any system objects");
                 throw new InternalException();
+            } else {
+                fframe.setPassed(1);
+                fb = fframe;
             }
-            fframe.setPassed(1);
-            fb = fframe;
             //throw new MissingSyncFrameException();
         }
 
-        allowR = frame.isLocal() ? !t.isNoTran() || t.getName().equals("su.interference.persistent.UndoChunk") : false;
-        className = t.getName();
+        className = bd == null ? null : t.getName();
         rtran = frame.getLiveTransactions();
         tframes = frame.getLiveTransFrames();
         if (frame.getClass().getName().equals("su.interference.core.DataFrame")) {
@@ -125,7 +127,14 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
         b = frame.getFrame();
         frameId = frame.getPtr();
         this.allocId = frame.getAllocFile()+ frame.getAllocPointer();
-        objectId = bd == null ? 0 : frame.getObjectId();
+    }
+
+    public Frame getRFrame() {
+        return rFrame;
+    }
+
+    public void setRFrame(Frame rFrame) {
+        this.rFrame = rFrame;
     }
 
     public byte[] getBytes() {
@@ -146,10 +155,6 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
 
     public int getFrameType() {
         return frameType;
-    }
-
-    public int getObjectId() {
-        return objectId;
     }
 
     public int getFile() {
