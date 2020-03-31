@@ -1091,11 +1091,12 @@ public class Table implements DataObject, ResultSet {
             bd.release();
             Metrics.get("persistInsertChunk").stop();
 
-            Metrics.get("persistInsertIndex").start();
-            this.persistIndexes(nc, s, llt);
-            Metrics.get("persistInsertIndex").stop();
-
             if (extllt == null) { llt.commit(); }
+
+            Metrics.get("persistInsertIndex").start();
+            //remove external llt for deadlock prevent
+            this.persistIndexes(nc, s, null);
+            Metrics.get("persistInsertIndex").stop();
 
             return nc;
 
@@ -1608,7 +1609,7 @@ public class Table implements DataObject, ResultSet {
     /****************** persistent indexes *******************/
 
     //rowid used in DataChunk constructor for build standalone indexes
-    private synchronized void add (RowId rowid, Object o, Session s, LLT llt) throws Exception {
+    private synchronized void add (RowId rowid, Object o, Session s, LLT extllt) throws Exception {
 
         final DataChunk dc = new DataChunk(o, s, rowid);
         final int len = dc.getBytesAmount();
@@ -1617,6 +1618,8 @@ public class Table implements DataObject, ResultSet {
 
         boolean cnue = true;
         FrameData target = Instance.getInstance().getFrameById(this.getFileStart()+this.getFrameStart());
+
+        final LLT llt = extllt==null?LLT.getLLT():extllt;
 
         while (cnue) {
             if (target.getIndexFrame().getType()== IndexFrame.INDEX_FRAME_LEAF) {
@@ -1629,7 +1632,11 @@ public class Table implements DataObject, ResultSet {
                     target = Instance.getInstance().getFrameById(cc.getHeader().getFramePtr());
                     target.getIndexFrame().setMv(cc.getDcs()); //set non-persitent maxvalue
                 } else {
-                    target = Instance.getInstance().getFrameById(target.getIndexFrame().getLcF()+target.getIndexFrame().getLcB()); //get by last child
+                    final long lcId = target.getIndexFrame().getLcF()+target.getIndexFrame().getLcB();
+                    target = Instance.getInstance().getFrameById(lcId); //get by last child
+                    if (target == null) {
+                        logger.info("null target returned for frame id "+lcId);
+                    }
                 }
                 target.getIndexFrame().setParentF(parentF);
                 target.getIndexFrame().setParentB(parentB);
@@ -1670,6 +1677,9 @@ public class Table implements DataObject, ResultSet {
                 }
             }
         }
+
+        if (extllt == null) { llt.commit(); }
+
         if (!isNoTran()) {
 //todo            ((EntityContainer)o).setTransId(dc.getHeader().getTran());
 //todo            ((EntityContainer)o).setRowId(dc.getHeader().getRowID());
@@ -1707,7 +1717,9 @@ public class Table implements DataObject, ResultSet {
                 ixstartfs.put(sourceNodeId, b.getBd().getFrameId());
                 b.getBd().setStarted(sourceNodeId);
             }
+            //final LLT llt_ = LLT.getLLT(); //df access reordering prevent deadlock
             b.getDf().writeFrame(b.getBd(), b.getBd().getPtr(), b.getBd().getFrame().getFrame(), llt, s);
+            //llt_.commit();
         }
     }
 
@@ -1892,7 +1904,11 @@ public class Table implements DataObject, ResultSet {
                 if (cc!=null) {
                     target = Instance.getInstance().getFrameById(cc.getHeader().getFramePtr()).getIndexFrame();
                 } else {
-                    target = Instance.getInstance().getFrameById(target.getLcF()+target.getLcB()).getIndexFrame(); //get by last child
+                    final long lcId = target.getLcF()+target.getLcB();
+                    target = Instance.getInstance().getFrameById(lcId).getIndexFrame(); //get by last child
+                    if (target == null) {
+                        logger.info("null target returned for frame id "+lcId);
+                    }
                 }
             }
         }

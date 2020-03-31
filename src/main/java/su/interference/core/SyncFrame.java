@@ -64,18 +64,20 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
     public SyncFrame(Frame frame, Session s, FreeFrame fb) throws Exception {
         final Table t = Instance.getInstance().getTableById(frame.getObjectId());
         final FrameData bd = Instance.getInstance().getFrameById(frame.getPtr());
-        if (bd == null) {
+        allowR = frame.isLocal() ? !t.isNoTran() || t.getName().equals("su.interference.persistent.UndoChunk") : false;
+
+        if (bd == null && allowR) {
             final FreeFrame fframe = Instance.getInstance().getFreeFrameById(frame.getPtr());
             if (fframe == null) {
                 logger.error(frame.getClass().getSimpleName()+" does not match any system objects");
                 throw new InternalException();
+            } else {
+                fframe.setPassed(1);
+                fb = fframe;
             }
-            fframe.setPassed(1);
-            fb = fframe;
             //throw new MissingSyncFrameException();
         }
 
-        allowR = frame.isLocal() ? !t.isNoTran() || t.getName().equals("su.interference.persistent.UndoChunk") : false;
         className = bd == null ? null : t.getName();
         rtran = frame.getLiveTransactions();
         tframes = frame.getLiveTransFrames();

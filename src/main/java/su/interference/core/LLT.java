@@ -24,6 +24,9 @@
 
 package su.interference.core;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,12 +44,20 @@ public class LLT {
     private static final ReentrantLock rlck = new ReentrantLock();
     private static final ConcurrentHashMap<Long, LLT> pool = new ConcurrentHashMap<Long, LLT>();
     private static final ConcurrentHashMap<Long, Frame> frames = new ConcurrentHashMap<Long, Frame>();
+    private final static Logger logger = LoggerFactory.getLogger(LLT.class);
     private final boolean lock;
     private final long id;
+    private final StackTraceElement[] trace;
 
-    private LLT(boolean lock) {
-        id = cntr.incrementAndGet();
+    // WARNING!!!
+    // change of 'debug' value to true causes decrease total performance
+    // dev & QA engineers may change this constant
+    private static final boolean debug = false;
+
+    private LLT(long id, boolean lock) {
+        this.id = id;
         this.lock = lock;
+        this.trace = debug ? Thread.currentThread().getStackTrace() : null;
     }
 
     public static long getSyncId() {
@@ -54,19 +65,34 @@ public class LLT {
     }
 
     public static LLT getLLT() throws InterruptedException {
+        final long id_ = Thread.currentThread().getId();
+        if (pool.get(id_) != null) {
+            if (debug) {
+                for (StackTraceElement e : pool.get(id_).getTrace()) {
+                    logger.info(e.toString());
+                }
+            }
+            logger.error("an unexpected attempt to get llt with id = "+id_+" which already exists");
+            throw new RuntimeException("an unexpected attempt to get llt with id = "+id_+" which already exists");
+        }
         rlck.lock();
-        final LLT llt = new LLT(false);
+        final LLT llt = new LLT(id_, false);
         pool.put(llt.getId(), llt);
         rlck.unlock();
         return llt;
     }
 
     public static LLT getLLTAndLock() throws InterruptedException {
+        final long id_ = Thread.currentThread().getId();
+        if (pool.get(id_) != null) {
+            logger.error("an unexpected attempt to get llt with id = "+id_+" which already exists");
+            throw new RuntimeException("an unexpected attempt to get llt with id = "+id_+" which already exists");
+        }
         if (Config.getConfig().SYNC_LOCK_ENABLE) {
             rlck.lock();
         }
         while(poolNotEmpty()) { }
-        final LLT llt = new LLT(true);
+        final LLT llt = new LLT(id_, true);
         sync.compareAndSet(0, llt.getId());
         pool.put(llt.getId(), llt);
         return llt;
@@ -103,4 +129,7 @@ public class LLT {
         return id;
     }
 
+    public StackTraceElement[] getTrace() {
+        return trace;
+    }
 }
