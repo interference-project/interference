@@ -53,7 +53,7 @@ public class RowHeader implements Header, Comparable {
         setLen(getIntFromBytes(append(new byte[2],substring(h,10,12))));
         setPtr(getIntFromBytes(append(new byte[2],substring(h,12,14))));
         setRes(getIntFromBytes(append(new byte[2],substring(h,14,16))));
-        if (h.length== Frame.INDEX_HEADER_SIZE) {
+        if (h.length == Frame.INDEX_HEADER_SIZE) {
             setFramePtr(new RowId(substring(h,16,32)));
         }
         setRowID(new RowId(file, frame, ptr));
@@ -85,15 +85,6 @@ public class RowHeader implements Header, Comparable {
         setLen(len);
     }
 
-    // updateObject HTTPThread
-    public RowHeader (RowId r, Transaction tran, int len) {
-        setRowID(new RowId(r.getFileId(), r.getFramePointer(), r.getRowPointer()));
-        setState(Header.RECORD_NORMAL_STATE);
-        setTran(tran);
-        setLen(len);
-        setPtr(r.getRowPointer());
-    }
-
     public byte[] getHeader() {
         byte[] res = getBytesFromLong(this.tran==null?0:this.tran.getTransId());
         res = append(res, substring(getBytesFromInt(this.state),2,4));
@@ -104,6 +95,14 @@ public class RowHeader implements Header, Comparable {
             res = append(res,framePtr.getBytes());
         }
         return res;
+    }
+
+    protected int getHeaderSize() {
+        if (framePtr == null) {
+            return Frame.ROW_HEADER_SIZE;
+        } else {
+            return Frame.INDEX_HEADER_SIZE;
+        }
     }
 
     public int compareTo (Object o) {

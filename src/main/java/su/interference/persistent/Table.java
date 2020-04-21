@@ -122,6 +122,8 @@ public class Table implements DataObject, ResultSet {
     @Transient
     private final java.lang.reflect.Field idfield;
     @Transient
+    private final java.lang.reflect.Method idmethod;
+    @Transient
     private final String idfieldtype;
     @Transient
     private final String idfieldgetter;
@@ -475,6 +477,10 @@ public class Table implements DataObject, ResultSet {
         return this.idfield;
     }
 
+    public Method getIdmethod() {
+        return idmethod;
+    }
+
     public String getIdFieldType() {
         return this.idfieldtype;
     }
@@ -522,7 +528,7 @@ public class Table implements DataObject, ResultSet {
     }
 
     //constructor for SystemData - SystemFrame only
-    public Table(String name) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException, MalformedURLException {
+    public Table(String name) throws ClassNotFoundException, NoSuchMethodException, SecurityException, MalformedURLException {
         this.setName(name);
         this.setFrameSize(DataFile.SYSTEM_FRAME_SIZE);
         this.lbs = new WaitFrame[Config.getConfig().FILES_AMOUNT];
@@ -534,12 +540,13 @@ public class Table implements DataObject, ResultSet {
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
+        this.idmethod = getTableIdField() == null ? null : ca == null ? null : getTableClass().getMethod(idfieldgetter, null);
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
     }
 
-    public Table(String name, Class pclass) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException, MalformedURLException {
+    public Table(String name, Class pclass) throws ClassNotFoundException, NoSuchMethodException, SecurityException, MalformedURLException {
         this.setName(name);
         this.lbs = new WaitFrame[Config.getConfig().FILES_AMOUNT];
         for (int i=0; i<Config.getConfig().FILES_AMOUNT; i++) {
@@ -559,13 +566,14 @@ public class Table implements DataObject, ResultSet {
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
+        this.idmethod = getTableIdField() == null ? null : ca == null ? null : getTableClass().getMethod(idfieldgetter, null);
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
         this.sc = pclass;
     }
 
-    public Table(String name, String name_) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException, MalformedURLException {
+    public Table(String name, String name_) throws ClassNotFoundException, NoSuchMethodException, SecurityException, MalformedURLException {
         this.setName(name);
         this.lbs = new WaitFrame[Config.getConfig().FILES_AMOUNT];
         for (int i=0; i<Config.getConfig().FILES_AMOUNT; i++) {
@@ -585,13 +593,14 @@ public class Table implements DataObject, ResultSet {
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
+        this.idmethod = getTableIdField() == null ? null : ca == null ? null : getTableClass().getMethod(idfieldgetter, null);
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
     }
 
     //used in bootstrap - only for FrameData
-    public Table(boolean v) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException, MalformedURLException {
+    public Table(boolean v) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException, NoSuchMethodException, SecurityException, MalformedURLException {
         this.objectId = FrameData.CLASS_ID;
         this.name = "su.interference.persistent.FrameData";
         this.frameSize = Instance.getInstance().getFrameSize();
@@ -609,13 +618,14 @@ public class Table implements DataObject, ResultSet {
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
+        this.idmethod = getTableIdField() == null ? null : ca == null ? null : getTableClass().getMethod(idfieldgetter, null);
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
     }
 
     //constructor for inital system method
-    public Table(int id, String name) throws MalformedURLException, ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException {
+    public Table(int id, String name) throws MalformedURLException, ClassNotFoundException, NoSuchMethodException, SecurityException {
         this.objectId = id;
         this.name = name;
         this.indexes  = new ArrayList<IndexField>();
@@ -629,6 +639,7 @@ public class Table implements DataObject, ResultSet {
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
+        this.idmethod = getTableIdField() == null ? null : ca == null ? null : getTableClass().getMethod(idfieldgetter, null);
         this.generatedfield = getGeneratedField();
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
@@ -636,7 +647,7 @@ public class Table implements DataObject, ResultSet {
     }
 
     //constructor for low-level storage function (initial first-time load table descriptions from datafile)
-    public Table (DataChunk chunk, IndexList ixl) throws IllegalAccessException, ClassNotFoundException, IOException, InternalException, InstantiationException {
+    public Table (DataChunk chunk, IndexList ixl) throws IllegalAccessException, ClassNotFoundException, IOException, InternalException, NoSuchMethodException, SecurityException {
         final Object[] dcs = chunk.getDcs().getValueSet();
         final Class c = this.getClass();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
@@ -662,6 +673,7 @@ public class Table implements DataObject, ResultSet {
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
+        this.idmethod = getTableIdField() == null ? null : sa == null ? null : getTableClass().getMethod(idfieldgetter, null);
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
@@ -1148,7 +1160,6 @@ public class Table implements DataObject, ResultSet {
                     dc.getUndoChunk().setFrame(dc.getHeader().getRowID().getFramePointer());
                     dc.getUndoChunk().setPtr(dc.getHeader().getPtr());
                     udc.setEntity(dc.getUndoChunk());
-                    udc.setChunk(udc.flush(s));
                     //logger.info("updated "+dc.getHeader().getRowID().getFileId()+" "+dc.getHeader().getRowID().getFramePointer()+" "+dc.getHeader().getRowID().getRowPointer()+" : "+dc.getUndoChunk().getFile()+" "+dc.getUndoChunk().getFrame()+" "+dc.getUndoChunk().getPtr());
                 }
 
@@ -1460,44 +1471,16 @@ public class Table implements DataObject, ResultSet {
         }
         if (this.isNoTran()) {
             final java.lang.reflect.Field idf = this.getIdField();
+            final Method idMethod = this.getIdmethod();
             if (idf == null) {
                 logger.error("No @Id annotated column found for " + this.getName());
             }
             final MapField mf = this.getMapFieldByColumn(idf.getName());
             final IndexField ix = this.getIndexFieldByColumn(idf.getName());
-            final String type = idf.getType().getName();
             if (mf != null) {
-                if (type.equals("int")||type.equals("java.lang.Integer")) {
-                    final Method z = c.getMethod("get"+idf.getName().substring(0,1).toUpperCase()+idf.getName().substring(1,idf.getName().length()), null);
-                    final int i = (Integer)z.invoke(o, null);
-                    return (DataChunk)mf.getMap().get(i);
-                }
-                if (type.equals("long")||type.equals("java.lang.Long")) {
-                    final Method z = c.getMethod("get"+idf.getName().substring(0,1).toUpperCase()+idf.getName().substring(1,idf.getName().length()), null);
-                    final long l = (Long)z.invoke(o, null);
-                    return (DataChunk)mf.getMap().get(l);
-                }
-                if (type.equals("java.lang.String")) {
-                    final Method z = c.getMethod("get"+idf.getName().substring(0,1).toUpperCase()+idf.getName().substring(1,idf.getName().length()), null);
-                    final String ss = (String)z.invoke(o, null);
-                    return (DataChunk)mf.getMap().get(ss);
-                }
+                return (DataChunk) mf.getMap().get(idmethod.invoke(o, null));
             } else if (ix != null) {
-                if (type.equals("int")||type.equals("java.lang.Integer")) {
-                    final Method z = c.getMethod("get"+idf.getName().substring(0,1).toUpperCase()+idf.getName().substring(1,idf.getName().length()), null);
-                    final int i = (Integer)z.invoke(o, null);
-                    return (DataChunk)ix.getIndex().getObjectByKey(i);
-                }
-                if (type.equals("long")||type.equals("java.lang.Long")) {
-                    final Method z = c.getMethod("get"+idf.getName().substring(0,1).toUpperCase()+idf.getName().substring(1,idf.getName().length()), null);
-                    final long l = (Long)z.invoke(o, null);
-                    return (DataChunk)ix.getIndex().getObjectByKey(l);
-                }
-                if (type.equals("java.lang.String")) {
-                    final Method z = c.getMethod("get"+idf.getName().substring(0,1).toUpperCase()+idf.getName().substring(1,idf.getName().length()), null);
-                    final String ss = (String)z.invoke(o, null);
-                    return (DataChunk)ix.getIndex().getObjectByKey(ss);
-                }
+                return (DataChunk) ix.getIndex().getObjectByKey(new IndexElementKey(new Object[]{idMethod.invoke(o, null)}));
             } else {
                 final byte[] id = new DataChunkId(o, s).getIdBytes();
                 if (id!=null) {
@@ -1516,6 +1499,7 @@ public class Table implements DataObject, ResultSet {
             final Table idt = getFirstIndexByIdColumn();
             if (!isIdFieldNoCheck()) {
                 if (to.getDataChunk() == null) {
+                    //todo need further optimize
                     final DataChunkId dcid = new DataChunkId(o, s);
                     if (idt != null) {
                         final DataChunk idc = idt.getObjectByKey(new ValueSet(dcid.getId()));
@@ -1613,7 +1597,6 @@ public class Table implements DataObject, ResultSet {
 
         final DataChunk dc = new DataChunk(o, s, rowid);
         final int len = dc.getBytesAmount();
-        dc.getHeader().setLen(len);
         dc.getHeader().setTran(s.getTransaction());
 
         boolean cnue = true;

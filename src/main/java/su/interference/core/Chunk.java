@@ -28,6 +28,7 @@ import su.interference.exception.InternalException;
 import su.interference.persistent.Session;
 import su.interference.persistent.UndoChunk;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 
@@ -41,9 +42,8 @@ public interface Chunk extends Comparable {
     Header getHeader();
     void setHeader(Header header);
     byte[] getChunk();
-    void setChunk(byte[] chunk);
     int getBytesAmount();
-    Comparable getId (Session s) throws InvocationTargetException, NoSuchMethodException, IllegalAccessException;
+    Comparable getId (Field idfield, Session s) throws InvocationTargetException, NoSuchMethodException, IllegalAccessException;
     ValueSet getDcs();
     boolean isTerminate();
     void setTerminate(boolean terminate);

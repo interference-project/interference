@@ -320,7 +320,7 @@ public class Storage {
         }
     }
 
-    public void openDataFiles () throws InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    public void openDataFiles () throws InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException {
         for (Map.Entry e : ifs.entrySet()) {
             if (((DataFile)e.getValue()).checkFile()==1) {
                 ((DataFile)e.getValue()).openFile(Config.getConfig().DISKIO_MODE);
@@ -412,7 +412,7 @@ public class Storage {
         state = STORAGE_STATE_CLOSED;
     }
 
-    public void dropStorage () throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException {
+    public void dropStorage () throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException, NoSuchMethodException {
         if (state==STORAGE_STATE_CLOSED) {
             for (Map.Entry e : ifs.entrySet()) {
                 if (((DataFile)e.getValue()).checkFile()==1) {
@@ -466,7 +466,7 @@ public class Storage {
     }
 
     //bootstrap subsystem - first index generate by objectId
-    private synchronized IndexList bootstrapFrameLoad() throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
+    private synchronized IndexList bootstrapFrameLoad() throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, NoSuchMethodException {
 //        ArrayList<FrameData> res = new ArrayList<FrameData>();
         final IndexList res = new IndexList();
         //bulk Table (t) object for use in DataFrame->DataChunk parse methods
@@ -512,7 +512,7 @@ public class Storage {
         return res;
     }
 
-    public synchronized Table bootstrapLoad() throws InternalException, IOException, InvalidFrame, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    public synchronized Table bootstrapLoad() throws InternalException, IOException, NoSuchMethodException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         Table res = null;
         final IndexList ixl = bootstrapFrameLoad();
         final List<Object> bds = ixl.getObjectsByKey(Table.CLASS_ID);

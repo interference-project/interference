@@ -76,7 +76,7 @@ public class Frame implements Comparable {
     public static final int DATA_FRAME        = 1;
     public static final int INDEX_FRAME       = 2;
 
-    protected final ChunkMap data = new ChunkMap();
+    protected final ChunkMap data = new ChunkMap(this);
     private final ConcurrentHashMap<Long, byte[]> snap = new ConcurrentHashMap<Long, byte[]>();
     protected byte[] b;
 
@@ -422,11 +422,13 @@ public class Frame implements Comparable {
 
         if (check) {
             final int frameFree = this.getFrameFree();
-            if (frameFree >= c.getChunk().length + Frame.ROW_HEADER_SIZE) {
+            final int chunkSize = c.getBytesAmount();
+            if (frameFree >= chunkSize) {
                 this.setRowCntr(ptr+1);
-                final RowHeader h = new RowHeader(this.getFile(), this.getPointer(), ptr, tran, c.getChunk().length);
-                h.setLltId(llt==null?0:llt.getId());
-                c.setHeader(h);
+                c.getHeader().setRowID(new RowId(this.getFile(), this.getPointer(), ptr));
+                c.getHeader().setPtr(ptr);
+                c.getHeader().setTran(tran);
+                c.getHeader().setLltId(llt==null?0:llt.getId());
                 if (llt != null) { llt.add(this); }
                 data.add(c);
                 return ptr;
@@ -438,7 +440,6 @@ public class Frame implements Comparable {
             c.getHeader().setRowID(new RowId(this.getFile(), this.getPointer(), ptr));
             c.getHeader().setPtr(ptr);
             c.getHeader().setTran(tran);
-            c.getHeader().setLen(c.getChunk().length);
             c.getHeader().setLltId(llt==null?0:llt.getId());
             if (llt!=null) { llt.add(this); }
             data.add(c);
@@ -461,8 +462,7 @@ public class Frame implements Comparable {
             chunk.updateEntity(o);
         }
 
-        final byte[] ncb = chunk.flush(s);
-        chunk.setChunk(ncb);
+        final byte[] ncb = chunk.getChunk();
         chunk.getHeader().setLen(ncb.length);
         final int newlen = chunk.getBytesAmount();
         return newlen;

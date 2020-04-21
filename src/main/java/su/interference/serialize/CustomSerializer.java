@@ -117,6 +117,53 @@ public class CustomSerializer implements SerializerApi {
         return null;
     }
 
+    public int length (String t, Object fo) throws IllegalAccessException, UnsupportedEncodingException, ClassNotFoundException, InternalException, InstantiationException {
+        if (!Types.isPrimitiveType(t)) {
+            switch (t) {
+                case ("java.lang.Integer"):
+                    return 5;
+                case ("java.lang.Long"):
+                    return 9;
+                case ("java.util.concurrent.atomic.AtomicInteger"):
+                    return 5;
+                case ("java.util.concurrent.atomic.AtomicLong"):
+                    return 9;
+                case ("java.lang.Float"):
+                    return 5;
+                case ("java.lang.Double"):
+                    return 9;
+                case ("java.util.Date"):
+                    return 9;
+                case ("java.lang.String"):
+                    return getBytesFromString((String)fo).length + 1;
+                case ("java.util.ArrayList"):
+                    return getBytesFromArrayList((ArrayList)fo).length + 1;
+                case ("[B"):
+                    return ((byte[])fo).length + 1;
+                case ("su.interference.core.DataChunk"):
+                    return append(getBytesFromInt(((DataChunk)fo).getT().getObjectId()),
+                            append(getBytesFromInt(((DataChunk)fo).getHeader().getRowID().getFileId()), getBytesFromLong(((DataChunk)fo).getHeader().getRowID().getFramePointer())),
+                            append(((DataChunk)fo).getHeader().getHeader(), ((DataChunk)fo).getChunk())).length + 1;
+            }
+        } else {
+            switch (t) {
+                case ("byte"):
+                    return 1;
+                case ("char"):
+                    return getBytesFromChar((Character) fo).length;
+                case ("int"):
+                    return 4;
+                case ("long"):
+                    return 8;
+                case ("float"):
+                    return 4;
+                case ("double"):
+                    return 8;
+            }
+        }
+        return 0;
+    }
+
     public Object deserialize (byte[] b, Field f) throws UnsupportedEncodingException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
         final String t = f.getType().getName();
         final String g = f.getGenericType().toString();

@@ -25,7 +25,10 @@
 package su.interference.sql;
 
 import su.interference.core.DataChunk;
+import su.interference.core.ValueSet;
 import su.interference.exception.InternalException;
+import su.interference.persistent.Session;
+import su.interference.persistent.Table;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -62,9 +65,9 @@ public class SQLGroupContainer {
         }
     }
 
-    public DataChunk add (DataChunk c) throws InternalException {
+    public DataChunk add (DataChunk c, Table target, Session s) throws InternalException {
         if (wcolumn != null) {
-            return add2Window(c);
+            return add2Window(c, target, s);
         }
         if (dc != null) {
             if (c != null && dc.compare(c, gcols.size()) == 0) {
@@ -79,13 +82,14 @@ public class SQLGroupContainer {
                 }
                 return null;
             } else {
+                final ValueSet groupvs = this.dc.getDcs();
                 for (int i=0; i<this.cols.size(); i++) {
                     if (this.cols.get(i).getFtype()>0) {
-                        this.dc.getDcs().getValueSet()[i] = fset[i].getResult();
+                        groupvs.getValueSet()[i] = fset[i].getResult();
                         fset[i].clear();
                     }
                 }
-                final DataChunk res = this.dc;
+                final DataChunk res = new DataChunk(groupvs, s, target);
                 this.dc = c;
                 final Object[] os = c.getDcs().getValueSet();
                 if (os.length != this.cols.size()) {
@@ -113,7 +117,7 @@ public class SQLGroupContainer {
         }
     }
 
-    private DataChunk add2Window(DataChunk c) throws InternalException {
+    private DataChunk add2Window(DataChunk c, Table target, Session s) throws InternalException {
         if (c != null) {
             w_.add(c);
         }
@@ -140,13 +144,14 @@ public class SQLGroupContainer {
                     }
                 }
             }
+            final ValueSet groupvs = this.dc.getDcs();
             for (int i=0; i<this.cols.size(); i++) {
                 if (this.cols.get(i).getFtype()>0) {
-                    this.dc.getDcs().getValueSet()[i] = fset[i].getResult();
+                    groupvs.getValueSet()[i] = fset[i].getResult();
                     fset[i].clear();
                 }
             }
-            final DataChunk res = this.dc;
+            final DataChunk res = new DataChunk(groupvs, s, target);
             this.dc = null;
             return res;
         }

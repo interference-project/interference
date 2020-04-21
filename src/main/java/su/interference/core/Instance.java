@@ -764,7 +764,7 @@ public class Instance implements Interference {
         return res;
     }
 
-    private synchronized void initSystemTable () throws InternalException, IOException, InvalidFrame, InvalidFrameHeader, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    private synchronized void initSystemTable () throws InternalException, IOException, NoSuchMethodException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         this.tt = Storage.getStorage().bootstrapLoad();
     }
 

@@ -162,8 +162,8 @@ public class SQLJoin {
                             if (((DataChunk) c).compare(cdc, gcs.size()) == 0) { //cdc & c chunks grouped
                                 sqlg.add((DataChunk) c);
                             } else {                                          //c start next group
-                                DataChunk gdc = sqlg.getDC();
-                                Object oo = gdc.getEntity(gtarget);
+                                DataChunk gdc = sqlg.getDC(gtarget, s);
+                                Object oo = gdc.getEntity();
                                 gtemp.persist(oo, s);
                                 sqlg = new SQLGroup((DataChunk) c, rscols);
                                 sqlg.add((DataChunk) c);
@@ -176,8 +176,8 @@ public class SQLJoin {
                     }
                 }
                 if (sqlg != null) {
-                    DataChunk gdc = sqlg.getDC();
-                    Object oo = gdc.getEntity(((ResultSetImpl)gtemp).getTarget());
+                    DataChunk gdc = sqlg.getDC(((ResultSetImpl) gtemp).getTarget(), s);
+                    Object oo = gdc.getEntity();
 
                     gtemp.persist(oo, s);
 

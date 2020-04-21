@@ -41,7 +41,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.lang.reflect.*;
 import java.net.MalformedURLException;
-import java.text.ParseException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author Yuriy Glotanov
@@ -52,11 +52,13 @@ import java.text.ParseException;
 public class DataChunk implements Chunk {
 
     private final static Logger logger = LoggerFactory.getLogger(DataChunk.class);
+    private final static int INIT_STATE = 1;
+    private final static int NORMAL_STATE = 2;
     private DataObject t;
+    private Class class_;
+    private volatile int state;
     private volatile RowHeader header;
-    //cache-dependency parameters
     private volatile byte[] chunk;
-    private volatile ValueSet dcs; //datacolumn set
     private Comparable id;
     private byte[] serializedId;
     private Object entity;
@@ -68,26 +70,91 @@ public class DataChunk implements Chunk {
 
     //returns datacolumn set
     public ValueSet getDcs() {
-        if (dcs==null) {
-            try {
-                final Field[] f = this.t == null ? this.entity.getClass().getFields() : t.getFields();
-                final List<Object> vs = new ArrayList<>();
-                for (int i = 0; i < f.length; i++) {
-                    final int m = f[i].getModifiers();
-                    final Transient ta = f[i].getAnnotation(Transient.class);
-                    if (ta == null) {
-                        if (Modifier.isPrivate(m)) {
-                            f[i].setAccessible(true);
-                        }
-                        vs.add(f[i].get(entity));
+        if (state == INIT_STATE) {
+            return getDcsFromBytes();
+        }
+        if (state == NORMAL_STATE) {
+            return getDcsFromEntity();
+        }
+        return null;
+    }
+
+    //returns datacolumn set
+    private ValueSet getDcsFromEntity() {
+        ValueSet dcs = null;
+        try {
+            final Field[] f = this.t == null ? this.entity.getClass().getDeclaredFields() : t.getFields();
+            final List<Object> vs = new ArrayList<>();
+            for (int i = 0; i < f.length; i++) {
+                final int m = f[i].getModifiers();
+                final Transient ta = f[i].getAnnotation(Transient.class);
+                if (ta == null) {
+                    if (Modifier.isPrivate(m)) {
+                        f[i].setAccessible(true);
                     }
+                    vs.add(f[i].get(entity));
                 }
-                dcs = new ValueSet(vs.toArray(new Object[]{}));
-            } catch (Exception e) {
-                throw new RuntimeException(e);
             }
+            dcs = new ValueSet(vs.toArray(new Object[]{}));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
         return dcs;
+    }
+
+    private ValueSet getDcsFromBytes() {
+        if (this.chunk == null) {
+            throw new RuntimeException("chunk of bytes not exists");
+        }
+
+        try {
+            Field[] cs = null;
+            if (t != null) {
+                cs = t.getFields();
+            } else {
+                Field[] f = class_.getDeclaredFields();
+                List<Field> ff = new ArrayList<Field>();
+                for (int i = 0; i < f.length; i++) {
+                    int m = f[i].getModifiers();
+                    Transient ta = f[i].getAnnotation(Transient.class);
+                    if (ta == null) {
+                        ff.add(f[i]);
+                    }
+                }
+                cs = ff.toArray(new Field[]{});
+            }
+
+            final ByteString bs = new ByteString(this.chunk);
+            final ValueSet dcs = new ValueSet(new Object[cs.length]);
+            int s = 0;
+
+            for (int i = 0; i < cs.length; i++) {
+                final int v = Types.isVarType(cs[i]) ? 4 : 0;
+                final int m = cs[i].getModifiers();
+                final Id a = cs[i].getAnnotation(Id.class);
+                //All var length types is non-primitive
+                final byte[] data = bs.substring(s + v, s + v + (Types.isVarType(cs[i]) ? bs.getIntFromBytes(bs.substring(s, s + v)) : Types.getLength(cs[i])));
+                if (a != null) {
+                    serializedId = data;
+                }
+                try {
+                    if (Modifier.isPrivate(m)) {
+                        cs[i].setAccessible(true);
+                    }
+                    dcs.getValueSet()[i] = sr.deserialize(data, cs[i]);
+                    if (a != null) {
+                        id = (Comparable) dcs.getValueSet()[i];
+                    }
+                } catch (UnsupportedEncodingException e) {
+                    dcs.getValueSet()[i] = "UnsupportedEncodingException";
+                }
+                s = s + data.length + v;
+            }
+
+            return dcs;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public UndoChunk getUndoChunk() {
@@ -104,16 +171,11 @@ public class DataChunk implements Chunk {
         this.uc = uc;
     }
 
-    //optimistic method used in DataChunk.compareTo method
-    public ValueSet getDcs(boolean z) {
-        return this.dcs;
-    }
-
     public DataObject getT() {
         return t;
     }
 
-    public Comparable getId (Session s) throws InvocationTargetException, NoSuchMethodException, IllegalAccessException {
+    public Comparable getId (Field idfield, Session s) throws InvocationTargetException, NoSuchMethodException, IllegalAccessException {
         if (serializedId==null) {
             if (entity==null) {
                 getEntity();
@@ -125,19 +187,33 @@ public class DataChunk implements Chunk {
                 //for Transactional Wrapper Entity we must get superclass (original Entity class)
                 c = c.getSuperclass();
             }
-            Field[] f = c.getDeclaredFields();
-            for (int i=0; i<f.length; i++) {
-                final Id a = f[i].getAnnotation(Id.class);
-                if (a!=null) {
-                    if (sa!=null) {
-                        Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), null);
-                        Object v = z.invoke(entity, null);
-                        id = (Comparable) v;
-                    } else {
-                        Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), new Class<?>[]{Session.class});
-                        Object v = z.invoke(entity, new Object[]{s});
-                        id = (Comparable) v;
+            if (idfield == null) {
+                Field[] f = c.getDeclaredFields();
+                for (int i = 0; i < f.length; i++) {
+                    final Id a = f[i].getAnnotation(Id.class);
+                    if (a != null) {
+                        if (sa != null) {
+                            //Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), null);
+                            //Object v = z.invoke(entity, null);
+                            //id = (Comparable) v;
+                            id = (Comparable) f[i].get(entity);
+                        } else {
+                            Method z = c.getMethod("get" + f[i].getName().substring(0, 1).toUpperCase() + f[i].getName().substring(1, f[i].getName().length()), new Class<?>[]{Session.class});
+                            Object v = z.invoke(entity, new Object[]{s});
+                            id = (Comparable) v;
+                        }
                     }
+                }
+            } else {
+                if (sa != null) {
+                    //Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), null);
+                    //Object v = z.invoke(entity, null);
+                    //id = (Comparable) v;
+                    id = (Comparable) idfield.get(entity);
+                } else {
+                    Method z = c.getMethod("get" + idfield.getName().substring(0, 1).toUpperCase() + idfield.getName().substring(1, idfield.getName().length()), new Class<?>[]{Session.class});
+                    Object v = z.invoke(entity, new Object[]{s});
+                    id = (Comparable) v;
                 }
             }
         }
@@ -178,11 +254,11 @@ public class DataChunk implements Chunk {
     }
     
     public int getBytesAmount() {
-        return this.getChunk().length+this.getHeader().getHeader().length;
+        return this.getHeader().getLen() + this.getHeader().getHeaderSize();
     }
 
     public int compareTo (Object o) {
-        return this.dcs.compareTo(((DataChunk)o).getDcs(false));
+        return this.getDcs().compareTo(((DataChunk)o).getDcs());
     }
 
     //used in partial compare datachunks in sql group algorithm
@@ -191,7 +267,7 @@ public class DataChunk implements Chunk {
         if (thr==0) {
             return 0; //group fields not exists
         }
-        return this.dcs.compare(((DataChunk)o).getDcs(false), thr);
+        return this.getDcs().compare(((DataChunk)o).getDcs(), thr);
     }
 
     public DataChunk () {
@@ -200,8 +276,8 @@ public class DataChunk implements Chunk {
 
     //for index implementation
     public DataChunk (ValueSet vs, Session s, RowId r, Table t) throws ClassNotFoundException, IllegalAccessException, UnsupportedEncodingException, InternalException, MalformedURLException, InstantiationException {
-        this.dcs = vs;
-        this.header = new RowHeader(r, s.getTransaction(), 0, false);
+        this.state = INIT_STATE;
+        this.t = t;
         final ByteString res = new ByteString();
         final Field[] f = t.getFields();
         for (int i=0; i<f.length; i++) {
@@ -215,6 +291,36 @@ public class DataChunk implements Chunk {
             }
         }
         chunk = res.getBytes();
+        this.header = new RowHeader(r, s.getTransaction(), chunk.length, false);
+    }
+
+    //group implementation
+    public DataChunk (ValueSet vs, Session s, Table t) {
+        this.header = new RowHeader(null, s.getTransaction(), 0, false);
+        this.state = NORMAL_STATE;
+        this.t = t;
+
+        try {
+            entity = t.getInstance(); //returns empty instance
+            final Field[] cs = t.getFields();
+            for (int i=0; i<cs.length; i++) {
+                final int m = cs[i].getModifiers();
+                if (Modifier.isPrivate(m)) {
+                    cs[i].setAccessible(true);
+                }
+                if (vs.getValueSet()[i]!=null) {
+                    cs[i].set(entity, vs.getValueSet()[i]);
+                }
+            }
+            if (!t.isNoTran()) {
+                ((EntityContainer)entity).setRowId(header.getRowID());
+                ((EntityContainer)entity).setTran(header.getTran());
+                ((EntityContainer)entity).setDataChunk(this);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        header.setLen(getChunkLen());
     }
 
     //serializer INSERT ONLY!!! (with generate Id value)
@@ -225,293 +331,143 @@ public class DataChunk implements Chunk {
     //serializer INSERT ONLY!!! (with generate Id value) - rowid for index chunk
     public DataChunk (Object o, Session s, RowId r) throws IOException, InvocationTargetException, NoSuchMethodException, InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         this.entity = o;
-        this.header = new RowHeader(r, null, 0, false);
-        Class c = o.getClass();
-        final SystemEntity sa = (SystemEntity)c.getAnnotation(SystemEntity.class);
-        final TransEntity ta = (TransEntity)c.getAnnotation(TransEntity.class);
-        final IndexEntity xa = (IndexEntity)c.getAnnotation(IndexEntity.class);
-        if (ta!=null) {
-            //for Transactional Wrapper Entity we must get superclass (original Entity class)
-            c = c.getSuperclass();
-        }
-//        long gid = 0;
-        final ByteString res = new ByteString();
-        final Entity ea = (Entity)c.getAnnotation(Entity.class);
-        if (ea==null) {
-            throw new InternalException();
-        }
-        if (Instance.getInstance().getSystemState()==Instance.SYSTEM_STATE_UP) {
-            this.t = Instance.getInstance().getTableByName(c.getName());
-            if (this.t==null&&!c.getName().equals("su.interference.core.SystemData")) {
-                throw new InternalException();
-            }
-        }
-        final Field[] f = c.getDeclaredFields();
-        final ArrayList<Object> dcsl = new ArrayList<Object>();
-        for (int i=0; i<f.length; i++) {
-            final int m = f[i].getModifiers();
-            final Transient tr = f[i].getAnnotation(Transient.class);
-            if (tr==null) {
-                byte[] b;
-                if (Modifier.isPrivate(m)) {
-                    f[i].setAccessible(true);
-                }
-                if (xa!=null) { //dcs use in datachunk.compareTo / indexes
-                    dcsl.add(f[i].get(o));
-                }
-                b = getBytes(f[i], o);
-                if (b==null) { b = new byte[]{}; } //stub for reflection convert null fields to byte[] object in DataRecord
-                if (Types.isVarType(f[i])) {
-                    res.addBytesFromInt(b.length);
-                    res.append(b);
-                } else {
-                    res.append(b);
-                }
-            }
-        }
-        if (xa!=null) { //dcs use in datachunk.compareTo / indexes
-            this.dcs = new ValueSet(dcsl.toArray(new Object[]{}));
-        }
-        for (int i=0; i<f.length; i++) {
-            final Id a = f[i].getAnnotation(Id.class);
-            if (a!=null) {
-                if (sa!=null) {
-                    final Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), null);
-                    final Object v = z.invoke(o, null);
-                    id = (Comparable) v;
-                    serializedId = sr.serialize(f[i].getType().getName(), v);
-                } else {
-                    final Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), new Class<?>[]{Session.class});
-                    final Object v = z.invoke(o, new Object[]{s});
-                    id = (Comparable) v;
-                    serializedId = sr.serialize(f[i].getType().getName(), v);
-                }
-            }
-        }
-        chunk = res.getBytes();
+        this.state = NORMAL_STATE;
+        this.header = new RowHeader(r, null, getChunkLen(), false);
     }
 
-    // ************************************************************************
-    // main disk-> constructor, called from DataFrame & IndexFrame constructors
-    // ************************************************************************
     public DataChunk (byte[] b, int file, long frame, int hsize, DataObject t, Class c) throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
         final ByteString bs = new ByteString(b);
         this.t = t;
+        this.class_= c;
         this.header = new RowHeader(bs.substring(0, hsize), file, frame);
+        this.state = INIT_STATE;
         final ByteString bsc = new ByteString(bs.substring(hsize, b.length));
         this.chunk = bsc.getBytes();
-
-//        Field[] cs = t.getColumns();
-
-        Field[] cs = null;
-        if (t!=null) {
-            cs = t.getFields();
-        } else {
-            Field[] f = c.getDeclaredFields();
-            List<Field> ff = new ArrayList<Field>();
-            for (int i=0; i<f.length; i++) {
-                int m = f[i].getModifiers();
-                Transient ta = f[i].getAnnotation(Transient.class);
-                if (ta==null) {
-                    ff.add(f[i]);
-                }
-            }
-            cs = ff.toArray(new Field[]{});
-        }
-
-        dcs = new ValueSet(new Object[cs.length]);
-        int s = 0;
-
-        for (int i=0; i<cs.length; i++) {
-            final int v = Types.isVarType(cs[i])?4:0;
-            final int m = cs[i].getModifiers();
-
-            //All var length types is non-primitive
-            final byte[] data = bsc.substring(s+v, s+v+(Types.isVarType(cs[i])?bsc.getIntFromBytes(bsc.substring(s,s+v)):Types.getLength(cs[i])));
-            try {
-                if (Modifier.isPrivate(m)) {
-                    cs[i].setAccessible(true);
-                }
-                dcs.getValueSet()[i] = sr.deserialize(data, cs[i]);
-            } catch (UnsupportedEncodingException e) {
-                dcs.getValueSet()[i] = "UnsupportedEncodingException";
-            }
-            s = s + data.length + v;
-        }   
     }
 
     //constructor for clone method - de-serialize chunk only without header 
     public DataChunk (byte[] b, DataObject t, RowHeader h, DataChunk source) throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
-        final ByteString bs = new ByteString(b);
         this.chunk  = b;
         this.header = h;
+        this.state = INIT_STATE;
         this.source = source;
-//        Field[] cs = t.getColumns();
         this.t = t;
-        final Field[] cs = t.getFields();
-        dcs = new ValueSet(new Object[cs.length]);
-        int s = 0;
-
-        for (int i=0; i<cs.length; i++) {
-            final int v = Types.isVarType(cs[i])?4:0;
-            final int m = cs[i].getModifiers();
-            final Id a  = cs[i].getAnnotation(Id.class);
-            //All var length types is non-primitive
-            final byte[] data = bs.substring(s+v, s+v+(Types.isVarType(cs[i])?bs.getIntFromBytes(bs.substring(s,s+v)):Types.getLength(cs[i])));
-            if (a!=null) {
-                serializedId = data;
-            }
-            try {
-                if (Modifier.isPrivate(m)) {
-                    cs[i].setAccessible(true);
-                }
-                dcs.getValueSet()[i] = sr.deserialize(data, cs[i]);
-                if (a!=null) {
-                    id = (Comparable) dcs.getValueSet()[i];
-                }
-            } catch (UnsupportedEncodingException e) {
-                dcs.getValueSet()[i] = "UnsupportedEncodingException";
-            }
-            s = s + data.length + v;
-        }
     }
 
-    //constructor for remote method - de-serialize chunk from hex string
-    public DataChunk (String h, FrameData bd) throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
-        byte[] b = getBytesFromHexString(h);
-        final ByteString bs = new ByteString(b);
-        this.chunk = b;
-        this.t = bd.getDataObject();
-        final Field[] cs = t.getFields();
-        dcs = new ValueSet(new Object[cs.length]);
-        int s = 0;
-
-        for (int i=0; i<cs.length; i++) {
-            final int v = Types.isVarType(cs[i])?4:0;
-            final int m = cs[i].getModifiers();
-            final Id a  = cs[i].getAnnotation(Id.class);
-            //All var length types is non-primitive
-            final byte[] data = bs.substring(s+v, s+v+(Types.isVarType(cs[i])?bs.getIntFromBytes(bs.substring(s,s+v)):Types.getLength(cs[i])));
-            if (a!=null) {
-                serializedId = data;
-            }
-            try {
-                if (Modifier.isPrivate(m)) {
-                    cs[i].setAccessible(true);
-                }
-                dcs.getValueSet()[i] = sr.deserialize(data, cs[i]);
-                if (a!=null) {
-                    id = (Comparable) dcs.getValueSet()[i];
-                }
-            } catch (UnsupportedEncodingException e) {
-                dcs.getValueSet()[i] = "UnsupportedEncodingException";
-            }
-            s = s + data.length + v;
+    public byte[] getChunk () {
+        if (state == INIT_STATE) {
+            return chunk;
         }
+        if (state == NORMAL_STATE) {
+            try {
+                if (this.entity == null) {
+                    throw new InternalException();
+                }
+                Class c = this.entity.getClass();
+                final SystemEntity sa = (SystemEntity) c.getAnnotation(SystemEntity.class);
+                final TransEntity ta = (TransEntity) c.getAnnotation(TransEntity.class);
+                Entity ea = (Entity) c.getAnnotation(Entity.class);
+                if (ta != null) {
+                    //for Transactional Wrapper Entity we must get superclass (original Entity class)
+                    c = c.getSuperclass();
+                    ea = (Entity) c.getAnnotation(Entity.class);
+                }
+                final Field[] f = c.getDeclaredFields();
+                final ByteString res = new ByteString();
+                if (ea == null) {
+                    throw new InternalException();
+                }
+                if (t != null) {
+                    if (!t.getName().equals(c.getName())) {
+                        throw new InternalException();
+                    }
+                }
+                for (int i = 0; i < f.length; i++) {
+                    final int m = f[i].getModifiers();
+                    final Transient tr = f[i].getAnnotation(Transient.class);
+                    if (tr == null) {
+                        byte[] b;
+                        if (Modifier.isPrivate(m)) {
+                            f[i].setAccessible(true);
+                        }
+                        b = getBytes(f[i], this.entity);
+                        if (b == null) {
+                            b = new byte[]{};
+                        } //stub for reflection convert null fields to byte[] object in DataRecord
+                        if (Types.isVarType(f[i])) {
+                            res.addBytesFromInt(b.length);
+                            res.append(b);
+                        } else {
+                            res.append(b);
+                        }
+                    }
+                }
+
+                return res.getBytes();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return null;
     }
 
-    //constructor for remote method - de-serialize chunk from hex string
-    public DataChunk (String h, Table t, Transaction tx) throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
-        byte[] b = getBytesFromHexString(h);
-        final ByteString bs = new ByteString(b);
-        this.chunk = b;
-        this.header = new RowHeader(new RowId(0,0,0), tx, 0, false);
-        this.t = t;
-//        Field[] cs = t.getColumns();
-        final Field[] cs = t.getFields();
-        dcs = new ValueSet(new Object[cs.length]);
-        int s = 0;
-
-        for (int i=0; i<cs.length; i++) {
-            final int v = Types.isVarType(cs[i])?4:0;
-            final int m = cs[i].getModifiers();
-            final Id a  = cs[i].getAnnotation(Id.class);
-
-            //All var length types is non-primitive
-            final byte[] data = bs.substring(s+v, s+v+(Types.isVarType(cs[i])?bs.getIntFromBytes(bs.substring(s,s+v)):Types.getLength(cs[i])));
-            if (a!=null) {
-                serializedId = data;
-            }
+    public int getChunkLen () {
+        if (state == INIT_STATE) {
+            return chunk.length;
+        }
+        if (state == NORMAL_STATE) {
             try {
-                if (Modifier.isPrivate(m)) {
-                    cs[i].setAccessible(true);
+                if (this.entity == null) {
+                    throw new InternalException();
                 }
-                dcs.getValueSet()[i] = sr.deserialize(data, cs[i]);
-                if (a!=null) {
-                    id = (Comparable) dcs.getValueSet()[i];
+                Class c = this.entity.getClass();
+                final SystemEntity sa = (SystemEntity) c.getAnnotation(SystemEntity.class);
+                final TransEntity ta = (TransEntity) c.getAnnotation(TransEntity.class);
+                Entity ea = (Entity) c.getAnnotation(Entity.class);
+                if (ta != null) {
+                    //for Transactional Wrapper Entity we must get superclass (original Entity class)
+                    c = c.getSuperclass();
+                    ea = (Entity) c.getAnnotation(Entity.class);
                 }
-            } catch (UnsupportedEncodingException e) {
-                dcs.getValueSet()[i] = "UnsupportedEncodingException";
-            }
-            s = s + data.length + v;
-        }
-    }
+                final Field[] f = c.getDeclaredFields();
+                final AtomicInteger res = new AtomicInteger();
+                if (ea == null) {
+                    throw new InternalException();
+                }
+                if (t != null) {
+                    if (!t.getName().equals(c.getName())) {
+                        throw new InternalException();
+                    }
+                }
+                for (int i = 0; i < f.length; i++) {
+                    final int m = f[i].getModifiers();
+                    final Transient tr = f[i].getAnnotation(Transient.class);
+                    if (tr == null) {
+                        if (Modifier.isPrivate(m)) {
+                            f[i].setAccessible(true);
+                        }
+                        final int len  = getLen(f[i], this.entity);
+                        if (Types.isVarType(f[i])) {
+                            res.getAndAdd(4);
+                            res.getAndAdd(len);
+                        } else {
+                            res.getAndAdd(len);
+                        }
+                    }
+                }
 
-    //for UPDATE ONLY!!!
-    public byte[] flush (Session s) throws IOException, InvocationTargetException, NoSuchMethodException, InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
-        if (this.entity==null) {
-            throw new InternalException();
-        }
-        //int chl = this.chunk.length;
-        Class c = this.entity.getClass();
-        final SystemEntity sa = (SystemEntity)c.getAnnotation(SystemEntity.class);
-        final TransEntity ta = (TransEntity)c.getAnnotation(TransEntity.class);
-        Entity ea = (Entity)c.getAnnotation(Entity.class);
-        if (ta!=null) {
-            //for Transactional Wrapper Entity we must get superclass (original Entity class)
-            c = c.getSuperclass();
-            ea = (Entity)c.getAnnotation(Entity.class);
-        }
-        final Field[] f = c.getDeclaredFields();
-        final ByteString res = new ByteString();
-        if (ea==null) {
-            throw new InternalException();
-        }
-        if (t!=null) {
-            if (!t.getName().equals(c.getName())) {
-                throw new InternalException();
+                return res.get();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
         }
-        for (int i=0; i<f.length; i++) {
-            final int m = f[i].getModifiers();
-            final Transient tr = f[i].getAnnotation(Transient.class);
-            if (tr==null) {
-                byte[] b;
-                if (Modifier.isPrivate(m)) {
-                    f[i].setAccessible(true);
-                }
-                b = getBytes(f[i], this.entity);
-                if (b==null) { b = new byte[]{}; } //stub for reflection convert null fields to byte[] object in DataRecord
-                if (Types.isVarType(f[i])) {
-                    res.addBytesFromInt(b.length);
-                    res.append(b);
-                } else {
-                    res.append(b);
-                }
-            }
-        }
-        for (int i=0; i<f.length; i++) {
-            final Id a = f[i].getAnnotation(Id.class);
-            if (a!=null) {
-                if (sa!=null) {
-                    final Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), null);
-                    final Object v = z.invoke(this.entity, null);
-                    id = (Comparable) v;
-                    serializedId = sr.serialize(f[i].getType().getName(), v);
-                } else {
-                    final Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), new Class<?>[]{Session.class});
-                    final Object v = z.invoke(this.entity, new Object[]{s});
-                    id = (Comparable) v;
-                    serializedId = sr.serialize(f[i].getType().getName(), v);
-                }
-            }
-        }
-        return res.getBytes();
+        return 0;
     }
 
     public Object getEntity () {
         if (entity==null) {
             try {
+                final ValueSet dcs = getDcsFromBytes();
                 final Object o = t.getInstance(); //returns empty instance
                 final Field[] cs = t.getFields();
                 for (int i=0; i<cs.length; i++) {
@@ -546,89 +502,9 @@ public class DataChunk implements Chunk {
                 e.printStackTrace();
             }
         }
+        this.chunk = null;
+        this.state = NORMAL_STATE;
         return entity;
-    }
-
-
-    public Object getEntityId () { //throws ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
-        Object id = null;
-        try {
-            final Field[] cs = t.getFields();
-            for (int i=0; i<cs.length; i++) {
-                final Id a  = cs[i].getAnnotation(Id.class);
-                final int m = cs[i].getModifiers();
-                if (Modifier.isPrivate(m)) {
-                    cs[i].setAccessible(true);
-                }
-                if (a!=null) {
-                    if (dcs.getValueSet()[i] != null) {
-                        id = dcs.getValueSet()[i];
-                    }
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return id;
-    }
-
-    //TEMPORARY - return Entity without DataChunk for remote operation
-    public Object getReceivedEntity () { //throws ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
-        if (entity==null) {
-            try {
-                final Object o = t.getInstance(); //returns empty instance
-                final Field[] cs = t.getFields();
-                for (int i=0; i<cs.length; i++) {
-                    final int m = cs[i].getModifiers();
-                    if (Modifier.isPrivate(m)) {
-                        cs[i].setAccessible(true);
-                    }
-                    if (dcs.getValueSet()[i]!=null) {
-                        cs[i].set(o, dcs.getValueSet()[i]);
-                    }
-                }
-                if (t.isIndex()) {
-                }
-                if (!t.isNoTran()) {
-                    ((EntityContainer)o).setRowId(header.getRowID());
-                    ((EntityContainer)o).setTran(header.getTran());
-                    ((EntityContainer)o).setReceived(true);
-                }
-                entity = o;
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        return entity;
-    }
-
-    //use in group by algorithm for generate another class object with same value set
-    public Object getEntity (Table tt) { //throws ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
-        Object o = null;
-        try {
-            o = tt.getInstance(); //returns empty instance
-            final Field[] cs = tt.getFields();
-            for (int i=0; i<cs.length; i++) {
-                final int m = cs[i].getModifiers();
-                if (Modifier.isPrivate(m)) {
-                    cs[i].setAccessible(true);
-                }
-                if (dcs.getValueSet()[i]!=null) {
-                    cs[i].set(o, dcs.getValueSet()[i]);
-                }
-            }
-            if (tt.isIndex()) {
-
-            }
-            if (!tt.isNoTran()) {
-                ((EntityContainer)o).setRowId(header.getRowID());
-                ((EntityContainer)o).setTran(header.getTran());
-                ((EntityContainer)o).setDataChunk(this);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return o;
     }
 
     //for bootstrap system / not use table objects
@@ -656,7 +532,7 @@ public class DataChunk implements Chunk {
                         if (Modifier.isPrivate(m)) {
                             f[i].setAccessible(true);
                         }
-                        f[i].set(o, dcs.getValueSet()[x]);
+                        f[i].set(o, getDcs().getValueSet()[x]);
                         x++;
                     }
                 }
@@ -666,10 +542,6 @@ public class DataChunk implements Chunk {
             e.printStackTrace();
         }
         return entity;
-    }
-
-    protected void setTable(Table t) {
-        entity = t;
     }
 
     public void setFrameData(FrameData b) {
@@ -688,7 +560,7 @@ public class DataChunk implements Chunk {
                     if (Modifier.isPrivate(m)) {
                         cs[i].setAccessible(true);
                     }
-                    cs[i].set(o, dcs.getValueSet()[i]);
+                    cs[i].set(o, getDcs().getValueSet()[i]);
                 }
                 undoentity = o;
             } catch (Exception e) {
@@ -726,28 +598,9 @@ public class DataChunk implements Chunk {
         }
     }
 
-    //for mgmt chunk updates by web form string values
-    public void updateEntity(String[] ulist, Session s)
-        throws InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException, IOException, ParseException {
-        final Field[] cs = t.getFields();
-        if (cs.length!=ulist.length) {
-            throw new InternalException(); //fields amount not match
-        }
-        for (int i=0; i<cs.length; i++) {
-            final Id a = cs[i].getAnnotation(Id.class);
-            if (a==null) { //id column do not change
-                final int m = cs[i].getModifiers();
-                if (Modifier.isPrivate(m)) {
-                    cs[i].setAccessible(true);
-                }
-                cs[i].set(this.entity, sr.deserialize(ulist[i], cs[i].getType().getName()));
-            }
-        }
-    }
-
     //for UNDO processing
     public DataChunk cloneEntity(Session s) throws IOException, InvocationTargetException, NoSuchMethodException, InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
-        final byte[] b = this.flush(s);
+        final byte[] b = this.getChunk();
         return new DataChunk(b, this.t, new RowHeader(this.getHeader()), this);
     }
 
@@ -765,7 +618,6 @@ public class DataChunk implements Chunk {
         }
         source.setHeader(this.getHeader());
         source.setEntity(this.getEntity(), false);
-        source.setChunk(source.flush(s));
         return source;
     }
 
@@ -775,20 +627,18 @@ public class DataChunk implements Chunk {
         return sr.serialize(t, fo);
     }
 
+    private int getLen(Field f, Object o) throws IllegalAccessException, UnsupportedEncodingException, ClassNotFoundException, InternalException, InstantiationException {
+        final String t = f.getType().getName();
+        final Object fo = f.get(o);
+        return sr.length(t, fo);
+    }
+
     public RowHeader getHeader() {
         return header;
     }
 
     public void setHeader(Header header) {
         this.header = (RowHeader)header;
-    }
-
-    public byte[] getChunk() {
-        return this.chunk;
-    }
-
-    public void setChunk(byte[] chunk) {
-        this.chunk = chunk;
     }
 
     //lock mechanism
