@@ -122,7 +122,6 @@ public class DataFrame extends Frame {
                     final long bptr = hmap.get(allocId) != null ? hmap.get(allocId) : Instance.getInstance().getFrameByAllocId(allocId).getFrameId();
                     uc.setFile((int) bptr % 4096);
                     uc.setFrame(bptr - (bptr % 4096));
-                    dc.setChunk(dc.flush(s));
                     data.add(dc);
                     if (umap.get(bptr) == null) {
                         umap.put(bptr, new ArrayList<>());

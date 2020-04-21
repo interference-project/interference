@@ -25,7 +25,10 @@
 package su.interference.sql;
 
 import su.interference.core.DataChunk;
+import su.interference.core.ValueSet;
 import su.interference.exception.InternalException;
+import su.interference.persistent.Session;
+import su.interference.persistent.Table;
 
 import java.util.*;
 import java.net.MalformedURLException;
@@ -62,13 +65,14 @@ public class SQLGroup {
         }
     }
 
-    public DataChunk getDC() {
+    public DataChunk getDC(Table t, Session s) {
+        ValueSet groupvs = this.dc.getDcs();
         for (int i=0; i<this.cols.size(); i++) {
             if (this.cols.get(i).getFtype()>0) {
-                this.dc.getDcs().getValueSet()[i] = fset[i].getResult();
+                groupvs.getValueSet()[i] = fset[i].getResult();
             }
         }
-        return this.dc;
+        return new DataChunk(groupvs, s, t);
     }
 
 }

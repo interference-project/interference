@@ -263,7 +263,7 @@ public class DataFile implements Serializable {
     // 1 - file OK
     // 2 - System versions don't match
     // 3 - SystemFrame corrupt or parameters don't match
-    public synchronized int checkFile() throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
+    public synchronized int checkFile() throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, NoSuchMethodException {
         try {
             this.file = new RandomAccessFile(this.fileName,"r");
             byte[] b = new byte[SYSTEM_FRAME_SIZE];

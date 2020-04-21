@@ -41,7 +41,7 @@ public class ChunkIdComparator implements Comparator<Chunk> {
 
     public int compare(Chunk c1, Chunk c2) {
         try {
-            return c1.getId(s).compareTo(c2.getId(s));
+            return c1.getId(null, s).compareTo(c2.getId(null, s));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

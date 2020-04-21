@@ -37,72 +37,80 @@ public class ChunkMap {
     private final ConcurrentHashMap<Integer, Chunk> hmap;
     private final ConcurrentHashMap<ValueSet, Chunk> imap;
     private final List<Chunk> list;
+    private final Frame frame;
     private volatile boolean sorted;
 
-    public ChunkMap() {
+    public ChunkMap(Frame frame) {
         hmap = new ConcurrentHashMap<>();
         imap = new ConcurrentHashMap<>();
         list = new CopyOnWriteArrayList<>();
+        this.frame = frame;
     }
 
-    public void sort() {
+    public synchronized void sort() {
         Collections.sort(list);
         sorted = true;
     }
 
-    public void add(Chunk c) {
+    public synchronized void add(Chunk c) {
         hmap.put(c.getHeader().getPtr(), c);
-        imap.put(c.getDcs(), c);
+        if (frame instanceof IndexFrame) {
+            imap.put(c.getDcs(), c);
+        }
         list.add(c);
         sorted = false;
     }
 
-    public List<Chunk> getChunks() {
+    public synchronized List<Chunk> getChunks() {
         return list;
     }
 
-    public Chunk getByPtr(int i) {
+    public synchronized Chunk getByPtr(int i) {
         return hmap.get(i);
     }
 
-    public Chunk get(int i) {
+    public synchronized Chunk get(int i) {
         return list.get(i);
     }
 
-    public Chunk getByKey(ValueSet key) {
+    public synchronized Chunk getByKey(ValueSet key) {
         return imap.get(key);
     }
 
-    public void removeByPtr(int i) {
+    public synchronized void removeByPtr(int i) {
         final boolean x = list.remove(hmap.get(i));
         final Chunk c = (Chunk)hmap.remove(i);
-        imap.remove(c.getDcs());
+        if (frame instanceof IndexFrame) {
+            imap.remove(c.getDcs());
+        }
         sorted = false;
         if (!x || c == null) {
             throw new RuntimeException("Internal error during remove object from frame");
         }
     }
 
-    public void remove(int i) {
+    public synchronized void remove(int i) {
         final Chunk c = list.get(i);
         list.remove(i);
         hmap.remove(c.getHeader().getPtr());
-        imap.remove(c.getDcs());
+        if (frame instanceof IndexFrame) {
+            imap.remove(c.getDcs());
+        }
         sorted = false;
     }
 
-    public int size() {
+    public synchronized int size() {
         return list.size();
     }
 
-    public void clear() {
+    public synchronized void clear() {
         hmap.clear();
         list.clear();
         imap.clear();
         sorted = false;
     }
 
-    public boolean isSorted() {
+    public synchronized boolean isSorted() {
         return sorted;
     }
 }
