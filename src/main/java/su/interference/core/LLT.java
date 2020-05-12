@@ -104,6 +104,7 @@ public class LLT {
     }
 
     public void add(Frame b) {
+        b.getFrameData().setSynced(false);
         frames.put(b.getFrameData().getFrameId(), b);
     }
 
@@ -111,6 +112,7 @@ public class LLT {
         pool.remove(this.id);
         if (this.lock) {
             for (Map.Entry<Long, Frame> entry : frames.entrySet()) {
+                entry.getValue().getFrameData().setSynced(true);
                 entry.getValue().clearSnaps(this.id);
             }
             frames.clear();
@@ -129,7 +131,7 @@ public class LLT {
         return id;
     }
 
-    public StackTraceElement[] getTrace() {
+    private StackTraceElement[] getTrace() {
         return trace;
     }
 }

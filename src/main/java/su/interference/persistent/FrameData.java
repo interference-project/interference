@@ -39,6 +39,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -112,31 +115,20 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @Transient
     private long transId; //for UndoChunk: transId
     @Transient
+    private final Map<Long, TransFrame> tcounter = new ConcurrentHashMap<>();
+    @Transient
+    private volatile int priority = 2;
+    @Transient
+    private volatile boolean synced = true;
+    @Transient
     private volatile Frame frame;
     @Transient
     private DataObject dataObject;
     @Transient
     private Class entityClass;
-    @Transient
-    private volatile WaitFrame waitFrame;
 
     public int getImpl() {
         return FrameApi.IMPL_DATA;
-    }
-
-    public void release() throws InternalException {
-        if (current == null || current.get() == 0) {
-            return;
-        }
-        if (waitFrame==null) {
-            throw new InternalException();
-        } else {
-            waitFrame.release();
-        }
-    }
-
-    public void setWaitFrame(WaitFrame waitFrame) {
-        this.waitFrame = waitFrame;
     }
 
     public void markAsCurrent() {
@@ -237,10 +229,9 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     //real current transactional value
     //skip negative differences for prevent frame oversize when many transactions change data
     public int getFrameUsed() {
-        final ArrayList<TransFrame> tbs = Instance.getInstance().getTransFrames(this.getFrameId());
         int tdiff = 0;
-        for (TransFrame tb : tbs) {
-            tdiff = tdiff + tb.getDiff();
+        for (Map.Entry<Long, TransFrame> entry : tcounter.entrySet()) {
+            tdiff = tdiff + entry.getValue().getDiff();
         }
         return this.getUsed() + (tdiff>0?tdiff:0);
     }
@@ -255,50 +246,6 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     public int getFrameFree() throws ClassNotFoundException, InternalException, InstantiationException, IllegalAccessException {
         return getFrameSize() - Frame.FRAME_HEADER_SIZE - getFrameUsed();
-    }
-
-    public boolean hasLiveTransaction(long transId) {
-        //Map<Long, Transaction> tmap = frame.getLiveTransactions();
-        final ArrayList<TransFrame> tbs = Instance.getInstance().getTransFrames(this.getFrameId());
-        for (TransFrame tb : tbs) {
-            if (tb.getTransId() == transId) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public boolean hasLocalTransactions() {
-        final ArrayList<TransFrame> tbs = Instance.getInstance().getTransFrames(this.getFrameId());
-        for (TransFrame tb : tbs) {
-            final Transaction tran = Instance.getInstance().getTransactionById(tb.getTransId());
-            if (tran.getNodeId() == Config.getConfig().LOCAL_NODE_ID) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    //returns node id
-    public int hasRemoteTransactions() throws InternalException {
-        final ArrayList<TransFrame> tbs = Instance.getInstance().getTransFrames(this.getFrameId());
-        boolean local = false;
-        int nodeId = 0;
-        for (TransFrame tb : tbs) {
-            final Transaction tran = Instance.getInstance().getTransactionById(tb.getTransId());
-            if (tran.getNodeId() == Config.getConfig().LOCAL_NODE_ID) {
-                local = true;
-            } else {
-                if (nodeId > 0 && nodeId != tran.getNodeId()) {
-                    throw new InternalException();
-                }
-                nodeId = tran.getNodeId();
-            }
-            if (local == true && nodeId > 0) {
-                throw new InternalException();
-            }
-        }
-        return nodeId;
     }
 
     public FrameData() {
@@ -323,7 +270,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         this.size = bd.getSize();
         this.allocId = bd.getAllocId();
         this.started = bd.getStarted();
-        this.current = bd.getCurrent();
+        this.current = new AtomicInteger(bd.getCurrent().get());
         this.used = bd.getUsed();
         this.prevFrame = bd.getPrevFrame();
         this.prevFile = bd.getPrevFile();
@@ -454,12 +401,48 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         }
     }
 
+    public void clearFrame() {
+        this.frame = null;
+    }
+
     public Class getEntityClass() {
         return entityClass;
     }
 
     public void setEntityClass(Class entityClass) {
         this.entityClass = entityClass;
+    }
+
+    public int getTcounterSize() {
+        return tcounter.size();
+    }
+
+    public void increaseTcounter(long id, TransFrame f) {
+        this.tcounter.put(id, f);
+    }
+
+    public void decreaseTcounter(long id) {
+        this.tcounter.remove(id);
+    }
+
+    public int getPriority() {
+        return priority;
+    }
+
+    public void setPriority(int priority) {
+        this.priority = priority;
+    }
+
+    public void decreasePriority() {
+        this.priority--;
+    }
+
+    public boolean isSynced() {
+        return synced;
+    }
+
+    public void setSynced(boolean synced) {
+        this.synced = synced;
     }
 
     public AtomicLong getDistribution() {

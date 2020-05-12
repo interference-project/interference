@@ -58,7 +58,6 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
     private Frame rFrame;
     private final HashMap<Long, Long> imap;
     private final HashMap<Long, Transaction> rtran;
-    private final ArrayList<TransFrame> tframes;
     private final static long serialVersionUID = 8712349857239487289L;
 
     public SyncFrame(Frame frame, Session s, FreeFrame fb) throws Exception {
@@ -80,7 +79,6 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
 
         className = bd == null ? null : t.getName();
         rtran = frame.getLiveTransactions();
-        tframes = frame.getLiveTransFrames();
         if (frame.getClass().getName().equals("su.interference.core.DataFrame")) {
             if (frame.getType()!=0) {
                 throw new InternalException();
@@ -92,8 +90,16 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
             final long nextId_ = db.getNextFrame()+db.getNextFile();
             try {
                 //todo NPE possibly by evicted frame
-                prevId = prevId_ == 0 ? 0 : Instance.getInstance().getFrameById(prevId_).getAllocId();
-                nextId = nextId_ == 0 ? 0 : Instance.getInstance().getFrameById(nextId_).getAllocId();
+                try {
+                    prevId = prevId_ == 0 ? 0 : Instance.getInstance().getFrameById(prevId_).getAllocId();
+                } catch (NullPointerException npe) {
+                    logger.info("evicted frame caused an NPE during SyncFrame construction id = " + frame.getPtr());
+                }
+                try {
+                    nextId = nextId_ == 0 ? 0 : Instance.getInstance().getFrameById(nextId_).getAllocId();
+                } catch (NullPointerException npe) {
+                    logger.info("evicted frame caused an NPE during SyncFrame construction id = " + frame.getPtr());
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -126,7 +132,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
         fileType = Instance.getInstance().getDataFileById(frame.getFile()).getType();
         b = frame.getFrame();
         frameId = frame.getPtr();
-        this.allocId = frame.getAllocFile()+ frame.getAllocPointer();
+        this.allocId = frame.getAllocFile() + frame.getAllocPointer();
     }
 
     public Frame getRFrame() {
@@ -215,10 +221,6 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
 
     public HashMap<Long, Transaction> getRtran() {
         return rtran;
-    }
-
-    public ArrayList<TransFrame> getTframes() {
-        return tframes;
     }
 
     public boolean equals (SyncFrame bl) {

@@ -306,6 +306,7 @@ public class Session {
     }
 
     public void closeStreamQueue() {
+        logger.info("Stream is closed");
         SQLCursor.removeStreamQueue(this);
     }
 

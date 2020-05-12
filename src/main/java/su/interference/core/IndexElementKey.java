@@ -76,20 +76,19 @@ public class IndexElementKey implements Comparable {
         return false;
     }
 
-    public String keyToString() {
-        String res = "";
-        for (int i=0; i<key.length; i++) {
-            res = res + key[i];
-        }
-        return res;
-    }
-
     public Object[] getKey() {
         return key;
     }
 
     public void setKey(Object[] key) {
         this.key = key;
+    }
+
+    public int hashCode() {
+        int hashCode = 1;
+        for (Object o : key)
+            hashCode = 31 * hashCode + (o == null ? 0 : o.hashCode());
+        return hashCode;
     }
 
 }

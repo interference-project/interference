@@ -44,15 +44,12 @@ import java.net.MalformedURLException;
 public class TransFrame implements Comparable, FilePartitioned, Serializable {
 
     @Column
-    @IndexColumn
     @MgmtColumn(width=10, show=true, form=false, edit=false)
     private long transId;
     @Column
-    @IndexColumn
     @MgmtColumn(width=10, show=true, form=false, edit=false)
     private int objectId;
     @Column
-    @IndexColumn
     @MgmtColumn(width=10, show=true, form=false, edit=false)
     private long cframeId;
     @Column
@@ -65,7 +62,7 @@ public class TransFrame implements Comparable, FilePartitioned, Serializable {
     @MapColumn
     @MgmtColumn(width=10, show=true, form=false, edit=false)
     @Transient
-    private transient String frameId;
+    private transient TransFrameId frameId;
 
     @Transient
     public static final int CLASS_ID = 8;
@@ -76,8 +73,11 @@ public class TransFrame implements Comparable, FilePartitioned, Serializable {
         return CLASS_ID;
     }
 
-    public String getFrameId() {
-        return transId + "-" + cframeId + "-" + uframeId;
+    public TransFrameId getFrameId() {
+        if (frameId == null) {
+            frameId = new TransFrameId(cframeId, uframeId, transId);
+        }
+        return frameId;
     }
 
     public TransFrame() {
@@ -85,10 +85,11 @@ public class TransFrame implements Comparable, FilePartitioned, Serializable {
     }
 
     public TransFrame(long tr, int obj, long cp, long up) {
-        this.transId  = tr;
+        this.transId = tr;
         this.objectId = obj;
-        this.cframeId   = cp;
-        this.uframeId   = up;
+        this.cframeId = cp;
+        this.uframeId = up;
+        this.frameId = new TransFrameId(cframeId, uframeId, transId);
     }
 
     public int compareTo(Object obj) {
@@ -128,32 +129,16 @@ public class TransFrame implements Comparable, FilePartitioned, Serializable {
         return transId;
     }
 
-    public void setTransId(long transId) {
-        this.transId = transId;
-    }
-
     public int getObjectId() {
         return objectId;
-    }
-
-    public void setObjectId(int objectId) {
-        this.objectId = objectId;
     }
 
     public long getCframeId() {
         return cframeId;
     }
 
-    public void setCframeId(long cframeId) {
-        this.cframeId = cframeId;
-    }
-
     public long getUframeId() {
         return uframeId;
-    }
-
-    public void setUframeId(long uframeId) {
-        this.uframeId = uframeId;
     }
 
     public int getDiff() {

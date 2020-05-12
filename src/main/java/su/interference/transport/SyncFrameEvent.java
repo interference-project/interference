@@ -97,11 +97,12 @@ public class SyncFrameEvent extends TransportEventImpl {
                                 b.setDf(f);
                             }
                         }
-                        logger.debug("create replicated frame with allocId " + b.getAllocId() + " ptr " + bd.getFrameId());
+                        logger.debug("create new frame allocId " + b.getAllocId() + " ptr " + bd.getFrameId());
                     } else {
-                        if (t.getObjectId() == bd.getObjectId()) {
+                        final Table t_ = Instance.getInstance().getTableById(bd.getObjectId());
+                        if (t.getName().equals(t_.getName())) {
                             b.setDf(Instance.getInstance().getDataFileById(bd.getFile()));
-                            logger.debug("rframe bd found with allocId=" + b.getAllocId());
+                            logger.debug("rframe bd " + bd.getFrameId() + " found with allocId=" + b.getAllocId());
                         } else {
                             final FrameData bd_ = new FrameData(bd, t);
                             s.delete(bd);
@@ -140,10 +141,12 @@ public class SyncFrameEvent extends TransportEventImpl {
                             frame.setRes02(nextF);
                             frame.setRes06(prevB);
                             frame.setRes07(nextB);
+                            frame.setFrameData(b.getBd());
+                            b.getBd().setFrame(frame);
                             final LLT llt_ = LLT.getLLT(); //df access reordering prevent deadlock
                             b.getDf().writeFrame(b.getBd(), b.getBd().getPtr(), frame.getFrame(), llt_, s);
                             llt_.commit();
-                            b.getBd().setFrame(null);
+//                            b.getBd().setFrame(null);
                             logger.debug("write undo frame with allocId "+b.getAllocId()+" ptr "+b.getBd().getFrameId());
                         }
                     }
@@ -173,11 +176,13 @@ public class SyncFrameEvent extends TransportEventImpl {
                             frame.setRes02(nextF);
                             frame.setRes06(prevB);
                             frame.setRes07(nextB);
+                            frame.setFrameData(b.getBd());
+                            b.getBd().setFrame(frame);
                             final LLT llt_ = LLT.getLLT(); //df access reordering prevent deadlock
                             b.getDf().writeFrame(b.getBd(), b.getBd().getPtr(), frame.getFrame(), llt_, s);
                             llt_.commit();
-                            b.getBd().setFrame(frame);
-                            logger.debug("write data frame with allocId "+b.getAllocId()+" ptr "+b.getBd().getFrameId());
+//                            logger.debug("write data frame with allocId "+b.getAllocId()+" ptr "+b.getBd().getFrameId()+" size "+frame.getChunks().size());
+                            logger.debug("allocId "+b.getAllocId()+" ptr "+b.getBd().getFrameId());
                         }
                     }
                 }
@@ -238,11 +243,13 @@ public class SyncFrameEvent extends TransportEventImpl {
 
         final Map<Integer, List<FrameApi>> frames_ = new HashMap<>();
         for (SyncFrame f : sb) {
-            final Table t = Instance.getInstance().getTableByName(f.getClassName());
-            if (frames_.get(t.getObjectId()) == null) {
-                frames_.put(t.getObjectId(), new ArrayList<>());
+            if (f.isAllowR()) {
+                final Table t = Instance.getInstance().getTableByName(f.getClassName());
+                if (frames_.get(t.getObjectId()) == null) {
+                    frames_.put(t.getObjectId(), new ArrayList<>());
+                }
+                frames_.get(t.getObjectId()).add(f.getBd());
             }
-            frames_.get(t.getObjectId()).add(f.getBd());
         }
         for (Map.Entry<Integer, List<FrameApi>> entry: frames_.entrySet()) {
             SQLCursor.addStreamFrame(new ContainerFrame(entry.getKey(), entry.getValue()));
@@ -264,24 +271,6 @@ public class SyncFrameEvent extends TransportEventImpl {
                     logger.error("unable to persist remote transaction", e);
                 }
             }
-        }
-    }
-
-    private void updateTransFrames(ArrayList<TransFrame> tframes, HashMap<Long, Long> hmap2, Session s) throws Exception {
-        for (TransFrame tb : tframes) {
-            final long cframeid = hmap2.get(tb.getCframeId());
-            if (cframeid == 0) {
-                throw new InternalException();
-            }
-            final long uframeid = tb.getUframeId() == 0 ? 0 : hmap2.get(tb.getUframeId());
-            if (tb.getUframeId() > 0) {
-                if (uframeid == 0) {
-                    throw new InternalException();
-                }
-            }
-            tb.setCframeId(cframeid);
-            tb.setUframeId(uframeid);
-            s.persist(tb);
         }
     }
 

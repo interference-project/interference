@@ -75,6 +75,7 @@ public class RSProxyFactory {
         sb.append("import javax.persistence.Column;\n");
         sb.append("import javax.persistence.Transient;\n");
         sb.append("import javax.persistence.GeneratedValue;\n");
+        sb.append("import su.interference.core.IndexChunk;\n");
         sb.append("import su.interference.core.SystemEntity;\n");
         sb.append("import su.interference.core.ResultSetEntity;\n");
         sb.append("import su.interference.core.IndexEntity;\n");
@@ -95,11 +96,15 @@ public class RSProxyFactory {
         sb.append("@DisableSync\n");
         sb.append("public class ");
         sb.append(sname);
-        sb.append(" extends su.interference.proxy.GenericResultImpl implements java.io.Serializable {\n");
+        sb.append(" extends su.interference.proxy.GenericResultImpl implements IndexChunk, java.io.Serializable {\n");
         sb.append("\n");
         //todo serialVersionUID should be unique for every proxy class
         sb.append("    @Transient\n");
         sb.append("    private final static long serialVersionUID = 6730871208437219890L;\n");
+        sb.append("    @Transient\n");
+        sb.append("    public su.interference.core.DataChunk dc;\n");
+        sb.append("    public su.interference.core.DataChunk getDataChunk() { return dc; }\n");
+        sb.append("    public void setDataChunk(su.interference.core.DataChunk c) { dc = c; }\n");
         sb.append("\n");
 
         for (int i=0; i<cs.size(); i++) {

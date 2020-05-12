@@ -60,6 +60,7 @@ public class FrameGroupTask implements Runnable {
     public void run() {
 
         final boolean ixflag = cur.getSqlStmt().getCols().getOrderColumns().size() > 0;
+        Thread.currentThread().setName("Group SQL thread "+Thread.currentThread().getId());
 
         try {
             final SQLGroupContainer sqlg = new SQLGroupContainer(((StreamQueue) target).getRscols(),

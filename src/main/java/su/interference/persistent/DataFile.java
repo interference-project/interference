@@ -196,6 +196,7 @@ public class DataFile implements Serializable {
         if (setcurrenable) bd.markAsCurrent();
         int prevFile = 0;
         long prevPtr = 0;
+
         if (frame != null && frameType == 0) {
             frame.clearCurrent();
             prevFile = frame.getFile();
@@ -206,26 +207,35 @@ public class DataFile implements Serializable {
             frame.getDataFrame().setNextFrame(bd.getPtr());
             s.persist(frame, llt); //update
         }
+
         bd.setPrevFile(prevFile);
         bd.setPrevFrame(prevPtr);
+
         if (frameType==0) {
             ((DataFrame)db).setPrevFile(prevFile);
             ((DataFrame)db).setPrevFrame(prevPtr);
         }
+
         if (t.getFileStart()==0&&t.getFrameStart()==0) {
             t.setFileStart(bd.getFile());
             t.setFrameStart(bd.getPtr());
         }
+
         t.setFileLast(bd.getFile());
         t.setFrameLast(bd.getPtr());
         t.incFrameAmount();
-        if (llt!=null) {
-            llt.add(db);
-            if (frame!=null) {
-                llt.add(frame.getFrame());
+
+        if (!external) {
+            if (llt != null) {
+                llt.add(db);
+                if (frame != null) {
+                    llt.add(frame.getFrame());
+                }
             }
         }
+
         s.persist(t, llt); //update
+
         if (t.getName().equals("su.interference.persistent.FrameData")) {
             DataChunk dc = new DataChunk(bd, s);
             int len = dc.getBytesAmount();
@@ -450,11 +460,15 @@ public class DataFile implements Serializable {
         final long ptr_ = bs.getLongFromBytes(4);
         final int id_ = bs.getIntFromBytes(12);
 
+        if (file_ == 0) {
+            logger.error("Wrong write frame operation with file = 0 ptr = " + ptr_);
+        }
+
         if (this.fileId != file_) {
             logger.error("Wrong write frame operation with file = " + this.file + ", internal file = " + file_ + " ptr = " + ptr_);
         }
 
-        if (ptr != ptr) {
+        if (ptr != ptr_) {
             logger.error("Wrong write frame operation with file = " + this.file + " ptr = " + ptr + ", internal file = " + file_ + " ptr = " + ptr_);
         }
 
@@ -472,13 +486,13 @@ public class DataFile implements Serializable {
             logger.error("Wrong write frame operation with file = " + this.file + ", internal file = " + file_ + " ptr = " + ptr_);
         }
 
-        if (ptr != ptr) {
+        if (ptr != ptr_) {
             logger.error("Wrong write frame operation with file = " + this.file + " ptr = " + ptr + ", internal file = " + file_ + " ptr = " + ptr_);
         }
 
         this.file.seek(ptr);
         this.file.write(b);
-
+        llt.add(bd.getFrame());
         s.persist(bd, llt);
     }
 

@@ -21,7 +21,7 @@ frame.size=8192
 frame.size.ix=8192
 
 # system code page
-codepage=Cp1251
+codepage=UTF8
 
 ###########################################
 # runtime parameters

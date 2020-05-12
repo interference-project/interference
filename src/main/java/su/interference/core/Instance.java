@@ -378,11 +378,11 @@ public class Instance implements Interference {
             startProcesses(s);
             systemState = Instance.SYSTEM_STATE_UP;
             //checkInMemoryIndexes();
-            logger.info(" ");
-            logger.info(" ");
-            logger.info("interference started");
-            logger.info(" ");
-            logger.info(" ");
+            logger.info("\n----------------------------------------------------------------------\n" +
+                          "------------------------ interference started ------------------------\n" +
+                          "------------------ (c) head systems, ltd 2010-2020 -------------------\n" +
+                          "--------------------------- release 2020.1 ---------------------------\n" +
+                          "----------------------------------------------------------------------");
         } else {
 
             systemState = Instance.SYSTEM_STATE_NA;
@@ -406,6 +406,8 @@ public class Instance implements Interference {
         Metrics.register(Metrics.HISTOGRAM, "recordRCount");
         Metrics.register(Metrics.HISTOGRAM, "recordLCount");
         Metrics.register(Metrics.HISTOGRAM, "syncQueue");
+        Metrics.register(Metrics.TIMER, "systemCleanUp");
+        Metrics.register(Metrics.METER, "сleanUpBlocks");
     }
 
     private void checkInMemoryIndexes() {
@@ -568,6 +570,12 @@ public class Instance implements Interference {
         return (Table)((DataChunk)tt.getMapFieldByColumn("name").getMap().get("su.interference.persistent.FrameData")).getEntity();
     }
 
+    protected Map getFramesMap () {
+        final Table t = getTableByName("su.interference.persistent.FrameData");
+        final MapField ixf = t.getMapFieldByColumn("frameId");
+        return ixf.getMap();
+    }
+
     public FrameData getFrameById (long id) {
         final Table t = getTableByName("su.interference.persistent.FrameData");
         final MapField ixf = t.getMapFieldByColumn("frameId");
@@ -681,45 +689,22 @@ public class Instance implements Interference {
         return r;
     }
 
-    //used in getUndoChunkByRowId
-    public ArrayList<TransFrame> getTransFrames(long cframeId) {
-        final Table t = getTableByName("su.interference.persistent.TransFrame");
-        final ArrayList<TransFrame> r = new ArrayList<TransFrame>();
-        for (Object o : t.getIndexFieldByColumn("cframeId").getIndex().getObjectsByKey(cframeId)) {
-            r.add((TransFrame)((DataChunk)o).getEntity());
-        }
-        return r;
-    }
-
     //used in storeFrame
     public TransFrame getTransFrameById(long transId, long cframeId, long uframe) {
         final Table t = getTableByName("su.interference.persistent.TransFrame");
-        for (Object o : t.getIndexFieldByColumn("cframeId").getIndex().getObjectsByKey(cframeId)) {
-            final TransFrame tb = (TransFrame)((DataChunk)o).getEntity();
-            if (tb.getTransId()==transId&&tb.getUframeId()==uframe) {
-                return tb;
-            }
+        final TransFrameId id = new TransFrameId(cframeId, uframe, transId);
+        DataChunk dc = (DataChunk) t.getMapFieldByColumn("frameId").getMap().get(id);
+        if (dc != null) {
+            return (TransFrame) dc.getEntity();
         }
         return null;
     }
 
-    //used in commit/rollback mechanism
-    public synchronized ArrayList<TransFrame> getTransFrameByTransId (long transId) {
-        final Table t = getTableByName("su.interference.persistent.TransFrame");
-        final ArrayList<TransFrame> r = new ArrayList<TransFrame>();
-        for (Object o : t.getIndexFieldByColumn("transId").getIndex().getObjectsByKey(transId)) {
-            r.add((TransFrame)((DataChunk)o).getEntity());
-        }
-        return r;
-    }
-
     //used in unlock table mechanism
+    @Deprecated
     public synchronized ArrayList<TransFrame> getTransFrameByObjectId (int objectId) {
-        final Table t = getTableByName("su.interference.persistent.TransFrame");
+        //final Table t = getTableByName("su.interference.persistent.TransFrame");
         final ArrayList<TransFrame> r = new ArrayList<TransFrame>();
-        for (Object o : t.getIndexFieldByColumn("objectId").getIndex().getObjectsByKey(objectId)) {
-            r.add((TransFrame)((DataChunk)o).getEntity());
-        }
         return r;
     }
 

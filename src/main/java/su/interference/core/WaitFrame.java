@@ -47,25 +47,23 @@ public class WaitFrame {
         this.busy = new AtomicLong(0);
     }
 
-    public synchronized FrameData acquire() {
+    public synchronized WaitFrame acquire() {
         if (this.bd == null) {
             return null;
         }
         if (this.busy.compareAndSet(0, Thread.currentThread().getId())) {
-            bd.setWaitFrame(this);
-            return bd;
+            return this;
         }
         return null;
     }
 
-    public synchronized FrameData acquire(final int fileId) {
+    public synchronized WaitFrame acquire(final int fileId) {
         if (this.bd == null) {
             return null;
         }
         if (this.bd.getFile() == fileId) {
             if (this.busy.compareAndSet(0, Thread.currentThread().getId()) || this.busy.compareAndSet(Thread.currentThread().getId(), Thread.currentThread().getId())) {
-                bd.setWaitFrame(this);
-                return bd;
+                return this;
             }
         }
         return null;
@@ -75,12 +73,10 @@ public class WaitFrame {
         if (oldbd==null) {
             if (this.bd == null) {
                 this.bd = newbd;
-                this.bd.setWaitFrame(this);
                 return true;
             }
         } else if ((this.bd.getFile() == oldbd.getFile()&&(busy.get() == Thread.currentThread().getId()))||frameType > 0) {
             this.bd = newbd;
-            this.bd.setWaitFrame(this);
             return true;
         }
         return false;
@@ -90,7 +86,6 @@ public class WaitFrame {
         if (this.busy.compareAndSet(0, Thread.currentThread().getId())) {
             if (this.bd == null) {
                 this.bd = bd;
-                this.bd.setWaitFrame(this);
                 return true;
             } else {
                 this.busy.compareAndSet(Thread.currentThread().getId(), 0);
@@ -108,14 +103,9 @@ public class WaitFrame {
         return busy;
     }
 
-    /*
-    public synchronized void setBd(FrameData bd) {
-        this.bd = bd;
-    }
-*/
-
     public void release() {
-        this.busy.compareAndSet(Thread.currentThread().getId(), 0);
+        //this.busy.compareAndSet(Thread.currentThread().getId(), 0);
+        this.busy.set(0);
     }
 
 }

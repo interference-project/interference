@@ -320,7 +320,8 @@ public class DataChunk implements Chunk {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        header.setLen(getChunkLen());
+        header.setLen(getChunk().length);
+        //header.setLen(getChunkLen());
     }
 
     //serializer INSERT ONLY!!! (with generate Id value)
@@ -332,7 +333,7 @@ public class DataChunk implements Chunk {
     public DataChunk (Object o, Session s, RowId r) throws IOException, InvocationTargetException, NoSuchMethodException, InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         this.entity = o;
         this.state = NORMAL_STATE;
-        this.header = new RowHeader(r, null, getChunkLen(), false);
+        this.header = new RowHeader(r, null, getChunk().length, false);
     }
 
     public DataChunk (byte[] b, int file, long frame, int hsize, DataObject t, Class c) throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
@@ -411,6 +412,7 @@ public class DataChunk implements Chunk {
         return null;
     }
 
+    //todo
     public int getChunkLen () {
         if (state == INIT_STATE) {
             return chunk.length;
@@ -480,7 +482,8 @@ public class DataChunk implements Chunk {
                     }
                 }
                 if (t.isIndex()) {
-                    final DataChunk dc = (DataChunk) Instance.getInstance().getChunkByPointer(this.getHeader().getFramePtr(), this.getHeader().getFramePtrRowId().getRowPointer());
+                    final ResultSetEntity rsa = (ResultSetEntity) ((Table) this.t).getTableClass().getAnnotation(ResultSetEntity.class);
+                    final DataChunk dc = rsa == null ? (DataChunk) Instance.getInstance().getChunkByPointer(this.getHeader().getFramePtr(), this.getHeader().getFramePtrRowId().getRowPointer()) : this;
                     ((IndexChunk)o).setDataChunk(dc);
                     if (dc == null) {
 // todo during rframe.IndexFrame.init system directory not yet contains replicated FrameData objects
@@ -541,6 +544,8 @@ public class DataChunk implements Chunk {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        this.chunk = null;
+        this.state = NORMAL_STATE;
         return entity;
     }
 
@@ -598,6 +603,12 @@ public class DataChunk implements Chunk {
         }
     }
 
+    protected void setNormalState() {
+        //set chunk to normal state after update
+        this.chunk = null;
+        this.state = NORMAL_STATE;
+    }
+
     //for UNDO processing
     public DataChunk cloneEntity(Session s) throws IOException, InvocationTargetException, NoSuchMethodException, InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         final byte[] b = this.getChunk();
@@ -644,8 +655,8 @@ public class DataChunk implements Chunk {
     //lock mechanism
 
     private synchronized DataChunk insertUC (FrameData cb, UndoChunk uc, Session s, LLT llt) throws Exception {
-        final FrameData ub = s.getTransaction().getAvailableFrame(uc, true);
-
+        final WaitFrame ubw = s.getTransaction().getAvailableFrame(uc, true);
+        final FrameData ub = ubw.getBd();
         if (ub == null) {
             //s.getTransaction().createUndoFrames(s);
             //ub = s.getTransaction().getAvailableFrame(uc, true);
@@ -665,7 +676,7 @@ public class DataChunk implements Chunk {
         } else {
             s.getTransaction().storeFrame(cb, ub, 0, s, llt);
         }
-        ub.release();
+        ubw.release();
         return dc;
     }
 
