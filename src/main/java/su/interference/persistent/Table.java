@@ -684,8 +684,8 @@ public class Table implements DataObject, ResultSet {
 
         if (this.name.equals("su.interference.persistent.FrameData")) {
             getIndexFieldByColumn("objectId").setIndex(ixl);
-            final Map<Long, Object> ixlb = new HashMap();
-            final Map<Long, Object> ixla = new HashMap();
+            final Map<Long, Object> ixlb = new ConcurrentHashMap<>();
+            final Map<Long, Object> ixla = new ConcurrentHashMap<>();
             final IndexList ixls = new IndexList();
             for (Object o : ixl.getContent()) {
                 ixlb.put(((FrameData) ((DataChunk) o).getEntity()).getFrameId(), o);
@@ -961,7 +961,7 @@ public class Table implements DataObject, ResultSet {
         }
     }
 
-    private FrameData getAvailableFrame(final Object o, final boolean fpart) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException {
+    private WaitFrame getAvailableFrame(final Object o, final boolean fpart) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException {
         Metrics.get("getAvailableFrame").start();
         final long st = System.currentTimeMillis();
 
@@ -976,7 +976,7 @@ public class Table implements DataObject, ResultSet {
             for (int i = 0; i < this.lbs.length; i++) {
                 final int i_ = (a + i) % this.lbs.length;
                 final WaitFrame wb = this.lbs[i_];
-                final FrameData bd = fpart ? wb.acquire(getTargetFileId(((FilePartitioned) o).getFile())) : wb.acquire();
+                final WaitFrame bd = fpart ? wb.acquire(getTargetFileId(((FilePartitioned) o).getFile())) : wb.acquire();
                 if (bd != null) {
                     avframeStart.getAndIncrement();
                     Metrics.get("getAvailableFrame").stop();
@@ -1067,7 +1067,8 @@ public class Table implements DataObject, ResultSet {
 
             final DataChunk nc = new DataChunk(o, s);
             final int len = nc.getBytesAmount();
-            final FrameData bd = getAvailableFrame(o, fpart);
+            final WaitFrame bdw = getAvailableFrame(o, fpart);
+            final FrameData bd = bdw.getBd();
             final int diff = len - bd.getFrameFree();
 
             if (isNoTran()) {
@@ -1075,7 +1076,6 @@ public class Table implements DataObject, ResultSet {
                 if (p==0) {
                     final FrameData nb = this.createNewFrame(bd, bd.getFile(), 0, 0, false, true, false, s, llt);
                     nb.getDataFrame().insertChunk(nc, s, true, llt);
-                    nb.release();
                     usedSpace(nb,nb.getUsed()+len, true, s, llt);
                 } else {
                     usedSpace(bd,bd.getUsed()+len, true, s, llt);
@@ -1084,7 +1084,6 @@ public class Table implements DataObject, ResultSet {
                 if (diff > 0) {
                     final FrameData nb = this.createNewFrame(bd, bd.getFile(), 0, 0, false, true, false, s, llt);
                     nb.getDataFrame().insertChunk(nc, s, true, llt);
-                    nb.release();
                     s.getTransaction().storeFrame(nb, len, s, llt);
                 } else {
                     final int p = bd.insertChunk(nc, s, true, llt);
@@ -1100,7 +1099,7 @@ public class Table implements DataObject, ResultSet {
 
             //system-only table in-memory indexes
             this.addIndexValue(nc);
-            bd.release();
+            bdw.release();
             Metrics.get("persistInsertChunk").stop();
 
             if (extllt == null) { llt.commit(); }
@@ -1129,14 +1128,14 @@ public class Table implements DataObject, ResultSet {
             if (diff>0) {
                 bd.removeChunk(dc.getHeader().getRowID().getRowPointer(), s, llt);
 //                bd.deleteChunk(dc.getHeader().getRowID().getRowPointer(), s, llt);
-                final FrameData ib = getAvailableFrame(o, fpart);
+                final WaitFrame ibw = getAvailableFrame(o, fpart);
+                final FrameData ib = ibw.getBd();
 
                 final int p = ib.getDataFrame().insertChunk(dc, s, true, llt);
                 if (p==0) {
 //                    bd.removeChunk(dc.getHeader().getRowID().getRowPointer(), s, llt);
                     final FrameData nb = this.createNewFrame(ib, ib.getFile(), 0, 0, false, true, false, s, llt);
                     nb.getDataFrame().insertChunk(dc, s, true, llt);
-                    nb.release();
                     if (isNoTran()) {
                         usedSpace(bd,bd.getUsed()-len, true, s, llt);
                         usedSpace(nb,newlen, true, s, llt);
@@ -1163,7 +1162,7 @@ public class Table implements DataObject, ResultSet {
                     //logger.info("updated "+dc.getHeader().getRowID().getFileId()+" "+dc.getHeader().getRowID().getFramePointer()+" "+dc.getHeader().getRowID().getRowPointer()+" : "+dc.getUndoChunk().getFile()+" "+dc.getUndoChunk().getFrame()+" "+dc.getUndoChunk().getPtr());
                 }
 
-                ib.release();
+                ibw.release();
                 if (extllt == null) { llt.commit(); }
 
                 return dc;
@@ -1243,16 +1242,16 @@ public class Table implements DataObject, ResultSet {
                     if (wb.getBd().getFile() == bd.getFile()) {
                         // remove evicted ptr from prevframe
                         frame.setNextFrame(wb.getBd().getPtr());
-                        s.persist(frame);
+                        s.persist(frame, llt);
                     }
                 }
                 bd.clearCurrent();
-                s.persist(bd);
+                s.persist(bd, llt);
                 logger.info("evict frame " + bd.getObjectId() + ":" + bd.getFile() + ":" + bd.getPtr() + " " + Thread.currentThread().getName());
                 for (WaitFrame wb : this.lbs) {
-                    final FrameData bd_ = wb.acquire(fileId);
+                    final WaitFrame bd_ = wb.acquire(fileId);
                     if (bd_ != null) {
-                        return bd_;
+                        return bd_.getBd();
                     }
                 }
             }
@@ -1272,6 +1271,7 @@ public class Table implements DataObject, ResultSet {
         }
     }
 
+    @Deprecated
     public void unlockTable(Session s) {
         try {
             final RetrieveLock rl = Instance.getInstance().getRetrieveLockById(this.objectId, s.getTransaction().getTransId());
@@ -1695,6 +1695,7 @@ public class Table implements DataObject, ResultSet {
     public synchronized void storeFrames(List<SyncFrame> frames, int sourceNodeId, LLT llt, Session s) throws Exception {
         for (SyncFrame b : frames) {
             b.getBd().setStarted(0);
+            b.getRFrame().setFrameData(b.getBd());
             b.getBd().setFrame(b.getRFrame());
             if (b.isStarted()) {
                 ixstartfs.put(sourceNodeId, b.getBd().getFrameId());

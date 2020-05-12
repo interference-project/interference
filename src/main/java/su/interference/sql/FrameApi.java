@@ -49,8 +49,5 @@ public interface FrameApi {
     int getImpl();
     ArrayList<Chunk> getFrameChunks(Session s) throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchMethodException;
     ArrayList<Object> getFrameEntities(Session s) throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchMethodException;
-    boolean hasLiveTransaction(long transId);
-    boolean hasLocalTransactions();
-    int hasRemoteTransactions() throws InternalException;
 
 }

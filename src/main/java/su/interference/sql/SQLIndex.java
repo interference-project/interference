@@ -68,8 +68,8 @@ public class SQLIndex implements FrameIterator, Finder {
         this.left = left;
         this.unique = left?lkey.isUnique():rkey.isUnique();
         this.merged = merged;
-        frames = t.getFrames(s);
-        amount = frames.size();
+        frames = left ? t.getFrames(s) : null;
+        amount = left ? frames.size() : 0;
         cntrStart = 0;
         this.framecntr = new AtomicInteger(0);
         this.returned = new AtomicBoolean(false);

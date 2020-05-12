@@ -60,7 +60,7 @@ public class SyncQueue implements Runnable, ManagedProcess {
         running = true;
         final LLT llt = LLT.getLLTAndLock();
         final int famt = Storage.getStorage().getFiles()==null?0:Storage.getStorage().getFiles().size();
-        logger.debug("sync procedure was started with frames amount="+LLT.getFrames().size());
+        logger.debug("sync procedure was started with frames amount=" + LLT.getFrames().size());
 
         final ArrayList<SyncFrame> frames = new ArrayList<>();
         final Map<Integer, List<FrameApi>> frames_ = new HashMap<>();
@@ -72,10 +72,12 @@ public class SyncQueue implements Runnable, ManagedProcess {
             try {
                 final Frame f = entry.getValue();
                 frames.add(new SyncFrame(f, s, fb));
-                if (frames_.get(f.getObjectId()) == null) {
-                    frames_.put(f.getObjectId(), new ArrayList<>());
+                if (f.isLocal()) {
+                    if (frames_.get(f.getObjectId()) == null) {
+                        frames_.put(f.getObjectId(), new ArrayList<>());
+                    }
+                    frames_.get(f.getObjectId()).add(f.getFrameData());
                 }
-                frames_.get(f.getObjectId()).add(f.getFrameData());
             } catch (MissingSyncFrameException e) {
                 logger.debug("Unable to sync frame "+((Frame) entry.getValue()).getPtr()+" because removed by freeing");
             }

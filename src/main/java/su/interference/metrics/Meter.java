@@ -29,9 +29,10 @@ package su.interference.metrics;
  * @since 1.0
  */
 
-public class Meter {
+public class Meter implements MeterMBean {
 
     private final String name;
+    private long value;
 
     public Meter (String name) {
         this.name = name;
@@ -42,11 +43,11 @@ public class Meter {
     }
 
     public void put(final long value) {
-
+        this.value = value;
     }
 
     public long getCnt() {
-        return 0;
+        return value;
     }
 
     public long getMin() {

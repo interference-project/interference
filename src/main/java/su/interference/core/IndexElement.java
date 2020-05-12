@@ -64,8 +64,4 @@ public class IndexElement implements Comparable {
         this.element = element;
     }
 
-    public String ElementToString () {
-        return "" + this.element;
-    }
-
 }

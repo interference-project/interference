@@ -38,6 +38,7 @@ import java.io.Serializable;
 import java.util.*;
 import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -79,6 +80,8 @@ public class Transaction implements Serializable {
     @MgmtColumn(width=10, show=true, form=false, edit=false)
     private long cid;
 
+    @Transient
+    private final List<TransFrame> tframes = new CopyOnWriteArrayList<>();
     @Transient
     private final transient WaitFrame[] lbs;
     @Transient
@@ -149,7 +152,7 @@ public class Transaction implements Serializable {
         }
     }
 
-    public FrameData getAvailableFrame(final FilePartitioned o, final boolean fpart) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException {
+    public WaitFrame getAvailableFrame(final FilePartitioned o, final boolean fpart) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException {
         Metrics.get("getAvailableFrame").start();
         final long st = System.currentTimeMillis();
         final long timeout = 1000;
@@ -158,7 +161,7 @@ public class Transaction implements Serializable {
         while (true) {
 //            for (int i=0; i<this.lbs.length; i++) {
             final WaitFrame wb = this.lbs[i.get()];
-            final FrameData bd = fpart?wb.acquire(getTargetFileId(o.getFile())):wb.acquire();
+            final WaitFrame bd = fpart?wb.acquire(getTargetFileId(o.getFile())):wb.acquire();
             if (bd != null) {
                 if (avframeStart.get()==this.lbs.length-1) { avframeStart.set(0); }
                 else { avframeStart.getAndIncrement(); }
@@ -228,7 +231,7 @@ public class Transaction implements Serializable {
                 s.persist(this);
                 syncq.commit();
 
-                for (TransFrame tb : Instance.getInstance().getTransFrameByTransId(this.transId)) {
+                for (TransFrame tb : tframes) {
                     boolean hasfb = false;
                     if (tb.getUframeId()>0) { // undo transframe record
                         for (Long f : fptr) {
@@ -238,6 +241,7 @@ public class Transaction implements Serializable {
                         }
                         final List<RetrieveLock> rls = Instance.getInstance().getRetrieveLocksByObjectId(tb.getObjectId());
                         if (rls.size()==0) {
+                            final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
                             //deallocate undo frame
                             final FrameData ub = Instance.getInstance().getFrameById(tb.getUframeId());
                             //store frame params as free
@@ -247,6 +251,7 @@ public class Transaction implements Serializable {
                                 s.delete(ub);
                                 fptr.add(tb.getUframeId());
                             }
+                            cb.decreaseTcounter(this.transId);
                             s.delete(tb);
                         }
                     } else { //change transframe record
@@ -256,6 +261,9 @@ public class Transaction implements Serializable {
                             freeFrames(cb, s);
                         } else {
                             s.persist(cb); //update new size value to dataframe
+                        }
+                        if (cb != null) {
+                            cb.decreaseTcounter(this.transId);
                         }
                         s.delete(tb);
                     }
@@ -268,6 +276,7 @@ public class Transaction implements Serializable {
                 e.printStackTrace();
             }
         }
+        tframes.clear();
         started = false;
         logger.info("Transaction committed");
     }
@@ -291,9 +300,8 @@ public class Transaction implements Serializable {
         } else {
             sendBroadcastEvents(CommandEvent.ROLLBACK, s);
             try {
-                ArrayList<TransFrame> tbs = Instance.getInstance().getTransFrameByTransId(this.transId);
-                Collections.sort(tbs);
-                for (TransFrame tb : tbs) {
+                Collections.sort(tframes);
+                for (TransFrame tb : tframes) {
                     final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
                     if (!ubd.contains(cb)) {
                         ubd.add(cb);
@@ -301,7 +309,7 @@ public class Transaction implements Serializable {
                 }
                 for (FrameData ub : ubd) {
                     final ArrayList<FrameData> ubs = new ArrayList<FrameData>();
-                    for (TransFrame tb : tbs) {
+                    for (TransFrame tb : tframes) {
                         if (ub.getFrameId()==tb.getCframeId()) {
                             if (tb.getUframeId()>0) {
                                 final FrameData ubb = Instance.getInstance().getFrameById(tb.getUframeId());
@@ -313,7 +321,7 @@ public class Transaction implements Serializable {
                     ub.getFrame().rollbackTransaction(this, ubs, s);
                 }
 
-                for (TransFrame tb : tbs) {
+                for (TransFrame tb : tframes) {
                     boolean hasfb = false;
                     if (tb.getUframeId()>0) { // undo transframe record
                         for (Long f : fptr) {
@@ -323,6 +331,7 @@ public class Transaction implements Serializable {
                         }
                         final List<RetrieveLock> rls = Instance.getInstance().getRetrieveLocksByObjectId(tb.getObjectId());
                         if (rls.size()==0) {
+                            final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
                             //deallocate undo frame
                             final FrameData ub = Instance.getInstance().getFrameById(tb.getUframeId());
                             //store frame params as free
@@ -332,6 +341,7 @@ public class Transaction implements Serializable {
                                 s.delete(ub);
                                 fptr.add(tb.getUframeId());
                             }
+                            cb.decreaseTcounter(this.transId);
                             s.delete(tb);
                         }
                     } else { //change transframe record
@@ -339,6 +349,9 @@ public class Transaction implements Serializable {
                         if (cb.getUsed()==0) {
                             logger.info("rollback freeing frame "+cb.getFile()+" "+cb.getPtr());
                             freeFrames(cb, s);
+                        }
+                        if (cb != null) {
+                            cb.decreaseTcounter(this.transId);
                         }
                         s.delete(tb);
                     }
@@ -353,18 +366,19 @@ public class Transaction implements Serializable {
                 e.printStackTrace();
             }
         }
+        tframes.clear();
         started = false;
         logger.info("Transaction rolled back");
     }
 
+    @Deprecated
     public void unlockUndoFrames (int objectId, Session s) throws InternalException {
         if (this.getTransType()!=TRAN_THR) {
             throw new InternalException();  //ONLY FOR FIXED TRANSACTIONS
         }
-        final ArrayList<TransFrame> tbs = Instance.getInstance().getTransFrameByTransId(this.transId);
         final ArrayList<Long> fptr = new ArrayList<Long>();
         try {
-            for (TransFrame tb : tbs) {
+            for (TransFrame tb : tframes) {
                 if (tb.getObjectId()==objectId) {
                     boolean hasfb = false;
                     if (tb.getUframeId()>0) { // undo transframe record
@@ -398,15 +412,10 @@ public class Transaction implements Serializable {
         final Table t = Instance.getInstance().getTableById(cb.getObjectId());
         if (!t.checkLBS(cb)) { //LB can't deallocated!!! May be empty
             //check for other transactions, which locked this frame
-            final ArrayList<TransFrame> tbs = Instance.getInstance().getTransFrames(cb.getFrameId());
-            boolean hasOT = false;
-            for (TransFrame tb: tbs) {
-                if (tb.getTransId()!=this.transId) {
-                    hasOT = true;
-                    break;
-                }
+            if (cb.getTcounterSize() == 0) {
+                throw new RuntimeException("Zero tcounter in transactional frame");
             }
-            if (!hasOT) {
+            if (cb.getTcounterSize() == 1) {
                 final FreeFrame fb = new FreeFrame(0, cb.getFrameId(), cb.getSize());
                 final FrameData pb = cb.getPrevFrameId()>0 ? Instance.getInstance().getFrameById(cb.getPrevFrameId()) : null;
                 final FrameData nb = Instance.getInstance().getFrameById(cb.getNextFrameId());
@@ -484,7 +493,6 @@ public class Transaction implements Serializable {
     }
 
     public void storeFrame (final FrameData cb, final FrameData ub, final int len, final Session s, LLT llt) {
-
         final long uframeid = ub==null?0:ub.getFrameId();
         final TransFrame tb = Instance.getInstance().getTransFrameById(this.transId, cb.getFrameId(), uframeid);
 
@@ -499,9 +507,11 @@ public class Transaction implements Serializable {
         }
 
         final TransFrame ntb = new TransFrame(this.transId, cb.getObjectId(), cb.getFrameId(), uframeid);
+        cb.increaseTcounter(this.transId, ntb);
         ntb.setDiff(len);
         try {
             s.persist(ntb, llt); //insert
+            this.tframes.add(ntb);
         } catch (Exception e) {
             e.printStackTrace();
         }

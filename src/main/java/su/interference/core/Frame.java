@@ -96,6 +96,10 @@ public class Frame implements Comparable {
         return frameData;
     }
 
+    public void setFrameData(FrameData frameData) {
+        this.frameData = frameData;
+    }
+
     public DataObject getDataObject() {
         return dataObject;
     }
@@ -271,10 +275,11 @@ public class Frame implements Comparable {
         this.res09 = bs.getIntFromBytes(92);
 
         if ((this.file==0)&&(this.pointer==0)) {
+            logger.error("empty frame header frameId = " + (bd == null ? "N/A" : bd.getFrameId()) + " allocId = " + (bd == null ? "N/A" : bd.getAllocId()));
             throw new EmptyFrameHeaderFound();
         }
         if ((this.file!=file)||(this.pointer!=pointer)) {
-            logger.error("InvalidFrameHeader: " + this.file + ":" + file + " " + this.pointer + ":" + pointer);
+            logger.error("invalid frame header frameId = " + (bd == null ? "N/A" : bd.getFrameId()) + " allocId = " + (bd == null ? "N/A" : bd.getAllocId()));
             throw new InvalidFrameHeader();
         }
         if (this.objectId<0) {
@@ -296,8 +301,10 @@ public class Frame implements Comparable {
 
         if (Config.getConfig().SYNC_LOCK_ENABLE||sync==0) {
             for (Chunk c : data.getChunks()) {
+                final byte[] chunk_ = c.getChunk();
+                c.getHeader().setLen(chunk_.length);
                 res2.append(c.getHeader().getHeader());
-                res2.append(c.getChunk());
+                res2.append(chunk_);
                 used = used + c.getBytesAmount();
             }
         } else {
@@ -306,8 +313,10 @@ public class Frame implements Comparable {
             }
             for (Chunk c : data.getChunks()) {
                 if (c.getHeader().getLltId() < sync) {
+                    final byte[] chunk_ = c.getChunk();
+//                    c.getHeader().setLen(chunk_.length);
                     res2.append(c.getHeader().getHeader());
-                    res2.append(c.getChunk());
+                    res2.append(chunk_);
                     used = used + c.getBytesAmount();
                 }
             }
@@ -349,32 +358,6 @@ public class Frame implements Comparable {
         if (used < getFrameSize()) {
             res.append(new byte[getFrameSize()-used]);
         }
-        return res.getBytes();
-    }
-
-    public synchronized byte[] flushHeader() {
-        final ByteString res = new ByteString();
-        final ByteString bs = new ByteString(this.b);
-        res.addBytesFromInt(this.file);
-        res.addBytesFromLong(this.pointer);
-        res.addBytesFromInt(this.objectId);
-        res.addBytesFromInt(this.type);
-        res.addBytesFromInt(this.cptr);
-        res.addBytesFromInt(this.bytesAmount);
-        res.addBytesFromInt(this.rowCntr);
-        res.addBytesFromInt(this.sptr);
-        res.addBytesFromInt(this.allocFile);
-        res.addBytesFromLong(this.allocPointer);
-        res.addBytesFromInt(this.res01);
-        res.addBytesFromInt(this.res02);
-        res.addBytesFromInt(this.res03);
-        res.addBytesFromInt(this.res04);
-        res.addBytesFromInt(this.res05);
-        res.addBytesFromLong(this.res06);
-        res.addBytesFromLong(this.res07);
-        res.addBytesFromLong(this.res08);
-        res.addBytesFromInt(this.res09);
-        res.append(bs.substring(FRAME_HEADER_SIZE, this.b.length));
         return res.getBytes();
     }
 
@@ -461,7 +444,7 @@ public class Frame implements Comparable {
         if (chunk.getEntity()!=o) { //not same object
             chunk.updateEntity(o);
         }
-
+        chunk.setNormalState();
         final byte[] ncb = chunk.getChunk();
         chunk.getHeader().setLen(ncb.length);
         final int newlen = chunk.getBytesAmount();
@@ -650,11 +633,6 @@ public class Frame implements Comparable {
             }
         }
         return rtran;
-    }
-
-    public ArrayList<TransFrame> getLiveTransFrames() {
-        final long ptr = this.file + this.pointer;
-        return Instance.getInstance().getTransFrames(ptr);
     }
 
     public int getBytesAmount() {

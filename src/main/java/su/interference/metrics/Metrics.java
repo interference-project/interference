@@ -40,6 +40,7 @@ public class Metrics {
     public static final int COUNTER = 1;
     public static final int HISTOGRAM = 2;
     public static final int TIMER = 3;
+    public static final int METER = 10;
     private static final ConcurrentHashMap<String, Meter> metrics = new ConcurrentHashMap<String, Meter>();
     private static final MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
 
@@ -47,6 +48,7 @@ public class Metrics {
         if (type == COUNTER) { metrics.put(name, new Counter(name)); }
         if (type == HISTOGRAM) { metrics.put(name, new Histogram(name)); }
         if (type == TIMER) { metrics.put(name, new Timer(name)); }
+        if (type == METER) { metrics.put(name, new Meter(name)); }
 
         ObjectName obj = new ObjectName("su.interference:type="+name+metrics.get(name).getClass().getSimpleName());
         mbs.registerMBean(metrics.get(name), obj);
