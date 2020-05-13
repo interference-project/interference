@@ -6,7 +6,7 @@
 ##### for detailed information see doc/InterferenceManual.pdf
 
 ##### contacts: info@inteference.su
-##### https://github.com/interference-project/inteference
+##### https://github.com/interference-project/interference
 
 
 ## Concepts & features
