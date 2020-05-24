@@ -475,7 +475,7 @@ public class Storage {
         for (DataFile df : Storage.getStorage().getInitDataFiles()) {
             long start = Instance.getInstance().getFrameSize(); //first data frame
             while (true) {
-                final FrameData bb = new FrameData(df.getFileId(), start, Instance.getInstance().getFrameSize(), t);
+                final FrameData bb = new FrameData(df.getFileId(), start, df.getType() == Storage.INDXFILE_TYPEID ? Instance.getInstance().getFrameSize2() : Instance.getInstance().getFrameSize(), t);
                 DataFrame db = null;
                 try {
                     db = bb.getDataFrame();

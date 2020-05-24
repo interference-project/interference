@@ -100,6 +100,8 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     private AtomicInteger current;
     @Column
     private volatile int started;
+    @Column
+    private volatile long frameOrder;
     @Id
     @MapColumn
     @Transient
@@ -222,10 +224,6 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return this.nextFile+this.nextFrame;
     }
 
-    protected int getFrameSize() throws ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException {
-        return Instance.getInstance().getFrameSize();
-    }
-
     //real current transactional value
     //skip negative differences for prevent frame oversize when many transactions change data
     public int getFrameUsed() {
@@ -245,7 +243,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     }
 
     public int getFrameFree() throws ClassNotFoundException, InternalException, InstantiationException, IllegalAccessException {
-        return getFrameSize() - Frame.FRAME_HEADER_SIZE - getFrameUsed();
+        return size - Frame.FRAME_HEADER_SIZE - getFrameUsed();
     }
 
     public FrameData() {
@@ -467,5 +465,13 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     public void setStarted(int started) {
         this.started = started;
+    }
+
+    public long getFrameOrder() {
+        return frameOrder;
+    }
+
+    public void setFrameOrder(long frameOrder) {
+        this.frameOrder = frameOrder;
     }
 }

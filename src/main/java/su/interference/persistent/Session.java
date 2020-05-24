@@ -204,16 +204,8 @@ public class Session {
         final Class proxy = cols==null&&flds==null?ppf.register(n):flds==null?rpf.register(cols,n,ixflag):ipf.register(flds,n,pt.getName());
         final String sname = proxy==null?null:proxy.getName();
 
-        w = (Table)t.newInstance(new Object[]{n, proxy==null?new String("x"):proxy});
-//        w.setName(n);
-        w.setFrameSize(Instance.getInstance().getFrameSize());
-//        w.setFileStart(cols==null?dataf:tmpdf);
-//        w.setFileLast(cols==null?dataf:tmpdf);
-        w.setParentId(pt==null?0:pt.getObjectId());
-        s.persist(w); //ident
-
         boolean setlbs = true;
-
+        int framesize = Instance.getInstance().getFrameSize();
         DataFile[] datafs = Storage.getStorage().getInitDataFiles();
 
         if (cols!=null) {
@@ -222,8 +214,14 @@ public class Session {
 
         if (flds!=null&&pt!=null) {
             datafs = Storage.getStorage().getIndexFiles();
+            framesize = Instance.getInstance().getFrameSize2();
             setlbs = false;
         }
+
+        w = (Table)t.newInstance(new Object[]{n, proxy==null?new String("x"):proxy});
+        w.setFrameSize(framesize);
+        w.setParentId(pt==null?0:pt.getObjectId());
+        s.persist(w); //ident
 
         final LLT llt = LLT.getLLT();
 
@@ -344,7 +342,8 @@ public class Session {
     }
 
     @Deprecated
-    public Object nfind (Class c, long id) throws InternalException, NoSuchMethodException, InvocationTargetException, IOException, InvalidFrameHeader, InvalidFrame, EmptyFrameHeaderFound, IncorrectUndoChunkFound, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    public Object nfind (Class c, long id)
+            throws InternalException, NoSuchMethodException, InvocationTargetException, IOException, InterruptedException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         final Table t = Instance.getInstance().getTableByName(c.getName());
         if (t != null) {
             return t.getChunkById(id, this).getEntity();
@@ -352,7 +351,7 @@ public class Session {
         return null;
     }
 
-    public void lock (Object o) throws Exception, InterruptedException, InvocationTargetException, NoSuchMethodException, InternalException, InvalidFrame, EmptyFrameHeaderFound, IncorrectUndoChunkFound, ClassNotFoundException, InstantiationException, IllegalAccessException, InvalidParameter, CannotAccessToDeletedRecord, CannotAccessToLockedRecord, NotEnoughFrameSpace {
+    public void lock (Object o) throws Exception {
         ((EntityContainer)o).getDataChunk().lock(this, null);
     }
 
@@ -382,7 +381,15 @@ public class Session {
     public void delete (Object o, LLT llt) throws Exception {
         final Table t = Instance.getInstance().getTableByName(o.getClass().getName());
         if (t != null) {
-            t.delete(o, this, llt);
+            t.delete(o, this, llt, false);
+        }
+        o = null;
+    }
+
+    public void purge (Object o, LLT llt) throws Exception {
+        final Table t = Instance.getInstance().getTableByName(o.getClass().getName());
+        if (t != null) {
+            t.delete(o, this, llt, true);
         }
         o = null;
     }

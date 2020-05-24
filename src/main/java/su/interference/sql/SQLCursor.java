@@ -195,7 +195,7 @@ public class SQLCursor implements FrameIterator {
         return new FrameJoinTask(cur, bd1, bd2, target, rscols, nc, id, nodeId, last, lbi.isLeftfs(), hmap, s);
     }
 
-    public void build() throws InternalException, IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    public void build() throws Exception {
         final Integer[] ns = TransportContext.getInstance().getOnlineNodesWithLocal();
         int i = 0;
         //int tnode = 0;
@@ -203,21 +203,29 @@ public class SQLCursor implements FrameIterator {
         while (lbi.hasNextFrame()) {
             final FrameApi bd1 = lbi.nextFrame();
 
-            if (rbi == null) {
-                tasks.add(new FrameApiJoin(ns[i], this, bd1, null));
-                i++;
-                if (i == ns.length) { i = 0; }
-            } else {
-                while (rbi.hasNextFrame()) {
-                    final FrameApi bd2 = rbi.nextFrame();
-                    if (rightType == null) {
-                        rightType = bd2.getClass().getSimpleName();
-                    }
-                    tasks.add(new FrameApiJoin(ns[i], this, bd1, bd2));
+            if (bd1 != null) {
+                if (rbi == null) {
+                    tasks.add(new FrameApiJoin(ns[i], this, bd1, null));
                     i++;
-                    if (i == ns.length) { i = 0; }
+                    if (i == ns.length) {
+                        i = 0;
+                    }
+                } else {
+                    while (rbi.hasNextFrame()) {
+                        final FrameApi bd2 = rbi.nextFrame();
+                        if (bd2 != null) {
+                            if (rightType == null) {
+                                rightType = bd2.getClass().getSimpleName();
+                            }
+                            tasks.add(new FrameApiJoin(ns[i], this, bd1, bd2));
+                            i++;
+                            if (i == ns.length) {
+                                i = 0;
+                            }
+                        }
+                    }
+                    rbi.resetIterator();
                 }
-                rbi.resetIterator();
             }
         }
         logger.debug("SQL cursor is build: tasks amount = "+tasks.size()+", use NC check = "+last);
@@ -270,7 +278,9 @@ public class SQLCursor implements FrameIterator {
                     List<FrameApi> flist = new ArrayList<>();
                     while (lbi.hasNextFrame()) {
                         final FrameApi bd1 = lbi.nextFrame();
-                        flist.add(bd1);
+                        if (bd1 != null) {
+                            flist.add(bd1);
+                        }
                     }
 
                     if (flist.size() > 0) {

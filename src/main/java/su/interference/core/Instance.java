@@ -62,7 +62,7 @@ public class Instance implements Interference {
     private static final int MAX_NODE_ID = 32;
     public static final int SESSION_EXPIRE = 7200000; //in ms
 
-    public static final int SYSTEM_VERSION = 20193;
+    public static final int SYSTEM_VERSION = 20200524;
 
     public static final int SYSTEM_STATE_ONLINE = 1;
     public static final int SYSTEM_STATE_UP = 2;

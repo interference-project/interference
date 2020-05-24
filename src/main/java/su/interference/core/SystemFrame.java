@@ -98,7 +98,7 @@ public class SystemFrame extends Frame {
         return 0;
     }
 
-    SystemData getSystemData() {
+    public SystemData getSystemData() {
         for (Chunk c : data.getChunks()) {
             final DataChunk dc = (DataChunk)c;
             return (SystemData)dc.getEntity();

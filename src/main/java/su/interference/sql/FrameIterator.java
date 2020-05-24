@@ -41,7 +41,7 @@ public interface FrameIterator {
     public static final int TYPE_TABLE = 1;
     public static final int TYPE_CURSOR = 2;
 
-    FrameApi nextFrame() throws InternalException, ClassNotFoundException, IOException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException;
+    FrameApi nextFrame() throws Exception;
     boolean hasNextFrame() throws InternalException;
     void resetIterator();
     int getType();

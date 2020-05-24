@@ -70,18 +70,20 @@ public class SQLHashMap implements FrameIterator {
         return (Comparable)y.invoke(o, new Object[]{s});
     }
 
-    public FrameApi nextFrame() throws InternalException, IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    public FrameApi nextFrame() throws Exception {
         if (!complete.get()) {
             while (rbi.hasNextFrame()) {
                 FrameApi bd = rbi.nextFrame();
-                ArrayList<Object> drs = bd.getFrameEntities(s);
-                for (Object o : drs) {
-                    if (bd.getImpl() == FrameApi.IMPL_INDEX) {
-                        final IndexChunk ib1 = (IndexChunk) o;
-                        o = ib1.getDataChunk().getEntity();
-                    }
+                if (bd != null) {
+                    ArrayList<Object> drs = bd.getFrameEntities(s);
+                    for (Object o : drs) {
+                        if (bd.getImpl() == FrameApi.IMPL_INDEX) {
+                            final IndexChunk ib1 = (IndexChunk) o;
+                            o = ib1.getDataChunk().getEntity();
+                        }
 
-                    hmap.put(getKeyValue(c, o, cmap, s), o);
+                        hmap.put(getKeyValue(c, o, cmap, s), o);
+                    }
                 }
             }
             complete.compareAndSet(false, true);

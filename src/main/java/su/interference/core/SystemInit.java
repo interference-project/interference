@@ -179,10 +179,10 @@ public class SystemInit {
                     int ufsCntr = 0;
                     for (int x=1; x<dfs.length; x++) {
                         DataFile f = dfs[x];
-                        if (f.getType()==DataFile.DATA_TYPE) {
+                        if (f.getType() == Storage.DATAFILE_TYPEID) {
                             FrameData frame = f.allocateFrame(t, s, null);
                             frame.markAsCurrent();
-                            if (f.getFileId()==df.getFileId()) {
+                            if (f.getFileId() == df.getFileId()) {
                                 t.setFrameStart(frame.getPtr());
                                 t.setFrameLast(frame.getPtr());
                             }
@@ -201,7 +201,7 @@ public class SystemInit {
                                 DataChunk dc = new DataChunk(f, s);
                                 ret[framesCntr].insertChunk(dc, s, true, null);
                                 for (int y=1; y<dfs.length; y++) {
-                                    if (dfs[y].getType()!=DataFile.DATA_TYPE) {
+                                    if (dfs[y].getType() != Storage.DATAFILE_TYPEID) {
                                         int p = Config.getConfig().FILES_AMOUNT*(dfs[y].getType()-1);
                                         if (f.getFileId()==(dfs[y].getFileId()-p)) {
                                             dc = new DataChunk(dfs[y], s);

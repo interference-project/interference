@@ -26,6 +26,7 @@ package su.interference.sql;
 
 import su.interference.core.Chunk;
 import su.interference.core.ChunkIdComparator;
+import su.interference.core.FrameOrderComparator;
 import su.interference.exception.InternalException;
 import su.interference.persistent.Session;
 
@@ -34,6 +35,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author Yuriy Glotanov
@@ -43,6 +46,7 @@ import java.util.List;
 public class ContainerFrame implements FrameApi {
     private final int objectId;
     private List<FrameApi> frames;
+    private static final Map<Long, Integer> lastfamt = new ConcurrentHashMap<>();
 
     public ContainerFrame(int objectId, List<FrameApi> frames) {
         this.objectId = objectId;
@@ -71,31 +75,44 @@ public class ContainerFrame implements FrameApi {
 
     public ArrayList<Object> getFrameEntities(Session s) throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchMethodException {
         if (s.isStream()) {
-            final List<Chunk> chunks = new ArrayList<>();
             final ArrayList<Object> res = new ArrayList<>();
+            Collections.sort(frames, new FrameOrderComparator());
+            final FrameApi first = frames.get(0);
+            final FrameApi last = frames.get(frames.size()-1);
+            Integer prevamt = lastfamt.get(first.getAllocId());
+            int lastamt = 0;
             for (FrameApi f : frames) {
                 if (f.getImpl() == FrameApi.IMPL_DATA) {
-                    chunks.addAll(f.getFrameChunks(s));
+                    if (f.getAllocId() == first.getAllocId() && prevamt != null) {
+                        int i = 0;
+                        for (Chunk c : f.getFrameChunks(s)) {
+                            if (i > prevamt) {
+                                res.add(c.getEntity());
+                            }
+                            i++;
+                        }
+                    } else {
+                        if (f.getAllocId() == last.getAllocId()) {
+                            for (Chunk c : f.getFrameChunks(s)) {
+                                res.add(c.getEntity());
+                                lastamt++;
+                            }
+                        } else {
+                            for (Chunk c : f.getFrameChunks(s)) {
+                                res.add(c.getEntity());
+                            }
+                        }
+                    }
                 }
             }
-            Collections.sort(chunks, new ChunkIdComparator(s));
-            for (Chunk c : chunks) {
-                res.add(c.getEntity());
-            }
+            lastfamt.remove(first.getAllocId());
+            lastfamt.put(last.getAllocId(), lastamt);
             return res;
         }
         return null;
     }
 
-    public boolean hasLiveTransaction(long transId) {
-        return false;
-    }
-
-    public boolean hasLocalTransactions() {
-        return false;
-    }
-
-    public int hasRemoteTransactions() throws InternalException {
+    public long getFrameOrder() {
         return 0;
     }
 

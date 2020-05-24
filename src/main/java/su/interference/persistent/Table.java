@@ -27,7 +27,8 @@ package su.interference.persistent;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -102,6 +103,8 @@ public class Table implements DataObject, ResultSet {
     private AtomicLong idValue;
     @Column
     private AtomicLong incValue;
+    @Column
+    private AtomicLong frameOrder;
 
     @Transient
     private Map<Integer, Long> ixstartfs = new HashMap<>();
@@ -140,6 +143,8 @@ public class Table implements DataObject, ResultSet {
     public java.lang.reflect.Field[] fields;
     @Transient
     public String[] fieldtypes;
+    @Transient
+    private static final ExecutorService framepool = Executors.newCachedThreadPool();
 
     public Class getSc() {
         return sc;
@@ -159,6 +164,10 @@ public class Table implements DataObject, ResultSet {
 
     public long getIncValue() {
         return incValue==null?0:incValue.get();
+    }
+
+    public long getFrameOrder() {
+        return frameOrder==null?0:frameOrder.get();
     }
 
     public WaitFrame[] getLbs() {
@@ -192,6 +201,12 @@ public class Table implements DataObject, ResultSet {
         incValue.addAndGet(1);
         s.persist(this, llt); //update
         return incValue.get();
+    }
+
+    public synchronized long getFrameOrder(Session s, LLT llt) throws Exception {
+        if (frameOrder==null) { frameOrder = new AtomicLong(0); }
+        frameOrder.addAndGet(1);
+        return frameOrder.get();
     }
 
     public void setIdValue(AtomicLong idValue) {
@@ -242,20 +257,53 @@ public class Table implements DataObject, ResultSet {
         return this.name;
     }
 
-    public List<FrameData> getFrames(Session s)
+    public LinkedBlockingQueue<FrameData> getFrames(Session s)
             throws IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InternalException, IllegalAccessException, InstantiationException {
         if (this.isIndex()) {
             //get ordered frame sequence
             return this.getLeafFrames(s);
         }
-        return Instance.getInstance().getFrameDataTable().getIndexFieldByColumn("objectId").getIndex().
-                getObjectsByKey(this.getObjectId()).stream().map(b -> (FrameData)((DataChunk)b).getEntity()).collect(Collectors.toList());
-        //return Instance.getInstance().getFramesByTable(this.getObjectId());
+        final LinkedBlockingQueue<FrameData> q = new LinkedBlockingQueue<>(1000);
+        final IndexList ixl = Instance.getInstance().getFrameDataTable().getIndexFieldByColumn("objectId").getIndex();
+        final int id = this.objectId;
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    for (Object o : ixl.getObjectsByKey(id)) {
+                        q.put((FrameData) ((DataChunk) o).getEntity());
+                    }
+                    //terminate
+                    q.put(new FrameData());
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        framepool.submit(r);
+        return q;
     }
 
-    public List<FrameData> getFrames() {
-        return Instance.getInstance().getFrameDataTable().getIndexFieldByColumn("objectId").getIndex().
-                getObjectsByKey(this.getObjectId()).stream().map(b -> (FrameData)((DataChunk)b).getEntity()).collect(Collectors.toList());
+    public LinkedBlockingQueue<FrameData> getFrames() {
+        final LinkedBlockingQueue<FrameData> q = new LinkedBlockingQueue<>(1000);
+        final IndexList ixl = Instance.getInstance().getFrameDataTable().getIndexFieldByColumn("objectId").getIndex();
+        final int id = this.objectId;
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    for (Object o : ixl.getObjectsByKey(id)) {
+                        q.put((FrameData) ((DataChunk) o).getEntity());
+                    }
+                    //terminate
+                    q.put(new FrameData());
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        framepool.submit(r);
+        return q;
     }
 
     //used in Session.registerTable
@@ -514,16 +562,22 @@ public class Table implements DataObject, ResultSet {
     }
 
     public void deallocate(Session s) throws Exception {
-        final List<FrameData> frames = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
-        for (FrameData bd : frames) {
-            //unsafe (chain-destruct) deallocate frame
-            final FreeFrame fb = new FreeFrame(0, bd.getFrameId(), bd.getSize());
-            fb.setPassed(1);
-            final LLT llt = LLT.getLLT();
-            s.delete(bd, llt);
-            s.persist(fb, llt);
-            llt.commit();
-            bd.setFrame(null);
+        final LinkedBlockingQueue<FrameData> frames = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
+        boolean cnue = true;
+        while (cnue) {
+            final FrameData bd = frames.take();
+            if (bd.getObjectId() == 0 && bd.getFrameId() == 0) {
+                cnue = false;
+            } else {
+                //unsafe (chain-destruct) deallocate frame
+                final FreeFrame fb = new FreeFrame(0, bd.getFrameId(), bd.getSize());
+                fb.setPassed(1);
+                final LLT llt = LLT.getLLT();
+                s.delete(bd, llt);
+                s.persist(fb, llt);
+                llt.commit();
+                bd.setFrame(null);
+            }
         }
     }
 
@@ -1191,17 +1245,14 @@ public class Table implements DataObject, ResultSet {
        }
     }
 
-    public void delete (final Object o, final Session s) throws Exception {
-        delete(o, s, null);
-    }
-
-    protected void delete (final Object o, final Session s, LLT extllt) throws Exception {
+    protected void delete (final Object o, final Session s, LLT extllt, boolean ignoreTransaction) throws Exception {
         final DataChunk dc = this.getChunkByEntity(o, s);
         final int len = dc.getBytesAmount();
         final FrameData bd = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId()+dc.getHeader().getRowID().getFramePointer());
         final LLT llt = extllt==null?LLT.getLLT():extllt;
+        final boolean noTran = ignoreTransaction ? true : isNoTran();
 
-        if (!isNoTran()) { //save undo information
+        if (!noTran) { //save undo information
             if (s.getTransaction() == null || !s.getTransaction().started || s.getTransaction().getMTran() == 0) {
                 s.startStatement();
             }
@@ -1216,7 +1267,7 @@ public class Table implements DataObject, ResultSet {
         }
         bd.deleteChunk(dc.getHeader().getRowID().getRowPointer(), s, llt);
         removeIndexValue(dc);
-        if (isNoTran()) { usedSpace(bd,bd.getUsed()-len, true, s, llt); } else { s.getTransaction().storeFrame(bd, 0-len, s, llt); }
+        if (noTran) { usedSpace(bd,bd.getUsed()-len, true, s, llt); } else { s.getTransaction().storeFrame(bd, 0-len, s, llt); }
         if (extllt == null) { llt.commit(); }
     }
 
@@ -1311,7 +1362,6 @@ public class Table implements DataObject, ResultSet {
 
     protected synchronized RetrieveQueue getTableContentQueue(Session s) {
         final Table t = this;
-        final int ptr = 0;
         final LinkedBlockingQueue<Chunk> q = new LinkedBlockingQueue<>(Config.getConfig().RETRIEVE_QUEUE_SIZE);
         final AtomicBoolean stopped = new AtomicBoolean();
         final Chunk tc = new DataChunk();
@@ -1320,15 +1370,16 @@ public class Table implements DataObject, ResultSet {
             @Override
             public Boolean call() throws Exception {
                 synchronized (t) {
-                    final List<FrameData> bds = Instance.getInstance().getTableById(getObjectId()).getFrames();
-                    Collections.sort(bds);
-                    int i = 0;
-                    for (FrameData b : bds) {
-                        if (stopped.get()) {
-                            return true;
-                        }
-                        i++;
-                        if (ptr == 0 || ptr == i) {
+                    final LinkedBlockingQueue<FrameData> bds = Instance.getInstance().getTableById(getObjectId()).getFrames();
+                    boolean cnue = true;
+                    while (cnue) {
+                        final FrameData b = bds.take();
+                        if (b.getObjectId() == 0 && b.getFrameId() == 0) {
+                            cnue = false;
+                        } else {
+                            if (stopped.get()) {
+                                return true;
+                            }
                             for (Chunk c : b.getDataFrame().getFrameChunks(s)) {
                                 q.put(c);
                             }
@@ -1453,17 +1504,24 @@ public class Table implements DataObject, ResultSet {
         if (this.isIndex()) { //index table
             throw new InternalException();
         } else {
-            final List<FrameData> bds = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
-            for (FrameData b : bds) {
-                if (retrieved.get(b.getFrameId()) == null) {
-                    r.add(b);
+            final LinkedBlockingQueue<FrameData> bds = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
+            boolean cnue = true;
+            while (cnue) {
+                final FrameData b = bds.take();
+                if (b.getObjectId() == 0 && b.getFrameId() == 0) {
+                    cnue = false;
+                } else {
+                    if (retrieved.get(b.getFrameId()) == null) {
+                        r.add(b);
+                    }
                 }
             }
         }
         return r;
     }
 
-    public DataChunk getChunkByEntity (Object o, Session s) throws IOException, InvocationTargetException, NoSuchMethodException, InternalException, InvalidFrame, EmptyFrameHeaderFound, IncorrectUndoChunkFound, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    public DataChunk getChunkByEntity (Object o, Session s)
+            throws IOException, InvocationTargetException, NoSuchMethodException, InternalException, InterruptedException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         final Class c = o.getClass();
         final ResultSetEntity ca = (ResultSetEntity)c.getAnnotation(ResultSetEntity.class);
         if (ca!=null) { //ResultSet entities ALWAYS insert only, then, no neccessary for find datachunk
@@ -1484,11 +1542,17 @@ public class Table implements DataObject, ResultSet {
             } else {
                 final byte[] id = new DataChunkId(o, s).getIdBytes();
                 if (id!=null) {
-                    final List<FrameData> bds = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
-                    for (FrameData b : bds) {
-                        for (Chunk dc : b.getDataFrame().getFrameChunks(s)) {
-                            if (Arrays.equals(id, ((DataChunk)dc).getSerializedId(s))) {
-                                return (DataChunk)dc;
+                    final LinkedBlockingQueue<FrameData> bds = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
+                    boolean cnue = true;
+                    while (cnue) {
+                        final FrameData b = bds.take();
+                        if (b.getObjectId() == 0 && b.getFrameId() == 0) {
+                            cnue = false;
+                        } else {
+                            for (Chunk dc : b.getDataFrame().getFrameChunks(s)) {
+                                if (Arrays.equals(id, ((DataChunk) dc).getSerializedId(s))) {
+                                    return (DataChunk) dc;
+                                }
                             }
                         }
                     }
@@ -1511,11 +1575,17 @@ public class Table implements DataObject, ResultSet {
                     } else {
                         final byte[] id = dcid.getIdBytes();
                         if (id != null) {
-                            final List<FrameData> bds = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
-                            for (FrameData b : bds) {
-                                for (Chunk dc : b.getDataFrame().getFrameChunks(s)) {
-                                    if (Arrays.equals(id, ((DataChunk) dc).getSerializedId(s))) {
-                                        return (DataChunk) dc;
+                            final LinkedBlockingQueue<FrameData> bds = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
+                            boolean cnue = true;
+                            while (cnue) {
+                                final FrameData b = bds.take();
+                                if (b.getObjectId() == 0 && b.getFrameId() == 0) {
+                                    cnue = false;
+                                } else {
+                                    for (Chunk dc : b.getDataFrame().getFrameChunks(s)) {
+                                        if (Arrays.equals(id, ((DataChunk) dc).getSerializedId(s))) {
+                                            return (DataChunk) dc;
+                                        }
                                     }
                                 }
                             }
@@ -1530,7 +1600,8 @@ public class Table implements DataObject, ResultSet {
         return null;
     }
 
-    public DataChunk getChunkById (long id, Session s) throws IOException, InvocationTargetException, NoSuchMethodException, InternalException, InvalidFrame, EmptyFrameHeaderFound, IncorrectUndoChunkFound, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    public DataChunk getChunkById (long id, Session s)
+            throws IOException, InvocationTargetException, NoSuchMethodException, InternalException, InterruptedException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         final String type = getIdField().getType().getName();
         final Table idt = getFirstIndexByIdColumn();
         final Integer id_ = type.equals("int")||type.equals("java.lang.Integer")?(int)id:null;
@@ -1558,11 +1629,17 @@ public class Table implements DataObject, ResultSet {
             }
 
             if (iid != null) {
-                List<FrameData> bds = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
-                for (FrameData b : bds) {
-                    for (Chunk c : b.getDataFrame().getFrameChunks(s)) {
-                        if (Arrays.equals(iid, ((DataChunk) c).getSerializedId(s))) {
-                            return (DataChunk) c;
+                LinkedBlockingQueue<FrameData> bds = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
+                boolean cnue = true;
+                while (cnue) {
+                    final FrameData b = bds.take();
+                    if (b.getObjectId() == 0 && b.getFrameId() == 0) {
+                        cnue = false;
+                    } else {
+                        for (Chunk c : b.getDataFrame().getFrameChunks(s)) {
+                            if (Arrays.equals(iid, ((DataChunk) c).getSerializedId(s))) {
+                                return (DataChunk) c;
+                            }
                         }
                     }
                 }
@@ -1762,23 +1839,39 @@ public class Table implements DataObject, ResultSet {
         return res;
     }
 
-    private synchronized ArrayList<FrameData> getLeafFrames (Session s) throws IOException, InternalException,  NoSuchMethodException, InvocationTargetException, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException {
-        ArrayList<FrameData> res = new ArrayList<FrameData>();
-        res.addAll(getLocalLeafFrames(this.fileStart+this.frameStart, s));
+    private synchronized LinkedBlockingQueue<FrameData> getLeafFrames (Session s) throws IOException, InternalException,  NoSuchMethodException, InvocationTargetException, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException {
+        final LinkedBlockingQueue<FrameData> q = new LinkedBlockingQueue<>(1000);
+        final ArrayList<Long> startfs = new ArrayList<>();
+        startfs.add(this.fileStart+this.frameStart);
         for (Map.Entry<Integer, Long> entry : ixstartfs.entrySet()) {
-            res.addAll(getLocalLeafFrames(entry.getValue(), s));
+            startfs.add(entry.getValue());
         }
-        return res;
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    for (Long start : startfs) {
+                        getLocalLeafFrames(q, start, s);
+                    }
+                    //terminate
+                    q.put(new FrameData());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        framepool.submit(r);
+        return q;
     }
 
-    private synchronized ArrayList<FrameData> getLocalLeafFrames (long start, Session s) throws IOException, InternalException,  NoSuchMethodException, InvocationTargetException, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException {
-        ArrayList<FrameData> res = new ArrayList<FrameData>();
+    private synchronized LinkedBlockingQueue<FrameData> getLocalLeafFrames (LinkedBlockingQueue<FrameData> q, long start, Session s)
+            throws IOException, InternalException,  InterruptedException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         ArrayList<IndexFrame> levelNodes = new ArrayList<IndexFrame>();
         boolean cnue = true;
         FrameData bd = Instance.getInstance().getFrameById(start);
         //frame must be local or remote chain started (RCS)
         if (bd.getFrameId() != bd.getAllocId() && bd.getStarted() == 0) {
-            return res;
+            return q;
         }
         IndexFrame el = bd.getIndexFrame();
         el.sort();
@@ -1789,7 +1882,7 @@ public class Table implements DataObject, ResultSet {
                 //levelNodes.get(k).sort();
                 if (levelNodes.get(k).getType()==1) {
                     cnue = false;
-                    res.add(Instance.getInstance().getFrameById(levelNodes.get(k).getPtr()));
+                    q.put(Instance.getInstance().getFrameById(levelNodes.get(k).getPtr()));
                 } else {
                     for (int i=0; i<levelNodes.get(k).getFrameChunks(s).size(); i++) {
                         inNodes.add(Instance.getInstance().getFrameById(levelNodes.get(k).getFrameChunks(s).get(i).getHeader().getFramePtr()).getIndexFrame());
@@ -1805,7 +1898,7 @@ public class Table implements DataObject, ResultSet {
             }
             levelNodes = inNodes;
         }
-        return res;
+        return q;
     }
 
     public synchronized String getInfo(Session s) throws IOException, InternalException,  NoSuchMethodException, InvocationTargetException, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException {

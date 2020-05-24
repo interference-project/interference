@@ -147,6 +147,6 @@ public class ResultSetImpl implements ResultSet {
     }
 
     public void deallocate(Session s) throws Exception {
-
+        this.target.deallocate(s);
     }
 }
