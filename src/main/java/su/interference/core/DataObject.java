@@ -57,6 +57,7 @@ public interface DataObject {
     void setFileLast (int fileLast);
     void setFrameLast (long frameLast);
     void setFrameAmount(long frameAmount);
+    long getFrameOrder(Session s, LLT llt) throws Exception;
     long getIdValue(Session s, LLT llt) throws Exception;
     long getIncValue(Session s, LLT llt) throws Exception;
     void incFrameAmount ();

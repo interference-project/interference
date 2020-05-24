@@ -47,6 +47,7 @@ public interface FrameApi {
     long getAllocId();
     int getObjectId();
     int getImpl();
+    long getFrameOrder();
     ArrayList<Chunk> getFrameChunks(Session s) throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchMethodException;
     ArrayList<Object> getFrameEntities(Session s) throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchMethodException;
 

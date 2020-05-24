@@ -49,14 +49,6 @@ import javax.persistence.*;
 @Entity
 @SystemEntity
 public class DataFile implements Serializable {
-    @Transient
-    public static final int DATA_TYPE = 1;
-    @Transient
-    public static final int INDX_TYPE = 2;
-    @Transient
-    public static final int UNDO_TYPE = 3;
-    @Transient
-    public static final int TEMP_TYPE = 4;
 
     @Column
     @Id
@@ -334,6 +326,8 @@ public class DataFile implements Serializable {
                     this.file.seek(0);
                     this.file.read(b,0,SYSTEM_FRAME_SIZE);
                     this.sframe = new SystemFrame(b,this.getFileId(),0);
+                    final SystemData sd = this.sframe.getSystemData();
+                    logger.info("open " + this.fileName + " file completed successfully (ver." + sd.getVersion() + ")");
                 } catch (Exception e) {
                     logger.error("open " + this.fileName + " file throws " + e.getMessage());
                 }
@@ -375,7 +369,7 @@ public class DataFile implements Serializable {
     }
 
     private synchronized void createHeaderFrame(Session s, LLT llt) throws IOException, InvocationTargetException, NoSuchMethodException, InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
-        this.sframe = new SystemFrame(this.getFileId(), 0, Instance.getInstance().getFrameSize());
+        this.sframe = new SystemFrame(this.getFileId(), 0, type == Storage.INDXFILE_TYPEID ? Instance.getInstance().getFrameSize2() : Instance.getInstance().getFrameSize());
         this.sframe.insertSU(s, llt);
 //        Storage.getStorage().writeFrame(this.sframe);
         this.writeFrame(0, this.sframe.getFrame());
@@ -388,6 +382,8 @@ public class DataFile implements Serializable {
             final FreeFrame fframe = getReallocFreeFrame(size);
             if (fframe != null) {
                 final FrameData bd = new FrameData(fframe.getFile(), fframe.getPtr(), fframe.getSize(), t);
+                // t should be updated mandatory during createFrame
+                bd.setFrameOrder(t.getFrameOrder(s, llt));
                 s.delete(fframe, llt);
                 Metrics.get("reallocateFrame").stop();
                 return bd;
@@ -406,6 +402,8 @@ public class DataFile implements Serializable {
 //        Storage.getStorage().writeFrame(this.sframe);
         this.writeFrame(0, this.sframe.getFrame());
         final FrameData bd = new FrameData(this.getFileId(), ptr, size, t);
+        // t should be updated mandatory during createFrame
+        bd.setFrameOrder(t.getFrameOrder(s, llt));
         Metrics.get("allocateFrame").stop();
         return bd;
     }

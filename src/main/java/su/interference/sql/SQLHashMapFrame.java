@@ -60,22 +60,6 @@ public class SQLHashMapFrame implements FrameApi, Finder {
         return Arrays.asList(new Object[]{hmap.get(key)});
     }
 
-//    public void put(Comparable k, Object v) {
-//        hmap.put(k, v);
-//    }
-
-    public boolean hasLiveTransaction(long transId) {
-        return false;
-    }
-
-    public boolean hasLocalTransactions() {
-        return false;
-    }
-
-    public int hasRemoteTransactions() throws InternalException {
-        return 0;
-    }
-
     public SQLColumn getCmap() {
         return cmap;
     }
@@ -85,6 +69,10 @@ public class SQLHashMapFrame implements FrameApi, Finder {
     }
 
     public long getFrameId() {
+        return 0;
+    }
+
+    public long getFrameOrder() {
         return 0;
     }
 

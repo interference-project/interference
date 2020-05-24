@@ -26,7 +26,6 @@ package su.interference.sql;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import su.interference.core.FrameAllocComparator;
 import su.interference.persistent.Table;
 import su.interference.persistent.FrameData;
 import su.interference.core.Instance;
@@ -34,7 +33,8 @@ import su.interference.sqlexception.InvalidTableDescription;
 import su.interference.sqlexception.MissingTableInSerializableMode;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.net.MalformedURLException;
 
 /**
@@ -48,11 +48,8 @@ public class SQLTable implements Comparable, FrameIterator {
     private final Table table;
     private SQLSelect sql; // inline view
     private final String alias;
-    private long frameStart;
-    private final int amount;
-    private final List<FrameData> frames;
-    private int cntrStart;
-    private AtomicInteger framecntr;
+    private volatile LinkedBlockingQueue<FrameData> frames;
+    private final AtomicBoolean terminate;
     private boolean leftfs;
 
     public SQLTable (String table, String alias) throws InvalidTableDescription, MissingTableInSerializableMode {
@@ -66,13 +63,9 @@ public class SQLTable implements Comparable, FrameIterator {
         if (this.table == null) {
             throw new InvalidTableDescription();
         }
+
         frames = Instance.getInstance().getTableById(this.table.getObjectId()).getFrames();
-        Collections.sort(frames, new FrameAllocComparator());
-        logger.info(this.table.getName()+" total frames: "+frames.size());
-        this.amount = frames.size();
-        this.frameStart = frames.get(0).getFrameId();
-        this.cntrStart = 0;
-        this.framecntr = new AtomicInteger(0);
+        this.terminate = new AtomicBoolean(false);
     }
 
     public int getType() {
@@ -102,11 +95,14 @@ public class SQLTable implements Comparable, FrameIterator {
         return 0;
     }
 
-    public synchronized FrameData nextFrame() {
+    public synchronized FrameData nextFrame() throws Exception {
         if (hasNextFrame()) {
-            FrameData bd = frames.get(framecntr.get());
-            logger.debug(this.table.getName()+" returns next "+framecntr+" frame with allocId = "+bd.getAllocId());
-            framecntr.incrementAndGet();
+            final FrameData bd = frames.take();
+            if (bd.getObjectId() == 0 && bd.getFrameId() == 0) {
+                terminate.compareAndSet(false, true);
+                return null;
+            }
+            logger.debug(this.table.getName()+" returns next frame with allocId = "+bd.getAllocId());
             return bd;
         }
         return null;
@@ -114,25 +110,20 @@ public class SQLTable implements Comparable, FrameIterator {
 
     public synchronized void resetIterator() {
         if (!hasNextFrame()) {
-            framecntr.set(0);
+            try {
+                frames = Instance.getInstance().getTableById(this.table.getObjectId()).getFrames();
+                terminate.compareAndSet(true, false);
+            } catch (Exception e) {
+                throw new RuntimeException();
+            }
         }
     }
 
     public synchronized boolean hasNextFrame() {
-        if ((this.amount+this.cntrStart) > framecntr.get()) {
-            return true;
+        if (terminate.get()) {
+            return false;
         }
-        return false;
-    }
-
-    public int getFramesAmount() {
-        return this.frames.size();
-    }
-
-    //start frameid for node partition
-    public long getStartFrameId(int node, int nodes) {
-        int psize = this.frames.size()/nodes;
-        return this.frames.get(node*psize).getFrameId();
+        return true;
     }
 
     public Table getTable() {
@@ -149,24 +140,6 @@ public class SQLTable implements Comparable, FrameIterator {
 
     public String getAlias() {
         return alias;
-    }
-
-    public long getFrameStart() {
-        return frameStart;
-    }
-
-    public void setFrameStart(long frameStart) {
-        this.frameStart = frameStart;
-        for (int i=0; i<this.frames.size(); i++) {
-            if (this.frames.get(i).getFrameId()==frameStart) {
-                this.cntrStart = i;
-                this.framecntr = new AtomicInteger(i);
-            }
-        }
-    }
-
-    public int getAmount() {
-        return amount;
     }
 
     @Override

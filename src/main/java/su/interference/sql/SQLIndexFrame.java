@@ -89,6 +89,10 @@ public class SQLIndexFrame implements FrameApi, Finder {
         return bd == null ? 0 : bd.getFrameId();
     }
 
+    public long getFrameOrder() {
+        return bd == null ? 0 : bd.getFrameOrder();
+    }
+
     public long getAllocId() {
         return bd == null ? 0 : bd.getAllocId();
     }
@@ -126,18 +130,6 @@ public class SQLIndexFrame implements FrameApi, Finder {
             }
             return null;
         }
-    }
-
-    public boolean hasLiveTransaction(long transId) {
-        return false;
-    }
-
-    public boolean hasLocalTransactions() {
-        return false;
-    }
-
-    public int hasRemoteTransactions() throws InternalException {
-        return 0;
     }
 
     public SQLColumn getLkey() {
