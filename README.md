@@ -70,7 +70,7 @@ Next, specify the necessary set of keys in the project
 -Dcom.sun.management.jmxremote.local.only=false 
 -Dcom.sun.management.jmxremote.authenticate=false 
 -Dcom.sun.management.jmxremote.ssl=false
--Xms256g
+-Xms256m
 -Xmn512m
 -Xmx4g
 -XX:MaxMetaspaceSize=256m
@@ -106,7 +106,7 @@ java -cp interference.jar
 -Dcom.sun.management.jmxremote.local.only=false 
 -Dcom.sun.management.jmxremote.authenticate=false 
 -Dcom.sun.management.jmxremote.ssl=false 
--Xms256g
+-Xms256m
 -Xmn512m
 -Xmx4g
 -XX:MaxMetaspaceSize=256m
