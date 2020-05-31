@@ -125,9 +125,11 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @Transient
     private volatile Frame frame;
     @Transient
-    private DataObject dataObject;
+    private Table dataObject;
     @Transient
     private Class entityClass;
+    @Transient
+    private DataFile dataFile;
 
     public int getImpl() {
         return FrameApi.IMPL_DATA;
@@ -146,26 +148,28 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         }
     }
 
-    public DataObject getDataObject() {
+    public Table getDataObject() {
         if (dataObject==null) {
             dataObject = Instance.getInstance().getTableById(this.objectId);
         }
         return dataObject;
     }
 
-    public void setDataObject(DataObject dataObject) {
+    public void setDataObject(Table dataObject) {
         this.dataObject = dataObject;
     }
 
     public synchronized DataFrame getDataFrame() throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
-        if (frame ==null) {
+        if (frame == null) {
+            this.priority = SystemCleanUp.DATA_RETRIEVED_PRIORITY;
             frame = new DataFrame(this.file,this.ptr,0,this,dataObject,entityClass);
         }
         return (DataFrame) frame;
     }
 
     public IndexFrame getIndexFrame() throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
-        if (frame ==null) {
+        if (frame == null) {
+            this.priority = SystemCleanUp.INDEX_RETRIEVED_PRIORITY;
             frame = new IndexFrame(this.file,this.ptr,0,this,dataObject,entityClass);
         }
         return (IndexFrame) frame;
@@ -190,7 +194,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     }
 
     public Frame getFrame() throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException {
-        if (frame ==null) {
+        if (frame == null) {
             if (getDataObject().isIndex()) {
                 frame = getIndexFrame();
             } else {
@@ -250,20 +254,21 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     }
 
-    public FrameData(int file, long ptr, int size, DataObject tt) {
-        this.dataObject = tt;
-        this.objectId = tt.getObjectId();
-        this.allocId = file+ptr;
+    public FrameData(int file, long ptr, int size, Table t) {
+        this.dataObject = t;
+        this.objectId = t.getObjectId();
+        this.allocId = file + ptr;
         this.file = file;
         this.ptr  = ptr;
         this.size = size;
     }
 
-    public FrameData(FrameData bd, DataObject tt) {
-        this.dataObject = tt;
-        this.objectId = tt.getObjectId();
-        this.allocId = bd.getFile()+bd.getPtr();
+    public FrameData(FrameData bd, Table t) {
+        this.dataObject = t;
+        this.objectId = t.getObjectId();
+        this.allocId = bd.getFile() + bd.getPtr();
         this.file = bd.getFile();
+        this.dataFile = Instance.getInstance().getDataFileById(this.file);
         this.ptr  = bd.getPtr();
         this.size = bd.getSize();
         this.allocId = bd.getAllocId();
@@ -309,6 +314,13 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     public void deleteChunk(int ptr, Session s, LLT llt) throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, IOException, NoSuchMethodException, InvocationTargetException {
         this.getDataFrame().deleteChunk(ptr, s, llt);
+    }
+
+    public DataFile getDataFile() {
+        if (this.dataFile == null) {
+            this.dataFile = Instance.getInstance().getDataFileById(this.file);
+        }
+        return this.dataFile;
     }
 
     public int getObjectId() {
@@ -399,8 +411,12 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         }
     }
 
-    public void clearFrame() {
-        this.frame = null;
+    public boolean clearFrame() {
+        if (this.frame != null) {
+            this.frame = null;
+            return true;
+        }
+        return false;
     }
 
     public Class getEntityClass() {
@@ -432,7 +448,9 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     }
 
     public void decreasePriority() {
-        this.priority--;
+        if (this.priority > 0) {
+            this.priority--;
+        }
     }
 
     public boolean isSynced() {

@@ -45,11 +45,11 @@ public class DataFrame extends Frame {
         super (file, pointer, size, t);
     }
 
-    public DataFrame(FrameData bd, DataObject t) throws InternalException {
+    public DataFrame(FrameData bd, Table t) throws InternalException {
         super (bd, t);
     }
 
-    public DataFrame(int file, long pointer, int size, FrameData bd, DataObject t, Class c) throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
+    public DataFrame(int file, long pointer, int size, FrameData bd, Table t, Class c) throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
         super(null, file, pointer, size, bd, t, c);
 
         int ptr = FRAME_HEADER_SIZE;
@@ -71,7 +71,7 @@ public class DataFrame extends Frame {
     }
 
     //constructor for replication service - data frames
-    public DataFrame(byte[] b, int file, long pointer, Map<Long, List<Chunk>> umap, DataObject t) throws Exception {
+    public DataFrame(byte[] b, int file, long pointer, Map<Long, List<Chunk>> umap, Table t) throws Exception {
         super(b, file, pointer, t);
 
         int ptr = FRAME_HEADER_SIZE;
@@ -102,7 +102,7 @@ public class DataFrame extends Frame {
     }
 
     // constructor for replication service - undo frames
-    public DataFrame(byte[] b, int file, long pointer, HashMap<Long, Long> imap, HashMap<Long, Long> hmap, Map<Long, List<Chunk>> umap, DataObject t, Session s) throws Exception {
+    public DataFrame(byte[] b, int file, long pointer, HashMap<Long, Long> imap, HashMap<Long, Long> hmap, Map<Long, List<Chunk>> umap, Table t, Session s) throws Exception {
         super(b, file, pointer, t);
 
         if (!t.getName().equals("su.interference.persistent.UndoChunk")) {

@@ -52,12 +52,12 @@ public class IndexFrame extends Frame {
         super(file, pointer, size, t);
     }
 
-    public IndexFrame(FrameData bd, int frameType, DataObject t) throws InternalException {
+    public IndexFrame(FrameData bd, int frameType, Table t) throws InternalException {
         super(bd, t);
         this.setType(frameType);
     }
 
-    public IndexFrame(int file, long pointer, int size, FrameData bd, DataObject t, Class c) throws IOException, InvalidFrameHeader, InvalidFrame, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
+    public IndexFrame(int file, long pointer, int size, FrameData bd, Table t, Class c) throws IOException, InvalidFrameHeader, InvalidFrame, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
         super(null, file, pointer, size, bd, t, c);
         int ptr = FRAME_HEADER_SIZE;
         final ByteString bs = new ByteString(this.b);
@@ -84,7 +84,7 @@ public class IndexFrame extends Frame {
     }
 
     //constructor for replication service
-    public IndexFrame(byte[] b, int file, long pointer, HashMap<Long, Long> imap, HashMap<Long, Long> hmap, DataObject t) throws IOException, InvalidFrameHeader, InvalidFrame, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
+    public IndexFrame(byte[] b, int file, long pointer, HashMap<Long, Long> imap, HashMap<Long, Long> hmap, Table t) throws IOException, InvalidFrameHeader, InvalidFrame, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
         super(b, file, pointer, t);
         int ptr = FRAME_HEADER_SIZE;
         final ByteString bs = new ByteString(this.b);
@@ -123,7 +123,7 @@ public class IndexFrame extends Frame {
 
         if (this.isFill(e)) {
 
-            final int nfileId = t.getIndexFileId();
+            final int nfileId = t.getIndexFileId(this.getFrameData());
             res = t.createNewFrame(this.getFrameData(), nfileId, this.getType(), 0, false, false, false, s, llt).getIndexFrame();
             res.setParentF(this.getParentF());
             res.setParentB(this.getParentB());

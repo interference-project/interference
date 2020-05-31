@@ -215,8 +215,9 @@ public class FrameJoinTask implements Callable<List<Object>> {
                             }
                         }
                     } else {
-                        //one table loop
-                        if (r == null) {
+                        // one table loop
+                        // workaround for StreamQueue - always returns initial EntityContainer
+                        if (r == null || target instanceof StreamQueue) {
                             //todo need to cast o1 to RS type
                             if (nc.checkNC(o1, sqlcid, last, s)) {
                                 res.add(o1); //target table is null -> result class is null -> returns generic entities

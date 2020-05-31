@@ -37,7 +37,6 @@ import java.nio.ByteBuffer;
 import java.lang.reflect.*;
 import java.lang.annotation.Annotation;
 import java.net.MalformedURLException;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,7 +59,7 @@ import javax.persistence.*;
 @Entity
 @SystemEntity
 @DisableSync
-public class Table implements DataObject, ResultSet {
+public class Table implements ResultSet {
 
     @Transient
     private final static Logger logger = LoggerFactory.getLogger(Table.class);
@@ -217,8 +216,12 @@ public class Table implements DataObject, ResultSet {
         this.incValue = incValue;
     }
 
-    public synchronized void incFrameAmount () {
+    protected synchronized void incFrameAmount () {
         frameAmount++;
+    }
+
+    protected synchronized void decFrameAmount () {
+        frameAmount--;
     }
 
     public static int getCLASS_ID() {
@@ -517,8 +520,11 @@ public class Table implements DataObject, ResultSet {
 
     public boolean isIdFieldNoCheck() throws ClassNotFoundException, MalformedURLException {
         java.lang.reflect.Field f = getTableIdField();
-        NoCheck a = f.getAnnotation(NoCheck.class);
-        return a == null ? false : true;
+        if (f != null) {
+            NoCheck a = f.getAnnotation(NoCheck.class);
+            return a == null ? false : true;
+        }
+        return true;
     }
 
     public java.lang.reflect.Field getIdField() {
@@ -563,6 +569,7 @@ public class Table implements DataObject, ResultSet {
 
     public void deallocate(Session s) throws Exception {
         final LinkedBlockingQueue<FrameData> frames = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
+        s.delete(this);
         boolean cnue = true;
         while (cnue) {
             final FrameData bd = frames.take();
@@ -996,6 +1003,8 @@ public class Table implements DataObject, ResultSet {
                     s.persist(nb, llt); //update
                     s.persist(fb, llt); //insert
                     s.delete(bd, llt);
+                    this.frameAmount--;
+                    s.persist(this, llt);
                     logger.debug("deallocate frame " + bd.getObjectId() + ":" + bd.getFile() + ":" + bd.getPtr() + " " + Thread.currentThread().getName());
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -1110,7 +1119,7 @@ public class Table implements DataObject, ResultSet {
         }
 
         Metrics.get("persistGetChunk").start();
-        final DataChunk dc = this.getChunkByEntity(o, s);
+        final DataChunk dc = isIdFieldNoCheck() ? null : this.getChunkByEntity(o, s);
         Metrics.get("persistGetChunk").stop();
 
         if (dc==null) {
@@ -1265,7 +1274,11 @@ public class Table implements DataObject, ResultSet {
         if (bd == null) {
             logger.error("cannot found frame " + dc.getHeader().getRowID().getFileId() + ":" + dc.getHeader().getRowID().getFramePointer() + " during delete " + o.getClass().getSimpleName() + Thread.currentThread().getName());
         }
-        bd.deleteChunk(dc.getHeader().getRowID().getRowPointer(), s, llt);
+        if (ignoreTransaction) {
+            bd.removeChunk(dc.getHeader().getRowID().getRowPointer(), s, llt);
+        } else {
+            bd.deleteChunk(dc.getHeader().getRowID().getRowPointer(), s, llt);
+        }
         removeIndexValue(dc);
         if (noTran) { usedSpace(bd,bd.getUsed()-len, true, s, llt); } else { s.getTransaction().storeFrame(bd, 0-len, s, llt); }
         if (extllt == null) { llt.commit(); }
@@ -1310,7 +1323,7 @@ public class Table implements DataObject, ResultSet {
         return bd;
     }
 
-    public synchronized FrameData allocateFrame(DataFile df, DataObject t, Session s, LLT llt) throws Exception {
+    public synchronized FrameData allocateFrame(DataFile df, Table t, Session s, LLT llt) throws Exception {
         return df.allocateFrame(t, s, llt);
     }
 
@@ -1561,39 +1574,37 @@ public class Table implements DataObject, ResultSet {
         } else {
             final EntityContainer to = (EntityContainer)o;
             final Table idt = getFirstIndexByIdColumn();
-            if (!isIdFieldNoCheck()) {
-                if (to.getDataChunk() == null) {
-                    //todo need further optimize
-                    final DataChunkId dcid = new DataChunkId(o, s);
-                    if (idt != null) {
-                        final DataChunk idc = idt.getObjectByKey(new ValueSet(dcid.getId()));
-                        if (idc == null) {
-                            return null;
-                        }
-                        final IndexChunk ibx = (IndexChunk) idc.getEntity();
-                        return ibx.getDataChunk();
-                    } else {
-                        final byte[] id = dcid.getIdBytes();
-                        if (id != null) {
-                            final LinkedBlockingQueue<FrameData> bds = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
-                            boolean cnue = true;
-                            while (cnue) {
-                                final FrameData b = bds.take();
-                                if (b.getObjectId() == 0 && b.getFrameId() == 0) {
-                                    cnue = false;
-                                } else {
-                                    for (Chunk dc : b.getDataFrame().getFrameChunks(s)) {
-                                        if (Arrays.equals(id, ((DataChunk) dc).getSerializedId(s))) {
-                                            return (DataChunk) dc;
-                                        }
+            if (to.getDataChunk() == null) {
+                //todo need further optimize
+                final DataChunkId dcid = new DataChunkId(o, s);
+                if (idt != null) {
+                    final DataChunk idc = idt.getObjectByKey(new ValueSet(dcid.getId()));
+                    if (idc == null) {
+                        return null;
+                    }
+                    final IndexChunk ibx = (IndexChunk) idc.getEntity();
+                    return ibx.getDataChunk();
+                } else {
+                    final byte[] id = dcid.getIdBytes();
+                    if (id != null) {
+                        final LinkedBlockingQueue<FrameData> bds = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
+                        boolean cnue = true;
+                        while (cnue) {
+                            final FrameData b = bds.take();
+                            if (b.getObjectId() == 0 && b.getFrameId() == 0) {
+                                cnue = false;
+                            } else {
+                                for (Chunk dc : b.getDataFrame().getFrameChunks(s)) {
+                                    if (Arrays.equals(id, ((DataChunk) dc).getSerializedId(s))) {
+                                        return (DataChunk) dc;
                                     }
                                 }
                             }
                         }
                     }
-                } else {
-                    return to.getDataChunk();
                 }
+            } else {
+                return to.getDataChunk();
             }
         }
 
@@ -1722,7 +1733,7 @@ public class Table implements DataObject, ResultSet {
                     dc__ = new DataChunk(prevtg.getIndexFrame().getMaxValue(), s, new RowId(prevtg.getIndexFrame().getFile(),prevtg.getIndexFrame().getPointer(),0), this);
                 }
                 if (prevtg.getIndexFrame().getParentF()==0) { //add parent ElementList - always type 2 (node)
-                    final int nfileId = getIndexFileId();
+                    final int nfileId = getIndexFileId(prevtg);
 //                    target = createNewFrame(prevtg, prevtg.getFile(), IndexFrame.INDEX_FRAME_NODE, s);
                     target = createNewFrame(prevtg, nfileId, IndexFrame.INDEX_FRAME_NODE, 0, false, false, false, s, llt);
                     this.setFileStart(target.getIndexFrame().getFile());
@@ -1749,10 +1760,11 @@ public class Table implements DataObject, ResultSet {
 
 
     //todo???
-    public int getIndexFileId() {
+    public int getIndexFileId(FrameData bd) {
+        final DataFile[] dfs = bd.getDataFile().isIndex() ? Storage.getStorage().getIndexFiles() : Storage.getStorage().getTempFiles();
         int first = 0;
         int last = 0;
-        for (DataFile f : Storage.getStorage().getIndexFiles()) {
+        for (DataFile f : dfs) {
             if (first == 0) {
                 first = f.getFileId();
             }

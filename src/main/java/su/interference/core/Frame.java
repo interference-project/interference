@@ -81,7 +81,7 @@ public class Frame implements Comparable {
     protected byte[] b;
 
     private FrameData frameData;
-    private DataObject dataObject;
+    private Table dataObject;
     private Class entityClass;
     private static final Logger logger = LoggerFactory.getLogger(Frame.class);
 
@@ -100,7 +100,7 @@ public class Frame implements Comparable {
         this.frameData = frameData;
     }
 
-    public DataObject getDataObject() {
+    public Table getDataObject() {
         return dataObject;
     }
 
@@ -108,7 +108,7 @@ public class Frame implements Comparable {
         return entityClass;
     }
 
-    public Frame(int file, long pointer, int size, DataObject t) throws InternalException {
+    public Frame(int file, long pointer, int size, Table t) throws InternalException {
         this.file       = file;
         this.pointer    = pointer;
         this.allocFile  = 0;
@@ -124,7 +124,7 @@ public class Frame implements Comparable {
         }
     }
 
-    public Frame(FrameData bd, DataObject t) throws InternalException {
+    public Frame(FrameData bd, Table t) throws InternalException {
         this.file         = bd.getFile();
         this.pointer      = bd.getPtr();
         this.allocFile    = (int)bd.getAllocId()%4096;
@@ -187,7 +187,7 @@ public class Frame implements Comparable {
     }
 
     //constructor for replication service
-    public Frame(byte[] b, int file, long pointer, DataObject t) throws InternalException {
+    public Frame(byte[] b, int file, long pointer, Table t) throws InternalException {
         this.dataObject = t;
         if (b.length<FRAME_HEADER_SIZE) {
             throw new InvalidFrameHeader();
@@ -232,7 +232,7 @@ public class Frame implements Comparable {
         }
     }
 
-    public Frame(byte[] bb, int file, long pointer, int size, FrameData bd, DataObject t, Class c) throws IOException, InternalException, ClassNotFoundException, IllegalAccessException, InstantiationException {
+    public Frame(byte[] bb, int file, long pointer, int size, FrameData bd, Table t, Class c) throws IOException, InternalException, ClassNotFoundException, IllegalAccessException, InstantiationException {
         entityClass = c;
         dataObject = t;
         if (bd!=null) { //system frame not used dataobject
@@ -484,21 +484,14 @@ public class Frame implements Comparable {
                 throw new NullPointerException();
             }
         } else {
-            if (chunk == null) {
-                System.out.println("ops");
-            }
             if (chunk.getHeader().getLltId() < sync) {
                 final ByteString sc = new ByteString();
                 sc.append(chunk.getHeader().getHeader());
                 sc.append(chunk.getChunk());
-                if (!Config.getConfig().SYNC_LOCK_ENABLE) {
-                    snap.put(llt.getId(), sc.getBytes());
-                }
+                if (!Config.getConfig().SYNC_LOCK_ENABLE) { snap.put(llt.getId(), sc.getBytes()); }
                 chunk.getHeader().setLltId(llt == null ? 0 : llt.getId());
-                if (llt != null) {
-                    llt.add(this);
-                }
             }
+            if (llt != null) { llt.add(this); }
             data.removeByPtr(ptr);
         }
     }
