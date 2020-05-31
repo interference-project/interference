@@ -63,8 +63,6 @@ public class DataFile implements Serializable {
     @IndexColumn
     private int nodeId;
     @Column
-    private int remoteId;
-    @Column
     @MgmtColumn(width=70, show=true, form=true, edit=false)
     private String fileName;
     @Column
@@ -75,12 +73,6 @@ public class DataFile implements Serializable {
     private long fileUsed;
     @Column
     private int fileExtAmount;
-    @Column
-    private int remoteMode; //0 - local, 1 - synchronous replication, 2 - asynchronous replication
-    @Column
-    private int persistentMode; //0 - allocate on disk, 1 - allocate in memory with store to disk, 2 - in memory only
-    @Column
-    private int maxMemoryCache; //volume of physical memory cache
 
     @Transient
     public static final int CLASS_ID = 4;
@@ -159,19 +151,13 @@ public class DataFile implements Serializable {
         this.fileName = fileName;
     }
 
-    public DataFile(int type, int nodeId, int remoteId) {
-        this.type     = type;
-        this.nodeId   = nodeId;
-        this.remoteId = remoteId;
-    }
-
     //todo need optimization (redundancy with store frame to disk on change prev-next values of FrameData)
     //causes deadlock by reorder of access:
     //normal order of access - lock datafile, then lock table<framedata>
     //but, in case of allocate undo space this may looks as:
     //lock datafile<undo> - lock table<framedata> - try lock datafile
     //todo deprecated started param
-    public synchronized FrameData createNewFrame(FrameData frame, int frameType, long allocId, boolean started, boolean external, DataObject t, Session s, LLT llt) throws Exception {
+    public synchronized FrameData createNewFrame(FrameData frame, int frameType, long allocId, boolean started, boolean external, Table t, Session s, LLT llt) throws Exception {
         //deadlock bug fix
         //instead this.allocateFrame we lock Table<FrameData> first
         final FrameData bd = t.allocateFrame(this, t, s, llt);
@@ -375,7 +361,7 @@ public class DataFile implements Serializable {
         this.writeFrame(0, this.sframe.getFrame());
     }
 
-    public synchronized FrameData allocateFrame(DataObject t, Session s, LLT llt) throws Exception {
+    public synchronized FrameData allocateFrame(Table t, Session s, LLT llt) throws Exception {
         final int size = t.getFrameSize();
         Metrics.get("reallocateFrame").start();
         if (Instance.getInstance().getSystemState()==Instance.SYSTEM_STATE_UP) {
@@ -494,12 +480,20 @@ public class DataFile implements Serializable {
         s.persist(bd, llt);
     }
 
-    public int getMaxMemoryCache() {
-        return maxMemoryCache;
+    public boolean isData() {
+        return this.type == Storage.DATAFILE_TYPEID;
     }
 
-    public void setMaxMemoryCache(int maxMemoryCache) {
-        this.maxMemoryCache = maxMemoryCache;
+    public boolean isIndex() {
+        return this.type == Storage.INDXFILE_TYPEID;
+    }
+
+    public boolean isUndo() {
+        return this.type == Storage.UNDOFILE_TYPEID;
+    }
+
+    public boolean isTemp() {
+        return this.type == Storage.TEMPFILE_TYPEID;
     }
 
     public int getFileId() {
@@ -520,14 +514,6 @@ public class DataFile implements Serializable {
 
     public void setNodeId(int nodeId) {
         this.nodeId = nodeId;
-    }
-
-    public int getRemoteId() {
-        return remoteId;
-    }
-
-    public void setRemoteId(int remoteId) {
-        this.remoteId = remoteId;
     }
 
     public String getFileName() {
@@ -562,19 +548,4 @@ public class DataFile implements Serializable {
         this.fileExtAmount = fileExtAmount;
     }
 
-    public int getRemoteMode() {
-        return remoteMode;
-    }
-
-    public void setRemoteMode(int remoteMode) {
-        this.remoteMode = remoteMode;
-    }
-
-    public int getPersistentMode() {
-        return persistentMode;
-    }
-
-    public void setPersistentMode(int persistentMode) {
-        this.persistentMode = persistentMode;
-    }
 }

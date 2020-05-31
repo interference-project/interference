@@ -274,7 +274,7 @@ public class Storage {
         return res.toArray(new DataFile[]{});
     }
 
-    public DataFile[] getInitTempFiles() throws ClassNotFoundException, InternalException, InstantiationException, IllegalAccessException {
+    public DataFile[] getInitTempFiles() {
         final List<DataFile> res = new ArrayList<DataFile>();
         if (state == STORAGE_STATE_OPEN) {
             for (Map.Entry e : dfs.entrySet()) {
@@ -306,6 +306,16 @@ public class Storage {
         final List<DataFile> res = new ArrayList<DataFile>();
         for (Map.Entry e : ifs.entrySet()) {
             if (((DataFile)e.getValue()).getType()==INDXFILE_TYPEID) {
+                res.add((DataFile)e.getValue());
+            }
+        }
+        return res.toArray(new DataFile[]{});
+    }
+
+    public DataFile[] getTempFiles () {
+        final List<DataFile> res = new ArrayList<DataFile>();
+        for (Map.Entry e : ifs.entrySet()) {
+            if (((DataFile)e.getValue()).getType()==TEMPFILE_TYPEID) {
                 res.add((DataFile)e.getValue());
             }
         }

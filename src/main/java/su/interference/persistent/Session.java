@@ -387,9 +387,13 @@ public class Session {
     }
 
     public void purge (Object o, LLT llt) throws Exception {
-        final Table t = Instance.getInstance().getTableByName(o.getClass().getName());
-        if (t != null) {
-            t.delete(o, this, llt, true);
+        if (o instanceof EntityContainer) {
+            final Table t = Instance.getInstance().getTableByName(o.getClass().getName());
+            if (t != null) {
+                t.delete(o, this, llt, true);
+            }
+        } else {
+            throw new RuntimeException("Can't purge non-entity object");
         }
         o = null;
     }

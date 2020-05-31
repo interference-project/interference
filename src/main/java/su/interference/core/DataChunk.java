@@ -54,7 +54,7 @@ public class DataChunk implements Chunk {
     private final static Logger logger = LoggerFactory.getLogger(DataChunk.class);
     private final static int INIT_STATE = 1;
     private final static int NORMAL_STATE = 2;
-    private DataObject t;
+    private Table t;
     private Class class_;
     private volatile int state;
     private volatile RowHeader header;
@@ -171,7 +171,7 @@ public class DataChunk implements Chunk {
         this.uc = uc;
     }
 
-    public DataObject getT() {
+    public Table getT() {
         return t;
     }
 
@@ -336,7 +336,7 @@ public class DataChunk implements Chunk {
         this.header = new RowHeader(r, null, getChunk().length, false);
     }
 
-    public DataChunk (byte[] b, int file, long frame, int hsize, DataObject t, Class c) throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
+    public DataChunk (byte[] b, int file, long frame, int hsize, Table t, Class c) throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
         final ByteString bs = new ByteString(b);
         this.t = t;
         this.class_= c;
@@ -347,7 +347,7 @@ public class DataChunk implements Chunk {
     }
 
     //constructor for clone method - de-serialize chunk only without header 
-    public DataChunk (byte[] b, DataObject t, RowHeader h, DataChunk source) throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
+    public DataChunk (byte[] b, Table t, RowHeader h, DataChunk source) throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
         this.chunk  = b;
         this.header = h;
         this.state = INIT_STATE;

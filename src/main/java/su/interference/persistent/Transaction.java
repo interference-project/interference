@@ -431,6 +431,8 @@ public class Transaction implements Serializable {
                 }
                 s.persist(fb); //insert
                 s.delete(cb);
+                t.decFrameAmount();
+                s.persist(t);
             }
         }
     }
