@@ -29,6 +29,6 @@ package su.interference.exception;
  * @since 1.0
  */
 
-public class MissingSyncFrameException extends Exception {
+public class MissingSyncFrameException extends RuntimeException {
 
 }

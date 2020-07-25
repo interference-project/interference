@@ -71,7 +71,7 @@ public class TransportChannel {
             @Override
             public void run() {
                 Socket sock = null;
-                Thread.currentThread().setName("transport channel thread");
+                Thread.currentThread().setName("interference-transport-channel-"+channelId+"-thread");
                 try {
                     try {
                         sock = new Socket();

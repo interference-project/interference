@@ -45,7 +45,7 @@ public class IndexDescript {
     private final Field[]  fields;
     private final boolean  unique;
 
-    public IndexDescript(Table t, String name, String columns, boolean unique) throws ClassNotFoundException, InternalException, MalformedURLException {
+    public IndexDescript(Table t, String name, String columns, boolean unique) throws InternalException {
         this.t = t;
         Field[] tfs = t.getFields();
         StringTokenizer st = new StringTokenizer(columns,",");

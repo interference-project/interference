@@ -29,6 +29,6 @@ package su.interference.exception;
  * @since 1.0
  */
 
-public class NotEnoughFrameSpace extends InternalException {
+public class NotEnoughFrameSpace extends RuntimeException {
     
 }

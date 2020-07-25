@@ -365,6 +365,7 @@ public class Instance implements Interference {
         if (ok) {
 
             logger.info("interference is starting...");
+            Thread.currentThread().setName("interference-main-thread");
             Storage.getStorage().restoreJournal();
             Storage.getStorage().openDataFiles();
             initSystemTable();
@@ -372,7 +373,11 @@ public class Instance implements Interference {
             Storage.getStorage().openStorage(getDataFiles());
             s.persist(Session.getDntmSession());
             for (String cl : Config.getConfig().REGISTER_CLASSES) {
-                s.registerTable(cl, s);
+                try {
+                    s.registerTable(cl, s);
+                } catch (Exception e) {
+                    logger.error("Class registration failed: " + cl, e);
+                }
             }
             TransportContext.getInstance().start();
             startProcesses(s);
@@ -598,7 +603,7 @@ public class Instance implements Interference {
         return null;
     }
 
-    public Chunk getChunkByPointer (long frameId, int ptr) throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, IOException {
+    public Chunk getChunkByPointer (long frameId, int ptr) throws Exception {
         final Table t = getTableByName("su.interference.persistent.FrameData");
         final MapField ixf = t.getMapFieldByColumn("frameId");
         final Map ixl = ixf.getMap();
@@ -749,7 +754,7 @@ public class Instance implements Interference {
         return res;
     }
 
-    private synchronized void initSystemTable () throws InternalException, IOException, NoSuchMethodException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    private synchronized void initSystemTable () throws Exception {
         this.tt = Storage.getStorage().bootstrapLoad();
     }
 

@@ -245,7 +245,7 @@ public class Session {
         if (pt == null) {
             final IndexDescript[] idcs = w.getIndexNames();
             for (IndexDescript ids : idcs) {
-                registerTable("su.interference.persistent."+ids.getName(), s, null, ids.getFields(), w, false);
+                registerTable(Table.SYSTEM_PKG_PREFIX + ids.getName(), s, null, ids.getFields(), w, false);
             }
         }
 
@@ -255,13 +255,24 @@ public class Session {
         return w;
     }
 
+    public Object newEntity (Class c) {
+        final Table t = Instance.getInstance().getTableByName(c.getName());
+        try {
+            final Object o = t.isNoTran() ? t.newInstance() : t.newInstance(this);
+            return o;
+        } catch (Exception e) {
+            logger.error("proxy instantiation fails", e);
+        }
+        return null;
+    }
+
     public Object newEntity (Class c, Object[] params) {
         final Table t = Instance.getInstance().getTableByName(c.getName());
         try {
             final Object o = t.isNoTran() ? t.newInstance(params) : t.newInstance(params, this);
             return o;
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("proxy instantiation fails", e);
         }
         return null;
     }
@@ -274,7 +285,8 @@ public class Session {
         final Table t = Instance.getInstance().getTableByName(c.getName());
         if (t != null) {
             this.startStatement();
-            return t.getChunkById(id, this).getEntity();
+            final DataChunk dc = t.getChunkById(id, this);
+            return dc == null ? null : dc.getEntity();
         }
         return null;
     }
@@ -342,8 +354,7 @@ public class Session {
     }
 
     @Deprecated
-    public Object nfind (Class c, long id)
-            throws InternalException, NoSuchMethodException, InvocationTargetException, IOException, InterruptedException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    public Object nfind (Class c, long id) throws Exception {
         final Table t = Instance.getInstance().getTableByName(c.getName());
         if (t != null) {
             return t.getChunkById(id, this).getEntity();
@@ -352,7 +363,10 @@ public class Session {
     }
 
     public void lock (Object o) throws Exception {
-        ((EntityContainer)o).getDataChunk().lock(this, null);
+        final DataChunk dc = ((EntityContainer)o).getDataChunk();
+        if (dc != null) {
+            dc.lock(this, null);
+        }
     }
 
     public DataChunk persist (Object o) throws Exception {

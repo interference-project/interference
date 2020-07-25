@@ -35,7 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ChunkMap {
     private final ConcurrentHashMap<Integer, Chunk> hmap;
-    private final ConcurrentHashMap<ValueSet, Chunk> imap;
+    private final ConcurrentHashMap<ValueSet, List<Chunk>> imap;
     private final List<Chunk> list;
     private final Frame frame;
     private volatile boolean sorted;
@@ -55,7 +55,10 @@ public class ChunkMap {
     public synchronized void add(Chunk c) {
         hmap.put(c.getHeader().getPtr(), c);
         if (frame instanceof IndexFrame) {
-            imap.put(c.getDcs(), c);
+            if (imap.get(c.getDcs()) == null) {
+                imap.put(c.getDcs(), new ArrayList<>());
+            }
+            imap.get(c.getDcs()).add(c);
         }
         list.add(c);
         sorted = false;
@@ -73,7 +76,8 @@ public class ChunkMap {
         return list.get(i);
     }
 
-    public synchronized Chunk getByKey(ValueSet key) {
+    //for unique indexes
+    public synchronized List<Chunk> getByKey(ValueSet key) {
         return imap.get(key);
     }
 
@@ -81,7 +85,13 @@ public class ChunkMap {
         final boolean x = list.remove(hmap.get(i));
         final Chunk c = (Chunk)hmap.remove(i);
         if (frame instanceof IndexFrame) {
-            imap.remove(c.getDcs());
+            int i_ = 0;
+            for (int i__ = 0; i__ <  imap.get(c.getDcs()).size(); i__++) {
+                if (imap.get(c.getDcs()).get(i__).getHeader().getPtr() == c.getHeader().getPtr()) {
+                    i_ = i__;
+                }
+            }
+            imap.get(c.getDcs()).remove(i_);
         }
         sorted = false;
         if (!x || c == null) {
@@ -94,7 +104,13 @@ public class ChunkMap {
         list.remove(i);
         hmap.remove(c.getHeader().getPtr());
         if (frame instanceof IndexFrame) {
-            imap.remove(c.getDcs());
+            int i_ = 0;
+            for (int i__ = 0; i__ <  imap.get(c.getDcs()).size(); i__++) {
+                if (imap.get(c.getDcs()).get(i__).getHeader().getPtr() == c.getHeader().getPtr()) {
+                    i_ = i__;
+                }
+            }
+            imap.get(c.getDcs()).remove(i_);
         }
         sorted = false;
     }

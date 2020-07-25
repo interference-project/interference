@@ -263,7 +263,7 @@ public class SQLCursor implements FrameIterator {
         Runnable r = new Runnable() {
             @Override
             public void run() {
-                Thread.currentThread().setName("Stream SQL thread "+Thread.currentThread().getId());
+                Thread.currentThread().setName("interference-sql-stream-thread-"+Thread.currentThread().getId());
                 try {
                     final ConcurrentLinkedQueue<Object> q_in = new ConcurrentLinkedQueue<>();
                     FrameGroupTask group = null;
@@ -468,6 +468,7 @@ public class SQLCursor implements FrameIterator {
             Runnable r = new Runnable() {
                 @Override
                 public void run() {
+                    Thread.currentThread().setName("interference-sql-cursor-flush-thread");
                     try {
                         while (hasNextFrame()) {
                             nextFrame();

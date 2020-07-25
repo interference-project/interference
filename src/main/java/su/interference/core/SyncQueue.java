@@ -134,6 +134,7 @@ public class SyncQueue implements Runnable, ManagedProcess {
     }
 
     public void run () {
+        Thread.currentThread().setName("interference-sync-thread");
         while (f) {
             latch = new CountDownLatch(1);
             try {

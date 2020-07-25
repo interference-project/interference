@@ -24,6 +24,7 @@
 
 package su.interference.sql;
 
+import su.interference.persistent.Session;
 import java.util.List;
 
 /**
@@ -32,5 +33,5 @@ import java.util.List;
  */
 
 public interface Finder {
-    List<Object> get(Object key) throws Exception;
+    List<Object> get(Object key, Session s) throws Exception;
 }

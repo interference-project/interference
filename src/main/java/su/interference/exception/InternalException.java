@@ -33,7 +33,7 @@ import su.interference.core.Instance;
  * @since 1.0
  */
 
-public class InternalException extends Exception {
+public class InternalException extends RuntimeException {
 
     private Exception e;
     private final static Logger logger = LoggerFactory.getLogger(InternalException.class);

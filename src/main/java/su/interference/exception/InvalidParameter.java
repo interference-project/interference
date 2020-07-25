@@ -29,6 +29,6 @@ package su.interference.exception;
  * @since 1.0
  */
 
-public class InvalidParameter extends InternalException {
+public class InvalidParameter extends RuntimeException {
 
 }

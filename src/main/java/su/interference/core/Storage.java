@@ -322,7 +322,7 @@ public class Storage {
         return res.toArray(new DataFile[]{});
     }
 
-    public void createSystemDataFiles (Session s, LLT llt) throws NoSuchMethodException, InternalException, IOException, InstantiationException, IllegalAccessException, InvocationTargetException, ClassNotFoundException {
+    public void createSystemDataFiles (Session s, LLT llt) throws Exception {
         for (Map.Entry e : ifs.entrySet()) {
             if (((DataFile)e.getValue()).checkFile()==0) {
                 ((DataFile)e.getValue()).createFile(s, llt);
@@ -330,7 +330,7 @@ public class Storage {
         }
     }
 
-    public void openDataFiles () throws InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException {
+    public void openDataFiles () throws Exception {
         for (Map.Entry e : ifs.entrySet()) {
             if (((DataFile)e.getValue()).checkFile()==1) {
                 ((DataFile)e.getValue()).openFile(Config.getConfig().DISKIO_MODE);
@@ -422,7 +422,7 @@ public class Storage {
         state = STORAGE_STATE_CLOSED;
     }
 
-    public void dropStorage () throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException, NoSuchMethodException {
+    public void dropStorage () throws Exception {
         if (state==STORAGE_STATE_CLOSED) {
             for (Map.Entry e : ifs.entrySet()) {
                 if (((DataFile)e.getValue()).checkFile()==1) {
@@ -522,7 +522,7 @@ public class Storage {
         return res;
     }
 
-    public synchronized Table bootstrapLoad() throws InternalException, IOException, NoSuchMethodException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    public synchronized Table bootstrapLoad() throws Exception {
         Table res = null;
         final IndexList ixl = bootstrapFrameLoad();
         final List<Object> bds = ixl.getObjectsByKey(Table.CLASS_ID);

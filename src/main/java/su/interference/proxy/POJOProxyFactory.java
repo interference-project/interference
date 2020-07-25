@@ -54,6 +54,7 @@ public class POJOProxyFactory {
     private static final URLClassLoader ucl = Instance.getUCL();
     private static final ConcurrentHashMap<String, Class> hmap = new ConcurrentHashMap<String, Class>();
     private static final POJOProxyFactory instance = new POJOProxyFactory();
+    private static final String PROXY_PREFIX = "$P";
     private final static Logger logger = LoggerFactory.getLogger(POJOProxyFactory.class);
 
     private POJOProxyFactory() { }
@@ -105,7 +106,8 @@ public class POJOProxyFactory {
         sb.append("\n");
         sb.append("@Entity\n");
         sb.append("@TransEntity\n");
-        sb.append("public class $W_");
+        sb.append("public class ");
+        sb.append(PROXY_PREFIX);
         sb.append(sname);
         sb.append(" extends ");
         sb.append(sname);
@@ -127,19 +129,22 @@ public class POJOProxyFactory {
         sb.append("    public void setRowId(su.interference.core.RowId r) { rowid = r; }\n");
         sb.append("    public su.interference.core.DataChunk getDataChunk() { return dc; }\n");
         sb.append("    public void setDataChunk(su.interference.core.DataChunk c) { dc = c; }\n");
+        sb.append("    public String toString() { return super.toString(); }\n");
         sb.append("\n");
         for (Constructor<?> ct : cts) {
             Class<?>[] cps = ct.getParameterTypes();
             if (cps.length==0) {
                 //simple constructor
-                sb.append("    public $W_");
+                sb.append("    public ");
+                sb.append(PROXY_PREFIX);
                 sb.append(sname);
                 sb.append(" () {\n");
                 sb.append("    }\n");
                 sb.append("\n");
             } else {
                 //constructor with params
-                sb.append("    public $W_");
+                sb.append("    public ");
+                sb.append(PROXY_PREFIX);
                 sb.append(sname);
                 sb.append(" (");
                 for (int k=0; k<cps.length; k++) {
@@ -328,7 +333,7 @@ public class POJOProxyFactory {
         final JavaCompiler jc = ToolProvider.getSystemJavaCompiler();
         final StandardJavaFileManager fm = jc.getStandardFileManager(null,null,null);
         fm.setLocation(StandardLocation.CLASS_OUTPUT, Arrays.asList(new File(Config.getConfig().DB_PATH)));
-        final SimpleJavaFileObject fo = new JavaSourceFromString(prefix + "$W_"+sname, s.toString());
+        final SimpleJavaFileObject fo = new JavaSourceFromString(prefix + PROXY_PREFIX + sname, s.toString());
         Iterable<? extends JavaFileObject> units = Arrays.asList(fo);
         final DiagnosticCollector<JavaFileObject> dc = new DiagnosticCollector<JavaFileObject>();
         final JavaCompiler.CompilationTask ct = jc.getTask(null,fm,dc,null,null,units);
@@ -345,7 +350,7 @@ public class POJOProxyFactory {
         }
 
 
-        final Class<?> pc = ucl.loadClass(prefix + "$W_"+sname);
+        final Class<?> pc = ucl.loadClass(prefix + PROXY_PREFIX + sname);
         hmap.put(name, pc);
         return pc;
     }
