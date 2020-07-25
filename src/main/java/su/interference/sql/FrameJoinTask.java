@@ -89,7 +89,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
 
     public List<Object> call() throws Exception {
         final Thread thread = Thread.currentThread();
-        thread.setName("SQL join task " + thread.getId());
+        thread.setName("interference-sql-join-task-" + thread.getId());
         final Class r = target instanceof ResultSetImpl ? ((ResultSetImpl)target).getTableClass() : target instanceof StreamQueue ? ((StreamQueue) target).getRstable().getSc() : null;
         final int t1 = bd1.getObjectId();
         final int t2 = bd2==null?0:bd2.getObjectId();
@@ -183,7 +183,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
                     //HashFrame returns null drs
                     if (bd2 != null && bd2.getImpl() == FrameApi.IMPL_HASH) {
                         final Comparable key = getKeyValue(c1, o1, ((SQLHashMapFrame) bd2).getCkey(), s);
-                        final List<Object> o2 = ((SQLHashMapFrame) bd2).get(key);
+                        final List<Object> o2 = ((SQLHashMapFrame) bd2).get(key, s);
                         if (o2 != null) {
                             if (!(o2.get(0) == null && last)) {
                                 Object j = joinDataRecords(r, c1, c2, t1, t2, o1, o2.get(0), cols, c1rs, s);
@@ -198,7 +198,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
                         }
                     } else if (bd2 != null && bd2.getImpl() == FrameApi.IMPL_INDEX) {
                         final Comparable key = getKeyValue(c1, o1, ((SQLIndexFrame) bd2).getLkey(), s);
-                        final List<Object> o2 = ((SQLIndexFrame) bd2).get(key);
+                        final List<Object> o2 = ((SQLIndexFrame) bd2).get(key, s);
                         //todo may cause wrong (cutted) resultsets in non-last cursors for (OR) conditions - see hashmap impl above
                         if (o2 != null) {
                             for (Object o2_ : o2) {

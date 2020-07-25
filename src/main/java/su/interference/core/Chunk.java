@@ -47,9 +47,9 @@ public interface Chunk extends Comparable {
     ValueSet getDcs();
     boolean isTerminate();
     void setTerminate(boolean terminate);
-    Object getEntity() throws ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException;
-    Object getUndoEntity() throws ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException;
-    void updateEntity(Object o) throws InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException, MalformedURLException;
+    Object getEntity();
+    Object getUndoEntity();
+    void updateEntity(Object o) throws InternalException, IllegalAccessException;
     UndoChunk getUndoChunk();
     String getHexByChunk();
 

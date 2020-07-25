@@ -69,11 +69,11 @@ public class ContainerFrame implements FrameApi {
         return FrameApi.IMPL_CONTAINER;
     }
 
-    public ArrayList<Chunk> getFrameChunks(Session s) throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchMethodException {
+    public ArrayList<Chunk> getFrameChunks(Session s) throws Exception {
         return null;
     }
 
-    public ArrayList<Object> getFrameEntities(Session s) throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchMethodException {
+    public ArrayList<Object> getFrameEntities(Session s) throws Exception {
         if (s.isStream()) {
             final ArrayList<Object> res = new ArrayList<>();
             Collections.sort(frames, new FrameOrderComparator());

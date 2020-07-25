@@ -29,6 +29,6 @@ package su.interference.exception;
  * @since 1.0
  */
 
-public class CannotAccessToLockedRecord extends InternalException {
+public class CannotAccessToLockedRecord extends RuntimeException {
     
 }

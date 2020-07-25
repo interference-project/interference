@@ -29,6 +29,6 @@ package su.interference.exception;
  * @since 1.0
  */
 
-public class AccessDenied extends InternalException {
+public class AccessDenied extends RuntimeException {
     
 }

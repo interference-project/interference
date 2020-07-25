@@ -29,6 +29,6 @@ package su.interference.exception;
  * @since 1.0
  */
 
-public class IncorrectUndoChunkFound extends InternalException {
+public class IncorrectUndoChunkFound extends RuntimeException {
 
 }

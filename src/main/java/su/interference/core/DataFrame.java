@@ -32,7 +32,6 @@ import su.interference.exception.*;
 import su.interference.serialize.ByteString;
 
 import java.util.*;
-import java.io.IOException;
 
 /**
  * @author Yuriy Glotanov
@@ -49,7 +48,7 @@ public class DataFrame extends Frame {
         super (bd, t);
     }
 
-    public DataFrame(int file, long pointer, int size, FrameData bd, Table t, Class c) throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
+    public DataFrame(int file, long pointer, int size, FrameData bd, Table t, Class c) throws Exception {
         super(null, file, pointer, size, bd, t, c);
 
         int ptr = FRAME_HEADER_SIZE;

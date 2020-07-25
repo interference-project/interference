@@ -95,7 +95,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @MgmtColumn(width=10, show=true, form=false, edit=false)
     private volatile long allocId; //virtual Id field
     @Column
-    private AtomicLong distribution;
+    private int distribution;
     @Column
     private AtomicInteger current;
     @Column
@@ -117,7 +117,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @Transient
     private long transId; //for UndoChunk: transId
     @Transient
-    private final Map<Long, TransFrame> tcounter = new ConcurrentHashMap<>();
+    private final Map<Long, Map<Long, TransFrame>> tcounter = new ConcurrentHashMap<>();
     @Transient
     private volatile int priority = 2;
     @Transient
@@ -159,7 +159,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         this.dataObject = dataObject;
     }
 
-    public synchronized DataFrame getDataFrame() throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
+    public synchronized DataFrame getDataFrame() throws Exception {
         if (frame == null) {
             this.priority = SystemCleanUp.DATA_RETRIEVED_PRIORITY;
             frame = new DataFrame(this.file,this.ptr,0,this,dataObject,entityClass);
@@ -167,7 +167,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return (DataFrame) frame;
     }
 
-    public IndexFrame getIndexFrame() throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
+    public IndexFrame getIndexFrame() throws Exception {
         if (frame == null) {
             this.priority = SystemCleanUp.INDEX_RETRIEVED_PRIORITY;
             frame = new IndexFrame(this.file,this.ptr,0,this,dataObject,entityClass);
@@ -175,8 +175,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return (IndexFrame) frame;
     }
 
-    public synchronized ArrayList<Chunk> getFrameChunks(Session s)
-            throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException {
+    public synchronized ArrayList<Chunk> getFrameChunks(Session s) throws Exception {
         if (getDataObject().isIndex()) {
             return getIndexFrame().getFrameChunks(s);
         } else {
@@ -184,8 +183,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         }
     }
 
-    public synchronized ArrayList<Object> getFrameEntities(Session s)
-        throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException {
+    public synchronized ArrayList<Object> getFrameEntities(Session s) throws Exception {
         final ArrayList<Object> res = new ArrayList<>();
         for (Chunk c : getFrameChunks(s)) {
             res.add(((DataChunk)c).getEntity());
@@ -193,7 +191,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return res;
     }
 
-    public Frame getFrame() throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException {
+    public Frame getFrame() throws Exception {
         if (frame == null) {
             if (getDataObject().isIndex()) {
                 frame = getIndexFrame();
@@ -232,10 +230,13 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     //skip negative differences for prevent frame oversize when many transactions change data
     public int getFrameUsed() {
         int tdiff = 0;
-        for (Map.Entry<Long, TransFrame> entry : tcounter.entrySet()) {
-            tdiff = tdiff + entry.getValue().getDiff();
+        for (Map.Entry<Long, Map<Long, TransFrame>> entry : tcounter.entrySet()) {
+            for (Map.Entry<Long, TransFrame> entry_ : entry.getValue().entrySet()) {
+                final int tdiff_ = entry_.getValue().getDiff() > 0 ? entry_.getValue().getDiff() : 0;
+                tdiff = tdiff + tdiff_;
+            }
         }
-        return this.getUsed() + (tdiff>0?tdiff:0);
+        return this.getUsed() + tdiff;
     }
 
     //real current non-tran amount of chunk bytes
@@ -246,7 +247,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return frame.getBytesAmount();
     }
 
-    public int getFrameFree() throws ClassNotFoundException, InternalException, InstantiationException, IllegalAccessException {
+    public int getFrameFree() throws InternalException {
         return size - Frame.FRAME_HEADER_SIZE - getFrameUsed();
     }
 
@@ -299,21 +300,21 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return 0;
     }
 
-    public int insertChunk(Chunk c, Session s, boolean check, LLT llt) throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, IOException, NoSuchMethodException, InvocationTargetException {
+    public int insertChunk(Chunk c, Session s, boolean check, LLT llt) throws Exception {
         int p = this.getDataFrame().insertChunk(c, s, check, llt);
         return p;
     }
 
-    public int updateChunk(DataChunk chunk, Object o, Session s, LLT llt) throws ClassNotFoundException, InvocationTargetException, IOException, NoSuchMethodException, InternalException, IllegalAccessException, InstantiationException {
+    public int updateChunk(DataChunk chunk, Object o, Session s, LLT llt) throws Exception {
         return this.getDataFrame().updateChunk(chunk, o, s, llt);
     }
 
-    public void removeChunk(int ptr, Session s, LLT llt) throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, IOException {
-        this.getDataFrame().removeChunk(ptr, llt, false);
+    public void removeChunk(int ptr, Session s, LLT llt) throws Exception {
+        this.getFrame().removeChunk(ptr, llt, false);
     }
 
-    public void deleteChunk(int ptr, Session s, LLT llt) throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, IOException, NoSuchMethodException, InvocationTargetException {
-        this.getDataFrame().deleteChunk(ptr, s, llt);
+    public void deleteChunk(int ptr, Session s, LLT llt) throws Exception {
+        this.getFrame().deleteChunk(ptr, s, llt);
     }
 
     public DataFile getDataFile() {
@@ -427,12 +428,18 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         this.entityClass = entityClass;
     }
 
-    public int getTcounterSize() {
-        return tcounter.size();
+    public int getTcounterSize(long transId) {
+        if (tcounter.get(transId) == null) {
+            return 0;
+        }
+        return 1;
     }
 
     public void increaseTcounter(long id, TransFrame f) {
-        this.tcounter.put(id, f);
+        if (tcounter.get(id) == null) {
+            tcounter.put(id, new ConcurrentHashMap<>());
+        }
+        tcounter.get(id).put(f.getUframeId(), f);
     }
 
     public void decreaseTcounter(long id) {
@@ -461,11 +468,11 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         this.synced = synced;
     }
 
-    public AtomicLong getDistribution() {
+    public int getDistribution() {
         return distribution;
     }
 
-    public void setDistribution(AtomicLong distribution) {
+    public void setDistribution(int distribution) {
         this.distribution = distribution;
     }
 

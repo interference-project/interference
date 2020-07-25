@@ -19,6 +19,7 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
     private static final int CLEANUP_PROTECTION_THR = 1000;
 
     public void run () {
+        Thread.currentThread().setName("interference-cleanup-thread");
         while (f) {
             latch = new CountDownLatch(1);
             try {

@@ -29,6 +29,6 @@ package su.interference.exception;
  * @since 1.0
  */
 
-public class CannotAccessToDeletedRecord extends InternalException {
+public class CannotAccessToDeletedRecord extends RuntimeException {
     
 }

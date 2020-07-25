@@ -282,8 +282,9 @@ public class Transaction implements Serializable {
     }
 
     public synchronized void rollback (Session s, boolean remote) {
-        ArrayList<FrameData> ubd = new ArrayList<FrameData>();
-        ArrayList<Long> fptr = new ArrayList<Long>();
+        final ArrayList<FrameData> ubd1 = new ArrayList<>();
+        final ArrayList<FrameData> ubd2 = new ArrayList<>();
+        final ArrayList<Long> fptr = new ArrayList<>();
         if (remote) {
             try {
                 this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
@@ -303,15 +304,35 @@ public class Transaction implements Serializable {
                 Collections.sort(tframes);
                 for (TransFrame tb : tframes) {
                     final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
-                    if (!ubd.contains(cb)) {
-                        ubd.add(cb);
+                    if (cb.getFrame() instanceof DataFrame) {
+                        if (!ubd1.contains(cb)) {
+                            ubd1.add(cb);
+                        }
+                    }
+                    if (cb.getFrame() instanceof IndexFrame) {
+                        if (!ubd2.contains(cb)) {
+                            ubd2.add(cb);
+                        }
                     }
                 }
-                for (FrameData ub : ubd) {
-                    final ArrayList<FrameData> ubs = new ArrayList<FrameData>();
+                for (FrameData ub : ubd1) {
+                    final ArrayList<FrameData> ubs = new ArrayList<>();
                     for (TransFrame tb : tframes) {
-                        if (ub.getFrameId()==tb.getCframeId()) {
-                            if (tb.getUframeId()>0) {
+                        if (ub.getFrameId() == tb.getCframeId()) {
+                            if (tb.getUframeId() > 0) {
+                                final FrameData ubb = Instance.getInstance().getFrameById(tb.getUframeId());
+                                ubs.add(ubb);
+                            }
+                        }
+                    }
+
+                    ub.getFrame().rollbackTransaction(this, ubs, s);
+                }
+                for (FrameData ub : ubd2) {
+                    final ArrayList<FrameData> ubs = new ArrayList<>();
+                    for (TransFrame tb : tframes) {
+                        if (ub.getFrameId() == tb.getCframeId()) {
+                            if (tb.getUframeId() > 0) {
                                 final FrameData ubb = Instance.getInstance().getFrameById(tb.getUframeId());
                                 ubs.add(ubb);
                             }
@@ -412,10 +433,10 @@ public class Transaction implements Serializable {
         final Table t = Instance.getInstance().getTableById(cb.getObjectId());
         if (!t.checkLBS(cb)) { //LB can't deallocated!!! May be empty
             //check for other transactions, which locked this frame
-            if (cb.getTcounterSize() == 0) {
+            if (cb.getTcounterSize(this.transId) == 0) {
                 throw new RuntimeException("Zero tcounter in transactional frame");
             }
-            if (cb.getTcounterSize() == 1) {
+            if (cb.getTcounterSize(this.transId) == 1) {
                 final FreeFrame fb = new FreeFrame(0, cb.getFrameId(), cb.getSize());
                 final FrameData pb = cb.getPrevFrameId()>0 ? Instance.getInstance().getFrameById(cb.getPrevFrameId()) : null;
                 final FrameData nb = Instance.getInstance().getFrameById(cb.getNextFrameId());
@@ -494,7 +515,7 @@ public class Transaction implements Serializable {
         }
     }
 
-    public void storeFrame (final FrameData cb, final FrameData ub, final int len, final Session s, LLT llt) {
+    protected void storeFrame (final FrameData cb, final FrameData ub, final int len, final Session s, LLT llt) {
         final long uframeid = ub==null?0:ub.getFrameId();
         final TransFrame tb = Instance.getInstance().getTransFrameById(this.transId, cb.getFrameId(), uframeid);
 
@@ -535,7 +556,7 @@ public class Transaction implements Serializable {
         return getNodeId() == Config.getConfig().LOCAL_NODE_ID;
     }
 
-    public void storeFrame (FrameData cb, int len, Session s, LLT llt) {
+    protected void storeFrame (FrameData cb, int len, Session s, LLT llt) {
         storeFrame (cb, null, len, s, llt);
     }
 

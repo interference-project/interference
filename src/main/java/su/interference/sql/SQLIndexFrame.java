@@ -73,13 +73,13 @@ public class SQLIndexFrame implements FrameApi, Finder {
         return FrameApi.IMPL_INDEX;
     }
 
-    public List<Object> get(Object key) throws Exception {
+    public List<Object> get(Object key, Session s) throws Exception {
         List<Object> res = new ArrayList<>();
         if (!left&&unique) {
-            res.add(t.getObjectByKey(new ValueSet(key)));
+            res.add(t.getObjectByKey(new ValueSet(key), s));
             return res;
         } else if (!left) {
-            res.addAll(t.getObjectsByKey(new ValueSet(key)));
+            res.addAll(t.getObjectsByKey(new ValueSet(key), s));
             return res;
         }
         return null;
@@ -105,13 +105,12 @@ public class SQLIndexFrame implements FrameApi, Finder {
         return null;
     }
 
-    public ArrayList<Object> getFrameEntities(Session s)
-            throws IOException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException, InvocationTargetException, NoSuchMethodException {
+    public ArrayList<Object> getFrameEntities(Session s) throws Exception {
         //todo wrong condition???
         if (vc != null && (vc.getCondition() == Condition.C_EQUAL || vc.getCondition() == Condition.C_IN)) {
             ArrayList<Object> res = new ArrayList<Object>();
             for (Object o : vc.getValues()) {
-                for (Chunk c : t.getObjectsByKey(new ValueSet(o))) {
+                for (Chunk c : t.getObjectsByKey(new ValueSet(o), s)) {
                     res.add(c.getEntity());
                 }
             }

@@ -56,6 +56,7 @@ public class TransportSyncTask implements Runnable {
     }
 
     public void run () {
+        Thread.currentThread().setName("interference-transport-sync-thread");
 
         final SyncFrame[] sb = frames.stream().filter(b -> b.isAllowR()).collect(Collectors.toList()).toArray(new SyncFrame[]{});
         try {

@@ -31,8 +31,6 @@ import su.interference.persistent.Session;
 import su.interference.serialize.ByteString;
 
 import java.util.*;
-import java.io.IOException;
-import java.net.MalformedURLException;
 
 /**
  * @author Yuriy Glotanov
@@ -57,7 +55,7 @@ public class IndexFrame extends Frame {
         this.setType(frameType);
     }
 
-    public IndexFrame(int file, long pointer, int size, FrameData bd, Table t, Class c) throws IOException, InvalidFrameHeader, InvalidFrame, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
+    public IndexFrame(int file, long pointer, int size, FrameData bd, Table t, Class c) throws Exception {
         super(null, file, pointer, size, bd, t, c);
         int ptr = FRAME_HEADER_SIZE;
         final ByteString bs = new ByteString(this.b);
@@ -84,7 +82,7 @@ public class IndexFrame extends Frame {
     }
 
     //constructor for replication service
-    public IndexFrame(byte[] b, int file, long pointer, HashMap<Long, Long> imap, HashMap<Long, Long> hmap, Table t) throws IOException, InvalidFrameHeader, InvalidFrame, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
+    public IndexFrame(byte[] b, int file, long pointer, HashMap<Long, Long> imap, HashMap<Long, Long> hmap, Table t) {
         super(b, file, pointer, t);
         int ptr = FRAME_HEADER_SIZE;
         final ByteString bs = new ByteString(this.b);
@@ -138,7 +136,7 @@ public class IndexFrame extends Frame {
                     this.sort();
                     while (inl>0) {
                         inl = inl - this.data.get(this.data.size()-1).getBytesAmount();
-                        res.insertChunk(this.data.get(this.data.size()-1), s, false, llt);
+                        res.insertChunk(this.data.get(this.data.size()-1), s, false, true, llt);
                         this.data.remove(this.data.size()-1);
                     }
                     this.setHasMV(1);
@@ -174,7 +172,7 @@ public class IndexFrame extends Frame {
                             keyrpt = false;
                         }
                         if (this.getFrameSize()-resamt>this.data.get(i).getBytesAmount()&&(keyrpt||((DataChunk)this.data.get(i)).getDcs().compareTo(max2)<0)) {
-                            res.insertChunk(this.data.get(i), s, false, llt);
+                            res.insertChunk(this.data.get(i), s, false, true, llt);
                             resamt = resamt + this.data.get(i).getBytesAmount();
                             res.setHasMV(1);
                         } else {
@@ -186,7 +184,7 @@ public class IndexFrame extends Frame {
                     }
                     this.data.clear();
                     for (DataChunk c : nlist) {
-                        this.insertChunk(c, s, false, llt);
+                        this.insertChunk(c, s, false, true, llt);
                     }
                 }
             }
@@ -207,7 +205,7 @@ public class IndexFrame extends Frame {
         return false;
     }
 
-    public ValueSet sort() throws ClassNotFoundException, IllegalAccessException, InternalException, MalformedURLException {
+    public ValueSet sort() throws InternalException {
         if (!this.data.isSorted()) {
             this.data.sort();
         }
@@ -221,7 +219,7 @@ public class IndexFrame extends Frame {
 
     //accepted only to node element lists
     //for unique indexes
-    public DataChunk getChildElementPtr(ValueSet value) throws ClassNotFoundException, IllegalAccessException, InternalException, MalformedURLException {
+    public DataChunk getChildElementPtr(ValueSet value) throws InternalException {
         //todo if (!this.sorted) {
             this.sort();
         //}
@@ -235,7 +233,7 @@ public class IndexFrame extends Frame {
 
     //accepted only to node element lists
     //for non-unique indexes
-    public synchronized ArrayList<Long> getChildElementsPtr(ValueSet value) throws ClassNotFoundException, IllegalAccessException, InternalException, MalformedURLException {
+    public synchronized ArrayList<Long> getChildElementsPtr(ValueSet value) throws InternalException {
         //todo if (!this.sorted) {
             this.sort();
         //}
@@ -257,30 +255,69 @@ public class IndexFrame extends Frame {
     }
 
     //return first element which found - for unique indexes
-    public DataChunk getObjectByKey(ValueSet key) {
-/*
-        for (Chunk ie : this.data.getChunks()) {
-            if (((DataChunk)ie).getDcs().equals(key)) {
-                return (DataChunk)ie;
+    public DataChunk getObjectByKey(ValueSet key, Session s) {
+        if (this.data.getByKey(key) == null) {
+            return null;
+        }
+        for (Chunk c : this.data.getByKey(key)) {
+            final DataChunk dc = (DataChunk) c;
+            final long tr = s.getTransaction().getTransId();
+            final long mtran = s.getTransaction().getMTran();
+            if (dc.getHeader().getState() == Header.RECORD_NORMAL_STATE) {
+                if (dc.getUndoChunk() != null && dc.getHeader().getTran().getCid() == 0) { //updated chunk in live transaction
+                    return dc;
+                } else {
+                    if (dc.getHeader().getTran() == null) {
+                        return dc;
+                    } else {
+                        if ((tr == dc.getHeader().getTran().getTransId()) || (dc.getHeader().getTran().getCid() > 0 && dc.getHeader().getTran().getCid() <= mtran)) {
+                            return dc;
+                        }
+                    }
+                }
+            }
+            if (dc.getHeader().getState() == Header.RECORD_DELETED_STATE) {
+                if (dc.getHeader().getTran() != null) {
+                    if ((tr != dc.getHeader().getTran().getTransId()) && (dc.getHeader().getTran().getCid() == 0 || dc.getHeader().getTran().getCid() > mtran)) {
+                        return dc;
+                    }
+                }
             }
         }
         return null;
-*/
-        return (DataChunk) this.data.getByKey(key);
     }
 
     //return all element which found - for non-unique indexes
-    public synchronized List<DataChunk> getObjectsByKey(ValueSet key) throws ClassNotFoundException, IllegalAccessException, InternalException, MalformedURLException {
-        ArrayList<DataChunk> r = new ArrayList<DataChunk>();
+    public synchronized List<DataChunk> getObjectsByKey(ValueSet key, Session s) throws InternalException {
+        final List<DataChunk> r = new ArrayList<>();
+        final long tr = s.getTransaction().getTransId();
+        final long mtran = s.getTransaction().getMTran();
         for (Chunk ie : this.data.getChunks()) {
             if (((DataChunk)ie).getDcs().equals(key)) {
-                r.add((DataChunk)ie);
+                if (((DataChunk)ie).getHeader().getState() == Header.RECORD_NORMAL_STATE) {
+                    if (((DataChunk) ie).getUndoChunk() != null && ((DataChunk) ie).getHeader().getTran().getCid() == 0) { //updated chunk in live transaction
+                        if (((DataChunk) ie).getHeader().getTran() == null) {
+                            r.add((DataChunk) ie);
+                        } else {
+                            if ((tr == ((DataChunk) ie).getHeader().getTran().getTransId()) || (((DataChunk) ie).getHeader().getTran().getCid() > 0 && ((DataChunk) ie).getHeader().getTran().getCid() <= mtran)) {
+                                r.add((DataChunk) ie);
+                            }
+                        }
+                    }
+                }
+                if (((DataChunk)ie).getHeader().getState() == Header.RECORD_DELETED_STATE) {
+                    if (((DataChunk)ie).getHeader().getTran()!=null) {
+                        if ((tr != ((DataChunk)ie).getHeader().getTran().getTransId()) && (((DataChunk)ie).getHeader().getTran().getCid() == 0 || ((DataChunk)ie).getHeader().getTran().getCid() > mtran)) {
+                            r.add((DataChunk)ie);
+                        }
+                    }
+                }
             }
         }
         return r;
     }
 
-    public synchronized int removeObjects(ValueSet key, Object o) throws ClassNotFoundException, IllegalAccessException, InternalException, MalformedURLException {
+    public synchronized int removeObjects(ValueSet key, Object o) throws InternalException {
         int len = 0;
         ArrayList<Integer> d = new ArrayList<Integer>();
         for (int i=0; i<this.data.size(); i++) {
@@ -296,7 +333,7 @@ public class IndexFrame extends Frame {
         return len;
     }
 
-    public ValueSet getMaxValue() throws ClassNotFoundException, IllegalAccessException, InternalException, MalformedURLException {
+    public ValueSet getMaxValue() throws InternalException {
         this.sort();
         return ((DataChunk)this.data.get(this.data.size()-1)).getDcs();
     }

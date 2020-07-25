@@ -72,7 +72,7 @@ public class TransportContext implements TransportApi {
         pool.submit(new Runnable() {
             @Override
             public void run() {
-                Thread.currentThread().setName("transport context thread");
+                Thread.currentThread().setName("interference-transport-context-thread");
                 boolean started_ = true;
                 while (started_) {
                     final TransportEvent transportEvent = mq.peek();

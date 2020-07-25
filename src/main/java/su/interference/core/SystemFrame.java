@@ -54,7 +54,7 @@ public class SystemFrame extends Frame {
         this.setColStartFrame(size*2);
     }
 
-    public SystemFrame(byte[] b, int file, long pointer) throws IOException, NoSuchMethodException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
+    public SystemFrame(byte[] b, int file, long pointer) throws Exception {
         super (b, file, pointer, 0, null, null, null) ;
         int ptr = FRAME_HEADER_SIZE;
         final ByteString bs = new ByteString(this.b);

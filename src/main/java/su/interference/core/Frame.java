@@ -35,8 +35,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 
 /**
  * @author Yuriy Glotanov
@@ -108,11 +106,11 @@ public class Frame implements Comparable {
         return entityClass;
     }
 
-    public Frame(int file, long pointer, int size, Table t) throws InternalException {
+    public Frame(int file, long pointer, int size, Table t) {
         this.file       = file;
         this.pointer    = pointer;
-        this.allocFile  = 0;
-        this.allocPointer = 0;
+        this.allocFile  = file;
+        this.allocPointer = pointer;
         this.rowCntr    = 1;
         this.dataObject = t;
         this.frameSize    = size;
@@ -124,7 +122,7 @@ public class Frame implements Comparable {
         }
     }
 
-    public Frame(FrameData bd, Table t) throws InternalException {
+    public Frame(FrameData bd, Table t) {
         this.file         = bd.getFile();
         this.pointer      = bd.getPtr();
         this.allocFile    = (int)bd.getAllocId()%4096;
@@ -142,7 +140,7 @@ public class Frame implements Comparable {
     }
 
     //constructor for retrieve frame from journal file
-    public Frame(byte[] b) throws InternalException {
+    public Frame(byte[] b) {
         if (b.length<FRAME_HEADER_SIZE) {
             throw new InvalidFrameHeader();
         }
@@ -187,7 +185,7 @@ public class Frame implements Comparable {
     }
 
     //constructor for replication service
-    public Frame(byte[] b, int file, long pointer, Table t) throws InternalException {
+    public Frame(byte[] b, int file, long pointer, Table t) {
         this.dataObject = t;
         if (b.length<FRAME_HEADER_SIZE) {
             throw new InvalidFrameHeader();
@@ -232,7 +230,7 @@ public class Frame implements Comparable {
         }
     }
 
-    public Frame(byte[] bb, int file, long pointer, int size, FrameData bd, Table t, Class c) throws IOException, InternalException, ClassNotFoundException, IllegalAccessException, InstantiationException {
+    public Frame(byte[] bb, int file, long pointer, int size, FrameData bd, Table t, Class c) throws Exception {
         entityClass = c;
         dataObject = t;
         if (bd!=null) { //system frame not used dataobject
@@ -394,8 +392,12 @@ public class Frame implements Comparable {
 
     //insert method for new chunks without header
     public synchronized int insertChunk (Chunk c, Session s, boolean check, LLT llt) {
-        final Transaction tran = s.getTransaction();
+        return insertChunk(c, s, check, false, llt);
+    }
 
+    //insert method for new chunks without header
+    public synchronized int insertChunk (Chunk c, Session s, boolean check, boolean notran, LLT llt) {
+        final Transaction tran = s.getTransaction();
         final int ptr = this.getRowCntr();
 
         //todo need fix timelapse bomb, need some row pointers recycle
@@ -410,7 +412,9 @@ public class Frame implements Comparable {
                 this.setRowCntr(ptr+1);
                 c.getHeader().setRowID(new RowId(this.getFile(), this.getPointer(), ptr));
                 c.getHeader().setPtr(ptr);
-                c.getHeader().setTran(tran);
+                if (!notran) {
+                    c.getHeader().setTran(tran);
+                }
                 c.getHeader().setLltId(llt==null?0:llt.getId());
                 if (llt != null) { llt.add(this); }
                 data.add(c);
@@ -422,7 +426,9 @@ public class Frame implements Comparable {
             this.setRowCntr(ptr+1);
             c.getHeader().setRowID(new RowId(this.getFile(), this.getPointer(), ptr));
             c.getHeader().setPtr(ptr);
-            c.getHeader().setTran(tran);
+            if (!notran) {
+                c.getHeader().setTran(tran);
+            }
             c.getHeader().setLltId(llt==null?0:llt.getId());
             if (llt!=null) { llt.add(this); }
             data.add(c);
@@ -431,7 +437,8 @@ public class Frame implements Comparable {
 
     }
 
-    public synchronized int updateChunk(DataChunk chunk, Object o, Session s, LLT llt) throws ClassNotFoundException, InvocationTargetException, IOException, NoSuchMethodException, InternalException, IllegalAccessException, InstantiationException {
+    public synchronized int updateChunk(DataChunk chunk, Object o, Session s, LLT llt) throws Exception {
+        final Transaction tran = s.getTransaction();
         final long sync = LLT.getSyncId();
         if (chunk.getHeader().getLltId() < sync) {
             final ByteString sc = new ByteString();
@@ -447,16 +454,25 @@ public class Frame implements Comparable {
         chunk.setNormalState();
         final byte[] ncb = chunk.getChunk();
         chunk.getHeader().setLen(ncb.length);
+        chunk.getHeader().setTran(tran);
         final int newlen = chunk.getBytesAmount();
         return newlen;
     }
 
-    public synchronized void deleteChunk (int ptr, Session s, LLT llt) throws CannotAccessToLockedRecord, CannotAccessToDeletedRecord {
+    public synchronized void deleteChunk (int ptr, Session s, LLT llt) {
+        if (!this.isLocal()) {
+            throw new CannotAccessToForeignRecord();
+        }
+        final Transaction tran = s.getTransaction();
         final long sync = LLT.getSyncId();
-        final Chunk chunk = getChunkByPtr(ptr);
-        if (chunk==null) { throw new CannotAccessToDeletedRecord(); }
+        final Chunk chunk = data.getByPtr(ptr);
+        if (chunk == null) {
+            throw new CannotAccessToDeletedRecord();
+        }
         final Header header = chunk.getHeader();
-        if (header.getState()==Header.RECORD_LOCKED_STATE) { throw new CannotAccessToLockedRecord(); }
+        if (header.getState() == Header.RECORD_LOCKED_STATE) {
+            throw new CannotAccessToLockedRecord();
+        }
         if (header.getLltId() < sync) {
             final ByteString sc = new ByteString();
             sc.append(chunk.getHeader().getHeader());
@@ -464,6 +480,7 @@ public class Frame implements Comparable {
             if (!Config.getConfig().SYNC_LOCK_ENABLE) { snap.put(llt.getId(), sc.getBytes()); }
             header.setLltId(llt==null?0:llt.getId());
         }
+        header.setTran(tran);
         if (llt!=null) { llt.add(this); }
         header.setState(Header.RECORD_DELETED_STATE);
     }
@@ -472,16 +489,15 @@ public class Frame implements Comparable {
         return data.getChunks();
     }
 
-    public Chunk getChunkByPtr(int ptr) {
-        return data.getByPtr(ptr);
-    }
-
     public synchronized void removeChunk (int ptr, LLT llt, boolean ignore) {
+        if (!this.isLocal()) {
+            throw new CannotAccessToForeignRecord();
+        }
         final long sync = LLT.getSyncId();
         final Chunk chunk = data.getByPtr(ptr);
         if (chunk == null) {
             if (!ignore) {
-                throw new NullPointerException();
+                throw new CannotAccessToDeletedRecord();
             }
         } else {
             if (chunk.getHeader().getLltId() < sync) {
@@ -497,7 +513,7 @@ public class Frame implements Comparable {
     }
 
     //returns all actual records
-    public synchronized ArrayList<Chunk> getFrameChunks (Session s) throws IOException, ClassNotFoundException {
+    public synchronized ArrayList<Chunk> getFrameChunks (Session s) {
         final ArrayList<Chunk> res = new ArrayList<Chunk>();
 
         if (dataObject==null) {
@@ -508,7 +524,7 @@ public class Frame implements Comparable {
             final int streamptr = s.isStream() ? s.streamFramePtr(this) : 0;
 
             for (Chunk c : data.getChunks()) {
-                if (c.getHeader().getState()==Header.RECORD_NORMAL_STATE) {
+                if (c.getHeader().getState() == Header.RECORD_NORMAL_STATE) {
                     if (c.getHeader().getPtr() >= streamptr) {
                         res.add(c);
                     }
@@ -528,53 +544,32 @@ public class Frame implements Comparable {
             for (Chunk c : data.getChunks()) {
                 Header h = c.getHeader();
                 if (h.getState()==Header.RECORD_NORMAL_STATE) {
-                    if (c.getUndoChunk()!=null) { //updated chunk
+                    if (c.getUndoChunk() != null && c.getHeader().getTran().getCid() == 0) { //updated chunk in live transaction
                         res.add(c);
                     } else {
-                        if (h.getTran()==null) {
+                        if (h.getTran() == null) {
                             res.add(c);
                         } else {
-                            if ((tr==h.getTran().getTransId())||(h.getTran().getCid()>0&&h.getTran().getCid()<=mtran)) {
+                            if ((tr == h.getTran().getTransId()) || (h.getTran().getCid() > 0 && h.getTran().getCid() <= mtran)) {
                                 res.add(c);
+                            } else {
+                                System.out.println("ooooops!!!");
                             }
                         }
                     }
                 }
-                if (h.getState()==Header.RECORD_DELETED_STATE) {
+                if (h.getState() == Header.RECORD_DELETED_STATE) {
                     if (h.getTran()!=null) {
-                        if ((tr!=h.getTran().getTransId())&&(h.getTran().getCid()==0||h.getTran().getCid()>mtran)) {
-                            res.add(c);
-                        }
-                    }
-                }
-            }
-/*
-        } else {
-            // read frame records
-            for (Chunk c : data.getChunks()) {
-                Header h = c.getHeader();
-                if (h.getState()==Header.RECORD_NORMAL_STATE) {
-                    if (c.getUndoChunk()!=null) { //updated chunk
-                        res.add(c);
-                    } else {
-                        if (h.getTran()==null) {
+                        if ((tr != h.getTran().getTransId()) && (h.getTran().getCid() == 0 || h.getTran().getCid() > mtran)) {
                             res.add(c);
                         } else {
-                            if (h.getTran().getTransType()>=Transaction.TRAN_THR) {
-                                res.add(c);
-                            }
+                            System.out.println("ooooops!!!");
                         }
-                    }
-                }
-                if (h.getState()==Header.RECORD_DELETED_STATE) {
-                    if (h.getTran()!=null) {
-                        if (h.getTran().getTransType()<Transaction.TRAN_THR) {
-                            res.add(c);
-                        }
+                    } else {
+                        System.out.println("ooooops!!!");
                     }
                 }
             }
-*/
         }
 
         return res;
@@ -582,16 +577,15 @@ public class Frame implements Comparable {
 
     public synchronized void rollbackTransaction(Transaction tran, ArrayList<FrameData> ubs, Session s) throws InterruptedException {
         //rollback inserted records
-        final ArrayList<Integer> r = new ArrayList<Integer>();
+        final ArrayList<Integer> r = new ArrayList<>();
         for (Chunk c : data.getChunks()) {
-            if (c.getHeader().getTran().getTransId()==tran.getTransId()) {
-//                data.remove(entry.getKey());
+            if (c.getHeader().getTran().getTransId() == tran.getTransId()) {
+                ((DataChunk) c).setUndoChunk(null);
                 r.add(c.getHeader().getPtr());
             }
         }
         for (Integer i : r) {
             data.removeByPtr(i);
-            //logger.debug("remove data "+this.file+" "+this.pointer+" "+i);
         }
 
         //rollback deleted & updated records
@@ -601,10 +595,8 @@ public class Frame implements Comparable {
                     for (Chunk c : ub.getDataFrame().getChunks()) {
                         final UndoChunk uc = (UndoChunk)c.getEntity();
                         final long frameptr = uc.getDataChunk().getHeader().getRowID().getFramePointer();
-                        //final int rowptr = uc.getDataChunk().getHeader().getRowID().getRowPointer();
                         if (uc.getTransId() == tran.getTransId() && uc.getFile() == this.file && frameptr == this.pointer) {
                             data.add(uc.getDataChunk().restore(this, s));
-                            //logger.info("cb "+this.file+" "+this.pointer+" ub "+ub.getFile()+" "+ub.getPtr()+" restored "+uc.getDataChunk().getHeader().getRowID().getFileId()+" "+uc.getDataChunk().getHeader().getRowID().getFramePointer()+" "+uc.getDataChunk().getHeader().getRowID().getRowPointer()+" : "+uc.getFile()+" "+uc.getFrame()+" "+uc.getPtr());
                         }
                     }
                 }

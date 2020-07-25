@@ -29,6 +29,6 @@ package su.interference.exception;
  * @since 1.0
  */
 
-public class EmptyFrameHeaderFound extends InternalException {
+public class EmptyFrameHeaderFound extends RuntimeException {
 
 }

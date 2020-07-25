@@ -29,6 +29,6 @@ package su.interference.exception;
  * @since 1.0
  */
 
-public class InvalidFrame extends InternalException {
+public class InvalidFrame extends RuntimeException {
 
 }

@@ -65,6 +65,9 @@ public class RowHeader implements Header, Comparable {
         setLen(rh.getLen());
         setPtr(rh.getPtr());
         setRes(rh.getRes());
+        if (rh.framePtr != null) {
+            setFramePtr(new RowId(rh.framePtr.getFileId(), rh.framePtr.getFramePointer(), rh.framePtr.getRowPointer()));
+        }
         setRowID(new RowId(rh.getRowID().getFileId(), rh.getRowID().getFramePointer(), rh.getRowID().getRowPointer()));
     }
 

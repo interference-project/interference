@@ -56,7 +56,7 @@ public class SQLHashMapFrame implements FrameApi, Finder {
         return FrameApi.IMPL_HASH;
     }
 
-    public List<Object> get(Object key) {
+    public List<Object> get(Object key, Session s) {
         return Arrays.asList(new Object[]{hmap.get(key)});
     }
 

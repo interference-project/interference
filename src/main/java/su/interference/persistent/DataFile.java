@@ -251,7 +251,7 @@ public class DataFile implements Serializable {
     // 1 - file OK
     // 2 - System versions don't match
     // 3 - SystemFrame corrupt or parameters don't match
-    public synchronized int checkFile() throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, NoSuchMethodException {
+    public synchronized int checkFile() throws Exception {
         try {
             this.file = new RandomAccessFile(this.fileName,"r");
             byte[] b = new byte[SYSTEM_FRAME_SIZE];
@@ -390,6 +390,7 @@ public class DataFile implements Serializable {
         final FrameData bd = new FrameData(this.getFileId(), ptr, size, t);
         // t should be updated mandatory during createFrame
         bd.setFrameOrder(t.getFrameOrder(s, llt));
+        bd.setDistribution(t.isDistributed() ? 0 : Config.getConfig().LOCAL_NODE_ID);
         Metrics.get("allocateFrame").stop();
         return bd;
     }

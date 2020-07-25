@@ -74,13 +74,13 @@ public class SQLIndex implements FrameIterator, Finder {
         this.vc = nc.getIndexVC(this, t);
     }
 
-    public List<Object> get(Object key) throws Exception {
+    public List<Object> get(Object key, Session s) throws Exception {
         List<Object> res = new ArrayList<>();
         if (!left&&unique) {
-            res.add(t.getObjectByKey(new ValueSet(key)));
+            res.add(t.getObjectByKey(new ValueSet(key), s));
             return res;
         } else if (!left) {
-            res.addAll(t.getObjectsByKey(new ValueSet(key)));
+            res.addAll(t.getObjectsByKey(new ValueSet(key), s));
             return res;
         }
         return null;
