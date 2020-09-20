@@ -200,11 +200,12 @@ public class CustomSerializer implements SerializerApi {
                 case ("[B"):
                     return substring(b, 1, b.length);
                 case ("su.interference.core.DataChunk"):
-                    Table to = Instance.getInstance().getTableById(getIntFromBytes(substring(b, 1, 5)));
-                    int file = getIntFromBytes(substring(b, 5, 9));
-                    long frame = getLongFromBytes(substring(b, 9, 17));
-                    RowHeader h = new RowHeader(substring(b, 17, 33), file, frame);
-                    return new DataChunk(substring(b, 33, b.length), to, h, null);
+                    final Table to = Instance.getInstance().getTableById(getIntFromBytes(substring(b, 1, 5)));
+                    final int file = getIntFromBytes(substring(b, 5, 9));
+                    final long frame = getLongFromBytes(substring(b, 9, 17));
+                    final int endpos = to.isIndex() ? 49 : 33;
+                    final RowHeader h = new RowHeader(substring(b, 17, endpos), file, frame);
+                    return new DataChunk(substring(b, endpos, b.length), to, h, null);
             }
         } else {
             switch (t) {

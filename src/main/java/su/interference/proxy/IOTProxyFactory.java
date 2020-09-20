@@ -95,8 +95,20 @@ public class IOTProxyFactory {
         sb.append("    @Transient\n");
         sb.append("    public su.interference.core.RowId rowid;\n");
         sb.append("    @Transient\n");
+        sb.append("    public su.interference.core.RowId framePtrRowId;\n");
+        sb.append("    @Transient\n");
         sb.append("    public su.interference.core.DataChunk dc;\n");
-        sb.append("    public su.interference.core.DataChunk getDataChunk() { return dc; }\n");
+        sb.append("    public su.interference.core.DataChunk getDataChunk() {\n");
+        sb.append("        if (dc == null) {\n");
+        sb.append("            final long framePtr = framePtrRowId.getFileId() + framePtrRowId.getFramePointer();\n");
+        sb.append("            try {\n");
+        sb.append("                dc = (su.interference.core.DataChunk) su.interference.core.Instance.getInstance().getChunkByPointer(framePtr, framePtrRowId.getRowPointer());\n");
+        sb.append("            } catch (java.lang.Exception e) {\n");
+        sb.append("                throw new java.lang.RuntimeException(e);\n");
+        sb.append("            }\n");
+        sb.append("        }\n");
+        sb.append("        return dc;\n");
+        sb.append("    }\n");
         sb.append("    public boolean getReceived() { return received; }\n");
         sb.append("    public void setReceived(boolean received) { this.received = received; }\n");
         sb.append("    public void setDataChunk(su.interference.core.DataChunk c) { dc = c; }\n");
@@ -104,6 +116,8 @@ public class IOTProxyFactory {
         sb.append("    public void setTran(Transaction t) { tran = t; }\n");
         sb.append("    public su.interference.core.RowId getRowId() { return rowid; }\n");
         sb.append("    public void setRowId(su.interference.core.RowId r) { rowid = r; }\n");
+        sb.append("    public su.interference.core.RowId getFramePtrRowId() { return framePtrRowId; }\n");
+        sb.append("    public void setFramePtrRowId(su.interference.core.RowId r) { framePtrRowId = r; }\n");
         sb.append("\n");
 
         for (int i=0; i<cs.length; i++) {
@@ -122,7 +136,8 @@ public class IOTProxyFactory {
         sb.append(sname);
         sb.append(" (su.interference.core.DataChunk dc, su.interference.persistent.Session s) {\n");
         sb.append("        this.dc = dc;\n");
-        sb.append("        ");
+        sb.append("        this.framePtrRowId = dc.getHeader().getRowID();\n");
+        sb.append("        final ");
         sb.append(pname);
         sb.append(" o = (");
         sb.append(pname);

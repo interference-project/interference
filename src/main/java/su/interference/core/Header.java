@@ -33,9 +33,9 @@ import su.interference.persistent.Transaction;
 
 public interface Header {
 
-    public static final int RECORD_NORMAL_STATE  = 1;
-    public static final int RECORD_LOCKED_STATE  = 2;
-    public static final int RECORD_DELETED_STATE = 3;
+    int RECORD_NORMAL_STATE  = 1;
+    int RECORD_UPDATED_STATE  = 2;
+    int RECORD_DELETED_STATE = 3;
 
     Transaction getTran ();
     int getState();

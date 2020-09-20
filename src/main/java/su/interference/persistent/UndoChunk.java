@@ -53,13 +53,13 @@ public class UndoChunk implements FilePartitioned {
     private long transId;
     @Column
     @MgmtColumn(width=10, show=true, form=false, edit=false)
-    private int  file;
+    private int file;
     @Column
     @MgmtColumn(width=10, show=true, form=false, edit=false)
     private long frame;
     @Column
     @MgmtColumn(width=10, show=true, form=false, edit=false)
-    private int  ptr;
+    private int ptr;
     @Column
     private DataChunk dataChunk;
     @Id

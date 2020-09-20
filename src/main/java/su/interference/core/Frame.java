@@ -453,6 +453,7 @@ public class Frame implements Comparable {
         }
         chunk.setNormalState();
         final byte[] ncb = chunk.getChunk();
+        // chunk.getHeader().setState(Header.RECORD_UPDATED_STATE);
         chunk.getHeader().setLen(ncb.length);
         chunk.getHeader().setTran(tran);
         final int newlen = chunk.getBytesAmount();
@@ -470,9 +471,6 @@ public class Frame implements Comparable {
             throw new CannotAccessToDeletedRecord();
         }
         final Header header = chunk.getHeader();
-        if (header.getState() == Header.RECORD_LOCKED_STATE) {
-            throw new CannotAccessToLockedRecord();
-        }
         if (header.getLltId() < sync) {
             final ByteString sc = new ByteString();
             sc.append(chunk.getHeader().getHeader());
@@ -487,6 +485,10 @@ public class Frame implements Comparable {
 
     public synchronized List<Chunk> getChunks() {
         return data.getChunks();
+    }
+
+    public synchronized boolean checkChunk(int ptr) {
+        return data.getByPtr(ptr) != null;
     }
 
     public synchronized void removeChunk (int ptr, LLT llt, boolean ignore) {
@@ -519,8 +521,8 @@ public class Frame implements Comparable {
         if (dataObject==null) {
             dataObject = Instance.getInstance().getTableById(this.objectId);
         }
-        if (dataObject.isNoTran() || s.isStream()) {
 
+        if (dataObject.isNoTran() || s.isStream()) {
             final int streamptr = s.isStream() ? s.streamFramePtr(this) : 0;
 
             for (Chunk c : data.getChunks()) {
@@ -535,38 +537,30 @@ public class Frame implements Comparable {
                 s.streamFramePtr(this, rowCntr);
             }
 
-        } else { //if (local()) {
-
+        } else {
             final long tr = s.getTransaction().getTransId();
             final long mtran = s.getTransaction().getMTran();
 
             // read frame records
             for (Chunk c : data.getChunks()) {
-                Header h = c.getHeader();
-                if (h.getState()==Header.RECORD_NORMAL_STATE) {
-                    if (c.getUndoChunk() != null && c.getHeader().getTran().getCid() == 0) { //updated chunk in live transaction
-                        res.add(c);
+                final Header h = c.getHeader();
+                if (c.getUndoChunk() != null && h.getTran() != null) {
+                    if (h.getState() == Header.RECORD_DELETED_STATE) {
+                        if ((tr != h.getTran().getTransId()) && (h.getTran().getCid() == 0 || h.getTran().getCid() > mtran)) {
+                            res.add(c);
+                        }
                     } else {
+                        res.add(c);
+                    }
+                } else {
+                    if (h.getState() == Header.RECORD_NORMAL_STATE) {
                         if (h.getTran() == null) {
                             res.add(c);
                         } else {
                             if ((tr == h.getTran().getTransId()) || (h.getTran().getCid() > 0 && h.getTran().getCid() <= mtran)) {
                                 res.add(c);
-                            } else {
-                                System.out.println("ooooops!!!");
                             }
                         }
-                    }
-                }
-                if (h.getState() == Header.RECORD_DELETED_STATE) {
-                    if (h.getTran()!=null) {
-                        if ((tr != h.getTran().getTransId()) && (h.getTran().getCid() == 0 || h.getTran().getCid() > mtran)) {
-                            res.add(c);
-                        } else {
-                            System.out.println("ooooops!!!");
-                        }
-                    } else {
-                        System.out.println("ooooops!!!");
                     }
                 }
             }
@@ -576,6 +570,8 @@ public class Frame implements Comparable {
     }
 
     public synchronized void rollbackTransaction(Transaction tran, ArrayList<FrameData> ubs, Session s) throws InterruptedException {
+        data.check();
+
         //rollback inserted records
         final ArrayList<Integer> r = new ArrayList<>();
         for (Chunk c : data.getChunks()) {
@@ -594,9 +590,10 @@ public class Frame implements Comparable {
                 for (FrameData ub : ubs) {
                     for (Chunk c : ub.getDataFrame().getChunks()) {
                         final UndoChunk uc = (UndoChunk)c.getEntity();
+                        final int ucfile = uc.getDataChunk().getHeader().getRowID().getFileId();
                         final long frameptr = uc.getDataChunk().getHeader().getRowID().getFramePointer();
-                        if (uc.getTransId() == tran.getTransId() && uc.getFile() == this.file && frameptr == this.pointer) {
-                            data.add(uc.getDataChunk().restore(this, s));
+                        if (uc.getTransId() == tran.getTransId() && ucfile == this.file && frameptr == this.pointer) {
+                            data.add(uc.getDataChunk().restore(uc));
                         }
                     }
                 }
@@ -639,6 +636,12 @@ public class Frame implements Comparable {
 
     public boolean isLocal() {
         return this.file+this.pointer == this.allocFile+this.allocPointer;
+    }
+
+    public void cleanUpIcs() {
+        for (Chunk c : this.data.getChunks()) {
+            ((DataChunk) c).cleanUpIcs();
+        }
     }
 
     public long getPtr() {

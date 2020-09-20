@@ -28,6 +28,7 @@ import su.interference.exception.*;
 import su.interference.persistent.Table;
 import su.interference.persistent.FrameData;
 import su.interference.persistent.Session;
+import su.interference.persistent.UndoChunk;
 import su.interference.serialize.ByteString;
 
 import java.util.*;
@@ -55,8 +56,22 @@ public class IndexFrame extends Frame {
         this.setType(frameType);
     }
 
-    public IndexFrame(int file, long pointer, int size, FrameData bd, Table t, Class c) throws Exception {
+    public IndexFrame(int file, long pointer, int size, FrameData bd, Table t, Class c, List<FrameData> uframes) throws Exception {
         super(null, file, pointer, size, bd, t, c);
+
+        Map<Integer, UndoChunk> ucs = new HashMap<>();
+        for (FrameData uframe : uframes) {
+            final DataFrame uf = uframe.getDataFrame();
+            for (Chunk udc : uf.getChunks()) {
+                UndoChunk uc = (UndoChunk) udc.getEntity();
+                final long frameId = file + pointer;
+                final long frameId_ = uc.getFile() + uc.getFrame();
+                if (frameId == frameId_) {
+                    ucs.put(uc.getPtr(), uc);
+                }
+            }
+        }
+
         int ptr = FRAME_HEADER_SIZE;
         final ByteString bs = new ByteString(this.b);
         while (ptr<this.b.length) {
@@ -68,6 +83,9 @@ public class IndexFrame extends Frame {
                         if (INITIALIZE_DURING_CONSTRUCT == 1) {
                             final IndexChunk ib = (IndexChunk) dc.getEntity();
                         }
+                    }
+                    if (ucs.get(dc.getHeader().getPtr()) != null) {
+                        dc.setUndoChunk(ucs.get(dc.getHeader().getPtr()));
                     }
                     data.add(dc);
                     ptr = ptr + INDEX_HEADER_SIZE + h.getLen();
@@ -82,9 +100,17 @@ public class IndexFrame extends Frame {
     }
 
     //constructor for replication service
-    public IndexFrame(byte[] b, int file, long pointer, HashMap<Long, Long> imap, HashMap<Long, Long> hmap, Table t) {
+    public IndexFrame(byte[] b, int file, long pointer, HashMap<Long, Long> imap, HashMap<Long, Long> hmap, Map<Long, List<Chunk>> umap, Table t) {
         super(b, file, pointer, t);
         int ptr = FRAME_HEADER_SIZE;
+
+        final Map<Integer, UndoChunk> ucmap = new HashMap<>();
+        if (umap.get(file + pointer) != null) {
+            for (Chunk c : umap.get(file + pointer)) {
+                ucmap.put(((UndoChunk) c.getEntity()).getPtr(), (UndoChunk) c.getEntity());
+            }
+        }
+
         final ByteString bs = new ByteString(this.b);
         while (ptr<this.b.length) {
             if (this.b.length>=ptr+INDEX_HEADER_SIZE) {
@@ -98,6 +124,7 @@ public class IndexFrame extends Frame {
                         h.getFramePtrRowId().setFramePointer(bptr - (bptr % 4096));
                     }
                     final DataChunk dc = new DataChunk(bs.substring(ptr, ptr+INDEX_HEADER_SIZE+h.getLen()), this.getFile(), this.getPointer(), INDEX_HEADER_SIZE, this.getDataObject(), this.getEntityClass());
+                    dc.setUndoChunk(ucmap.get(h.getPtr()));
                     dc.setHeader(h);
                     if (this.getType()==INDEX_FRAME_LEAF) {
                         if (INITIALIZE_DURING_CONSTRUCT == 1) {
@@ -238,16 +265,12 @@ public class IndexFrame extends Frame {
             this.sort();
         //}
         ArrayList<Long> r = new ArrayList<Long>();
-        //boolean f = false;
         for (Chunk ie : this.data.getChunks()) {
-            if (((DataChunk)ie).getDcs().compareTo(value)==0) {
+            if (((DataChunk)ie).getDcs().compareTo(value) == 0) {
                 r.add (((DataChunk)ie).getHeader().getFramePtr()); //known as ptr for node element
-                //f = true;
             }
-            if (((DataChunk)ie).getDcs().compareTo(value)>0) {
-                //if (!f) {
-                    r.add (((DataChunk)ie).getHeader().getFramePtr()); //known as ptr for node element
-                //}
+            if (((DataChunk)ie).getDcs().compareTo(value) > 0) {
+                r.add (((DataChunk)ie).getHeader().getFramePtr()); //known as ptr for node element
                 break;
             }
         }
@@ -296,6 +319,8 @@ public class IndexFrame extends Frame {
             if (((DataChunk)ie).getDcs().equals(key)) {
                 if (((DataChunk)ie).getHeader().getState() == Header.RECORD_NORMAL_STATE) {
                     if (((DataChunk) ie).getUndoChunk() != null && ((DataChunk) ie).getHeader().getTran().getCid() == 0) { //updated chunk in live transaction
+                        r.add((DataChunk) ie);
+                    } else {
                         if (((DataChunk) ie).getHeader().getTran() == null) {
                             r.add((DataChunk) ie);
                         } else {

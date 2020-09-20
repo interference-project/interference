@@ -32,6 +32,8 @@ package su.interference.core;
 public interface IndexChunk {
 
     DataChunk getDataChunk();
+    RowId getFramePtrRowId();
     void setDataChunk(DataChunk c);
+    void setFramePtrRowId(RowId r);
 
 }

@@ -102,6 +102,10 @@ public class TransFrame implements Comparable, FilePartitioned, Serializable {
         return 0;
     }
 
+    public String toString() {
+        return transId+":"+objectId+":"+cframeId+":"+uframeId;
+    }
+
     //constructor for low-level storage function (initial first-time load table descriptions from datafile)
     public TransFrame(DataChunk chunk) throws ClassNotFoundException, IllegalAccessException, InternalException, MalformedURLException {
         final Object[] dcs = chunk.getDcs().getValueSet();
