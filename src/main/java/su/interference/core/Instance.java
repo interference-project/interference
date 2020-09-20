@@ -62,7 +62,7 @@ public class Instance implements Interference {
     private static final int MAX_NODE_ID = 32;
     public static final int SESSION_EXPIRE = 7200000; //in ms
 
-    public static final int SYSTEM_VERSION = 20200531;
+    public static final int SYSTEM_VERSION = 20200920;
 
     public static final int SYSTEM_STATE_ONLINE = 1;
     public static final int SYSTEM_STATE_UP = 2;
@@ -386,7 +386,7 @@ public class Instance implements Interference {
             logger.info("\n----------------------------------------------------------------------\n" +
                           "------------------------ interference started ------------------------\n" +
                           "------------------ (c) head systems, ltd 2010-2020 -------------------\n" +
-                          "--------------------------- release 2020.1 ---------------------------\n" +
+                          "--------------------------- release 2020.2 ---------------------------\n" +
                           "----------------------------------------------------------------------");
         } else {
 
@@ -412,7 +412,9 @@ public class Instance implements Interference {
         Metrics.register(Metrics.HISTOGRAM, "recordLCount");
         Metrics.register(Metrics.HISTOGRAM, "syncQueue");
         Metrics.register(Metrics.TIMER, "systemCleanUp");
-        Metrics.register(Metrics.METER, "сleanUpBlocks");
+        Metrics.register(Metrics.HISTOGRAM, "сleanUpDataFrames");
+        Metrics.register(Metrics.HISTOGRAM, "сleanUpIndexFrames");
+        Metrics.register(Metrics.HISTOGRAM, "сleanUpUndoFrames");
     }
 
     private void checkInMemoryIndexes() {
@@ -495,39 +497,6 @@ public class Instance implements Interference {
         return res.toArray(new DataFile[]{});
     }
 
-/*
-    public Node[] getNodes() {
-        final Table t = getTableByName("su.interference.persistent.Node");
-        final ArrayList<Node> res = new ArrayList<Node>();
-        for (Object o : t.getIndexFieldByColumn("nodeId").getIndex().getContent()) {
-            res.add((Node)((DataChunk)o).getEntity());
-        }
-        return res.toArray(new Node[]{});
-    }
-*/
-
-    //returns all available nodes exclude local
-/*
-    public Node[] getAvailableNodes() throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException {
-        final ArrayList<Node> res = new ArrayList<Node>();
-        for (Node n : getNodes()) {
-            if (n.getNodeId()!=getLocalNodeId()) {
-                res.add(n);
-            }
-        }
-        return res.toArray(new Node[]{});
-    }
-*/
-
-/*
-    public synchronized Node getNodeById (int id) {
-        final Table t = getTableByName("su.interference.persistent.Node");
-        final DataChunk c = (DataChunk)t.getIndexFieldByColumn("nodeId").getIndex().getObjectByKey(id);
-        if (c == null) return null;
-        return (Node)c.getEntity();
-    }
-*/
-
     public MgmtModule[] getMgmtModules() {
         final Table t = getTableByName("su.interference.persistent.MgmtModule");
         final ArrayList<MgmtModule> res = new ArrayList<MgmtModule>();
@@ -562,7 +531,7 @@ public class Instance implements Interference {
 
     public synchronized Table getTableByName (String name) {
         final MapField map = tt.getMapFieldByColumn("name");
-        if (map!=null) {
+        if (map != null && name != null) {
             final DataChunk c = (DataChunk)map.getMap().get(name);
             if (c!=null) {
                 return (Table)c.getEntity();

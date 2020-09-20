@@ -64,6 +64,15 @@ public class ChunkMap {
         sorted = false;
     }
 
+    public synchronized void check() {
+        for (Map.Entry<Integer, Chunk> entry : hmap.entrySet()) {
+            Chunk c = entry.getValue();
+            if (c.getHeader().getPtr() != entry.getKey()) {
+                throw new RuntimeException("internal cmap check failed");
+            }
+        }
+    }
+
     public synchronized List<Chunk> getChunks() {
         return list;
     }

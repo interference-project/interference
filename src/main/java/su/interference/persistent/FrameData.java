@@ -39,6 +39,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -162,7 +163,15 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     public synchronized DataFrame getDataFrame() throws Exception {
         if (frame == null) {
             this.priority = SystemCleanUp.DATA_RETRIEVED_PRIORITY;
-            frame = new DataFrame(this.file,this.ptr,0,this,dataObject,entityClass);
+            List<FrameData> uframes = new ArrayList<>();
+            for (Map.Entry<Long, Map<Long, TransFrame>> entry : tcounter.entrySet()) {
+                for (Map.Entry<Long, TransFrame> entry_ : entry.getValue().entrySet()) {
+                    if (entry_.getKey() > 0) {
+                        uframes.add(Instance.getInstance().getFrameById(entry_.getKey()));
+                    }
+                }
+            }
+            frame = new DataFrame(this.file, this.ptr, 0, this, dataObject, entityClass, uframes);
         }
         return (DataFrame) frame;
     }
@@ -170,7 +179,15 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     public IndexFrame getIndexFrame() throws Exception {
         if (frame == null) {
             this.priority = SystemCleanUp.INDEX_RETRIEVED_PRIORITY;
-            frame = new IndexFrame(this.file,this.ptr,0,this,dataObject,entityClass);
+            List<FrameData> uframes = new ArrayList<>();
+            for (Map.Entry<Long, Map<Long, TransFrame>> entry : tcounter.entrySet()) {
+                for (Map.Entry<Long, TransFrame> entry_ : entry.getValue().entrySet()) {
+                    if (entry_.getKey() > 0) {
+                        uframes.add(Instance.getInstance().getFrameById(entry_.getKey()));
+                    }
+                }
+            }
+            frame = new IndexFrame(this.file, this.ptr, 0, this, dataObject, entityClass, uframes);
         }
         return (IndexFrame) frame;
     }
@@ -414,6 +431,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     public boolean clearFrame() {
         if (this.frame != null) {
+            this.frame.cleanUpIcs();
             this.frame = null;
             return true;
         }
@@ -428,11 +446,15 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         this.entityClass = entityClass;
     }
 
-    public int getTcounterSize(long transId) {
-        if (tcounter.get(transId) == null) {
-            return 0;
+    public boolean isFrameBusy() {
+        for (Map.Entry<Long, Map<Long, TransFrame>> entry : tcounter.entrySet()) {
+            for (Map.Entry<Long, TransFrame> entry_ : entry.getValue().entrySet()) {
+                if (entry_.getValue().getCframeId() == getFrameId()) {
+                    return true;
+                }
+            }
         }
-        return 1;
+        return false;
     }
 
     public void increaseTcounter(long id, TransFrame f) {
@@ -443,7 +465,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     }
 
     public void decreaseTcounter(long id) {
-        this.tcounter.remove(id);
+        tcounter.remove(id);
     }
 
     public int getPriority() {

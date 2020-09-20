@@ -7,7 +7,7 @@
 
     <groupId>su.interference</groupId>
     <artifactId>interference</artifactId>
-    <version>2020.1</version>
+    <version>2020.2</version>
     <packaging>jar</packaging>
 
     <name>interference</name>

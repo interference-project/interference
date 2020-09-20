@@ -209,7 +209,7 @@ public class SyncFrameEvent extends TransportEventImpl {
                         throw new InternalException();
                     } else {
                         if (b.getFrameType() == 1 || b.getFrameType() == 2) {
-                            IndexFrame frame = new IndexFrame(b.getBytes(), b.getBd().getFile(), b.getBd().getPtr(), b.getImap(), hmap, t);
+                            IndexFrame frame = new IndexFrame(b.getBytes(), b.getBd().getFile(), b.getBd().getPtr(), b.getImap(), hmap, umap, t);
                             frame.setRes04(parentF);
                             frame.setRes05(lcF);
                             frame.setRes06(parentB);

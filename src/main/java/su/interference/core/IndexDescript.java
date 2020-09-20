@@ -30,7 +30,6 @@ import su.interference.exception.InternalException;
 import java.util.StringTokenizer;
 import java.util.ArrayList;
 import java.lang.reflect.Field;
-import java.net.MalformedURLException;
 
 /**
  * @author Yuriy Glotanov
@@ -49,11 +48,13 @@ public class IndexDescript {
         this.t = t;
         Field[] tfs = t.getFields();
         StringTokenizer st = new StringTokenizer(columns,",");
-        ArrayList<String> cs = new ArrayList<String>();
-        ArrayList<Field> fs = new ArrayList<Field>();
+        ArrayList<String> cs = new ArrayList<>();
+        ArrayList<Field> fs = new ArrayList<>();
+
         while (st.hasMoreTokens()) {
             cs.add(st.nextToken().trim());
         }
+
         for (String cname : cs) {
             boolean chk = false;
             for (Field f : tfs) {
@@ -64,6 +65,7 @@ public class IndexDescript {
             }
             if (!chk) { throw new InternalException(); }
         }
+
         this.name = name;
         this.columns = cs.toArray(new String[]{});
         this.fields = fs.toArray(new Field[]{});

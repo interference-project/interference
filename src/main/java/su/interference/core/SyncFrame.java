@@ -85,7 +85,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
             }
             started = false;
             final DataFrame db = (DataFrame) frame;
-            imap = db.getAllocateMap();
+            imap = allowR ? db.getAllocateMap() : null;
             final long prevId_ = db.getPrevFrame()+db.getPrevFile();
             final long nextId_ = db.getNextFrame()+db.getNextFile();
             try {
@@ -118,7 +118,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
                 started = false;
             }
             final IndexFrame ib = (IndexFrame) frame;
-            imap = ib.getAllocateMap();
+            imap = allowR ? ib.getAllocateMap() : null;
             prevId = 0;
             nextId = 0;
             final long parentId_ = ib.getParentF()+ib.getParentB();

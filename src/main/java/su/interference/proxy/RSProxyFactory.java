@@ -102,9 +102,13 @@ public class RSProxyFactory {
         sb.append("    @Transient\n");
         sb.append("    private final static long serialVersionUID = 6730871208437219890L;\n");
         sb.append("    @Transient\n");
+        sb.append("    public su.interference.core.RowId framePtrRowId;\n");
+        sb.append("    @Transient\n");
         sb.append("    public su.interference.core.DataChunk dc;\n");
         sb.append("    public su.interference.core.DataChunk getDataChunk() { return dc; }\n");
         sb.append("    public void setDataChunk(su.interference.core.DataChunk c) { dc = c; }\n");
+        sb.append("    public su.interference.core.RowId getFramePtrRowId() { return framePtrRowId; }\n");
+        sb.append("    public void setFramePtrRowId(su.interference.core.RowId r) { framePtrRowId = r; }\n");
         sb.append("\n");
 
         for (int i=0; i<cs.size(); i++) {

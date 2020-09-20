@@ -43,6 +43,8 @@ import java.lang.reflect.*;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static su.interference.persistent.Table.SYSTEM_PKG_PREFIX;
+
 /**
  * @author Yuriy Glotanov
  * @since 1.0
@@ -64,7 +66,6 @@ public class DataChunk implements Chunk {
     private Object entity;
     private Object undoentity;
     private Map<Integer, DataChunk> ics = new HashMap<>();
-    private DataChunk source;
     private UndoChunk uc;
     private FrameData uframe;
     private boolean terminate;
@@ -199,9 +200,6 @@ public class DataChunk implements Chunk {
                     final Id a = f[i].getAnnotation(Id.class);
                     if (a != null) {
                         if (sa != null) {
-                            //Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), null);
-                            //Object v = z.invoke(entity, null);
-                            //id = (Comparable) v;
                             id = (Comparable) f[i].get(entity);
                         } else {
                             Method z = c.getMethod("get" + f[i].getName().substring(0, 1).toUpperCase() + f[i].getName().substring(1, f[i].getName().length()), new Class<?>[]{Session.class});
@@ -212,9 +210,6 @@ public class DataChunk implements Chunk {
                 }
             } else {
                 if (sa != null) {
-                    //Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), null);
-                    //Object v = z.invoke(entity, null);
-                    //id = (Comparable) v;
                     id = (Comparable) idfield.get(entity);
                 } else {
                     Method z = c.getMethod("get" + idfield.getName().substring(0, 1).toUpperCase() + idfield.getName().substring(1, idfield.getName().length()), new Class<?>[]{Session.class});
@@ -357,7 +352,6 @@ public class DataChunk implements Chunk {
         this.chunk  = b;
         this.header = h;
         this.state = INIT_STATE;
-        this.source = source;
         this.t = t;
     }
 
@@ -490,15 +484,13 @@ public class DataChunk implements Chunk {
                 if (t.isIndex()) {
                     final ResultSetEntity rsa = (ResultSetEntity) ((Table) this.t).getTableClass().getAnnotation(ResultSetEntity.class);
                     final DataChunk dc = rsa == null ? (DataChunk) Instance.getInstance().getChunkByPointer(this.getHeader().getFramePtr(), this.getHeader().getFramePtrRowId().getRowPointer()) : this;
-                    dc.setIc(this);
-                    ((IndexChunk)o).setDataChunk(dc);
                     if (dc == null) {
-// todo during rframe.IndexFrame.init system directory not yet contains replicated FrameData objects
-//                        final long allocId = Instance.getInstance().getFrameById(this.header.getRowID().getFileId()+this.header.getRowID().getFramePointer()).getAllocId();
-//                        final long allocId2 = Instance.getInstance().getFrameById(this.getHeader().getFramePtr()).getAllocId();
-//                        logger.error("null datachunk found for indexframe allocId = " + allocId + " indexptr allocId = " + allocId2);
+                        // todo during rframe.IndexFrame.init system directory not yet contains replicated FrameData objects
                         logger.error("null datachunk found");
                     }
+                    dc.setIc(this);
+                    ((IndexChunk)o).setFramePtrRowId(this.getHeader().getFramePtrRowId());
+                    ((IndexChunk)o).setDataChunk(dc);
                 }
                 if (!t.isNoTran()) {
                     ((EntityContainer) o).setRowId(header.getRowID());
@@ -629,19 +621,15 @@ public class DataChunk implements Chunk {
         return dc_;
     }
 
-    public DataChunk restore(Frame b, Session s) throws Exception {
-        if (source == null) {
-            throw new InternalException();
-        }
-        if (!(this.getHeader().getRowID().getFileId() == source.getHeader().getRowID().getFileId() && this.getHeader().getRowID().getFramePointer() == source.getHeader().getRowID().getFramePointer())) {
-            final long srcFrameId = source.getHeader().getRowID().getFileId() + source.getHeader().getRowID().getFramePointer();
+    public DataChunk restore(UndoChunk uc) throws Exception {
+        // second, since we are using a dirty hack with changing the header in a source chunk for rollback his,
+        // we need to first delete the source chunk in the target block to prevent inconsistency within ChunkMap / chunk headers
+        if (!(this.getHeader().getRowID().getFileId() == uc.getFile() && this.getHeader().getRowID().getFramePointer() == uc.getFrame())) {
+            final long srcFrameId = uc.getFile() + uc.getFrame();
             final Frame srcFrame = Instance.getInstance().getFrameById(srcFrameId).getFrame();
-            //todo ???
-            srcFrame.removeChunk(source.getHeader().getRowID().getRowPointer(), null, false);
+            srcFrame.removeChunk(uc.getPtr(), null, true);
         }
-        source.setHeader(this.getHeader());
-        source.updateEntity(this.getEntity());
-        return source;
+        return this;
     }
 
     private byte[] getBytes(Field f, Object o) throws IllegalAccessException, UnsupportedEncodingException, ClassNotFoundException, InternalException, InstantiationException {
@@ -666,15 +654,11 @@ public class DataChunk implements Chunk {
 
     //lock mechanism
 
-    private synchronized DataChunk insertUC (FrameData cb, UndoChunk uc, Session s, LLT llt) throws Exception {
+    private synchronized DataChunk insertUC (UndoChunk uc, Session s, LLT llt) throws Exception {
         final WaitFrame ubw = s.getTransaction().getAvailableFrame(uc, true);
         final FrameData ub = ubw.getBd();
         if (ub == null) {
-            //s.getTransaction().createUndoFrames(s);
-            //ub = s.getTransaction().getAvailableFrame(uc, true);
-            //if (ub == null) {
-                throw new InternalException();
-            //}
+            throw new InternalException();
         }
 
         final DataChunk dc = new DataChunk(uc, s);
@@ -685,10 +669,8 @@ public class DataChunk implements Chunk {
             s.getTransaction().setNewLB(ub, nb, false);
             nb.getDataFrame().insertChunk(dc, s, true, llt);
             dc.uframe = nb;
-            //s.getTransaction().storeFrame(cb, nb, 0, s, llt);
         } else {
             dc.uframe = ub;
-            //s.getTransaction().storeFrame(cb, ub, 0, s, llt);
         }
         ubw.release();
         return dc;
@@ -739,25 +721,11 @@ public class DataChunk implements Chunk {
         this.getHeader().setTran(s.getTransaction());
         ((EntityContainer)o).setTran(s.getTransaction());
 
-        final FrameData bd = Instance.getInstance().getFrameById(this.getHeader().getRowID().getFileId() + this.getHeader().getRowID().getFramePointer());
         final DataChunk cc = this.cloneEntity(s);
         cc.getHeader().setTran(s.getTransaction());
         final RowId rw = this.getHeader().getRowID();
         uc = new UndoChunk(cc, s.getTransaction(), rw.getFileId(), rw.getFramePointer(), rw.getRowPointer());
-        return insertUC(bd, uc, s, llt);
-    }
-
-    protected synchronized void undo(Session s, LLT llt) throws Exception {
-        if (s.getTransaction().getTransId() != this.getHeader().getTran().getTransId()) {
-            throw new InternalException();
-        } else {
-            final FrameData bd = Instance.getInstance().getFrameById(this.getHeader().getRowID().getFileId() + this.getHeader().getRowID().getFramePointer());
-            final DataChunk cc = this.cloneEntity(s);
-            cc.getHeader().setTran(s.getTransaction());
-            final RowId rw = this.getHeader().getRowID();
-            uc = new UndoChunk(cc, s.getTransaction(), rw.getFileId(), rw.getFramePointer(), rw.getRowPointer());
-            insertUC(bd, uc, s, llt);
-        }
+        return insertUC(uc, s, llt);
     }
 
     public FrameData getUframe() {
@@ -777,8 +745,48 @@ public class DataChunk implements Chunk {
         this.ics.put(t_.getObjectId(), ic);
     }
 
-    public Map<Integer, DataChunk> getIcs() {
-        return this.ics;
+    public void clearIcs() {
+        this.ics.clear();
+    }
+
+    protected void cleanUpIcs() {
+        for (Map.Entry<Integer, DataChunk> entry : this.ics.entrySet()) {
+            final IndexChunk ic = (IndexChunk) entry.getValue().getEntity();
+            ic.setDataChunk(null);
+        }
+    }
+
+    public DataChunk getIc(IndexDescript ids, Session s) throws Exception {
+        final Table ixt = Instance.getInstance().getTableByName(SYSTEM_PKG_PREFIX + ids.getName());
+        final DataChunk ic = this.ics.get(ixt.getObjectId());
+        if (ic == null) {
+            final ValueSet key = this.getValueByColumnName(ids.getColumns(), s);
+            final DataChunk ic_ = ixt.getObjectByKey(key, s);
+            if (ic_ != null) {
+                this.ics.put(ixt.getObjectId(), ic_);
+                return ic_;
+            } else {
+                throw new RuntimeException("Unable to retrieve index chunk: " + ids.getName());
+            }
+        }
+        return ic;
+    }
+
+    public ValueSet getValueByColumnName(String[] columns, Session s) throws Exception {
+        final Object o = this.getEntity();
+        final Class c = o.getClass();
+        final SystemEntity sa = (SystemEntity)c.getAnnotation(SystemEntity.class);
+        final List<Object> res = new ArrayList<>();
+        for (String name : columns) {
+            if (sa != null) {
+                final Method z = c.getMethod("get" + name.substring(0, 1).toUpperCase() + name.substring(1, name.length()), null);
+                res.add(z.invoke(o, null));
+            } else {
+                final Method z = c.getMethod("get" + name.substring(0, 1).toUpperCase() + name.substring(1, name.length()), new Class<?>[]{Session.class});
+                res.add(z.invoke(o, new Object[]{s}));
+            }
+        }
+        return new ValueSet(res.toArray(new Object[]{}));
     }
 
     private byte[] getBytesFromHexString(String s) {

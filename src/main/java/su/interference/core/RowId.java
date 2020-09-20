@@ -78,8 +78,8 @@ public class RowId implements Comparable {
         return res;
     }
 
-    public String getRowidAsString () {
-        return "" + this.file + ":" + this.frame + ":" + this.row;
+    public String toString()  {
+        return "ROW "+ this.file + ":" + this.frame + ":" + this.row;
     }
 
     public int getFileId () {
@@ -101,10 +101,6 @@ public class RowId implements Comparable {
     public void setFramePointer(long frame) {
         this.frame = frame;
     }
-
-    /************************************************************
-     byte utils
-     ***********************************************************/
 
     public byte[] getBytesFromInt (int p) {
         byte[] res = new byte[4];
@@ -134,45 +130,6 @@ public class RowId implements Comparable {
         bb.put(b);
         bb.rewind();
         return bb.getLong();
-    }
-
-    public static int getIntByHex (String hexval) {
-        return Integer.parseInt(hexval.trim(),16);
-    }
-
-    public static long getLongByHex (String hexval) {
-        return Long.parseLong(hexval.trim(),16);
-    }
-
-    public static String getHexByInt (int intval) {
-       String s = Integer.toHexString(intval);
-       String p = new String();
-       for (int i=0; i < 8-s.length(); i++) {
-           p = p + "0";
-       }
-       return p + s;
-    }
-
-    public static String getHexByLong (long longval) {
-       String s = Long.toHexString(longval);
-       String p = new String();
-       for (int i=0; i < 16-s.length(); i++) {
-           p = p + "0";
-       }
-       return p + s;
-    }
-
-    public static RowId getRowIdFromHex (String hex) {
-        RowId res = new RowId(getIntByHex(hex.substring(0,8)),getLongByHex(hex.substring(8,24)),getIntByHex(hex.substring(24,32)));
-        return res;
-    }
-
-    public static String getHexFromRowId (RowId r) {
-        String res = new String();
-        res = res + getHexByInt(r.getFileId());
-        res = res + getHexByLong(r.getFramePointer());
-        res = res + getHexByInt(r.getRowPointer());
-        return res;
     }
 
     public byte[] substring(byte[] b, int startPos, int endPos){

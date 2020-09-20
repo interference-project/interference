@@ -48,8 +48,21 @@ public class DataFrame extends Frame {
         super (bd, t);
     }
 
-    public DataFrame(int file, long pointer, int size, FrameData bd, Table t, Class c) throws Exception {
+    public DataFrame(int file, long pointer, int size, FrameData bd, Table t, Class c, List<FrameData> uframes) throws Exception {
         super(null, file, pointer, size, bd, t, c);
+
+        Map<Integer, UndoChunk> ucs = new HashMap<>();
+        for (FrameData uframe : uframes) {
+            final DataFrame uf = uframe.getDataFrame();
+            for (Chunk udc : uf.getChunks()) {
+                UndoChunk uc = (UndoChunk) udc.getEntity();
+                final long frameId = file + pointer;
+                final long frameId_ = uc.getFile() + uc.getFrame();
+                if (frameId == frameId_) {
+                    ucs.put(uc.getPtr(), uc);
+                }
+            }
+        }
 
         int ptr = FRAME_HEADER_SIZE;
         final ByteString bs = new ByteString(this.b);
@@ -57,7 +70,11 @@ public class DataFrame extends Frame {
             if (this.b.length>=ptr+ROW_HEADER_SIZE) {
                 final RowHeader h = new RowHeader(bs.substring(ptr, ptr+ROW_HEADER_SIZE), this.getFile(), this.getPointer());
                 if ((h.getPtr()>0)&&(h.getLen()>0)) {
-                    data.add(new DataChunk(bs.substring(ptr, ptr+ROW_HEADER_SIZE+h.getLen()), this.getFile(), this.getPointer(), ROW_HEADER_SIZE, this.getDataObject(), this.getEntityClass()));
+                    final DataChunk dc = new DataChunk(bs.substring(ptr, ptr+ROW_HEADER_SIZE+h.getLen()), this.getFile(), this.getPointer(), ROW_HEADER_SIZE, this.getDataObject(), this.getEntityClass());
+                    if (ucs.get(dc.getHeader().getPtr()) != null) {
+                        dc.setUndoChunk(ucs.get(dc.getHeader().getPtr()));
+                    }
+                    data.add(dc);
                     ptr = ptr + ROW_HEADER_SIZE + h.getLen();
                 } else {
                     ptr = this.b.length;
