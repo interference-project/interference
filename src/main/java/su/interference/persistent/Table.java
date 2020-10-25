@@ -1882,9 +1882,10 @@ public class Table implements ResultSet {
                 ixstartfs.put(sourceNodeId, b.getBd().getFrameId());
                 b.getBd().setStarted(sourceNodeId);
             }
-            //final LLT llt_ = LLT.getLLT(); //df access reordering prevent deadlock
             b.getDf().writeFrame(b.getBd(), b.getBd().getPtr(), b.getBd().getFrame().getFrame(), llt, s);
-            //llt_.commit();
+        }
+        for (SyncFrame b : frames) {
+            b.getBd().setFrame(null);
         }
     }
 

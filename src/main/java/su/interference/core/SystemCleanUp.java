@@ -4,7 +4,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.metrics.Metrics;
 import su.interference.persistent.FrameData;
-import su.interference.persistent.Table;
 
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -51,6 +50,10 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
         int d = 0;
         int x = 0;
         int u = 0;
+        int i_ = 0;
+        int d_ = 0;
+        int x_ = 0;
+        int u_ = 0;
         for (Object entry : Instance.getInstance().getFramesMap().entrySet()) {
             final FrameData f = (FrameData) ((DataChunk) ((Map.Entry) entry).getValue()).getEntity();
             final long frameAmount = f.getDataObject().getFrameAmount();
@@ -61,6 +64,9 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
                         d++;
                     }
                 }
+                if (f.isFrame()) {
+                    d_++;
+                }
             }
             if (f.getDataFile().isIndex()) {
                 f.decreasePriority();
@@ -69,12 +75,18 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
                         x++;
                     }
                 }
+                if (f.isFrame()) {
+                    x_++;
+                }
             }
             if (f.getDataFile().isTemp()) {
                 if (f.isSynced() && f.getObjectId() > 999 && frameAmount > CLEANUP_PROTECTION_THR) {
                     if (f.clearFrame()) {
                         i++;
                     }
+                }
+                if (f.isFrame()) {
+                    i_++;
                 }
             }
             if (f.getDataFile().isUndo()) {
@@ -83,11 +95,17 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
                         u++;
                     }
                 }
+                if (f.isFrame()) {
+                    u_++;
+                }
             }
         }
         Metrics.get("сleanUpDataFrames").put(d);
         Metrics.get("сleanUpIndexFrames").put(x);
         Metrics.get("сleanUpUndoFrames").put(u);
+        Metrics.get("imDataFrames").put(d_);
+        Metrics.get("imIndexFrames").put(x_);
+        Metrics.get("imUndoFrames").put(u_);
         Metrics.get("systemCleanUp").stop();
 
     }

@@ -46,7 +46,7 @@ public class SyncQueue implements Runnable, ManagedProcess {
     private volatile boolean f = true;
     private volatile boolean running = false;
     private final ExecutorService pool = Executors.newFixedThreadPool(Config.getConfig().FILES_AMOUNT);
-    private final ExecutorService pool2 = Executors.newCachedThreadPool();
+    private final ExecutorService pool2 = Executors.newFixedThreadPool(1);
     CountDownLatch latch;
     private final static Logger logger = LoggerFactory.getLogger(SyncQueue.class);
 

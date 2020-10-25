@@ -83,6 +83,8 @@ public class Transaction implements Serializable {
     @Transient
     private final List<TransFrame> tframes = new CopyOnWriteArrayList<>();
     @Transient
+    private final Set<Long> rframes = new HashSet<>();
+    @Transient
     private final transient WaitFrame[] lbs;
     @Transient
     private final AtomicInteger avframeStart = new AtomicInteger(0);
@@ -144,10 +146,12 @@ public class Transaction implements Serializable {
 
     }
 
+    // llt should be null, set synced flag as false for initial undo frames prevent cleanup
     public void createUndoFrames(Session s, LLT llt) throws Exception {
         final Table t = Instance.getInstance().getTableByName("su.interference.persistent.UndoChunk");
         for (DataFile f : Storage.getStorage().getUndoFiles()) {
             final FrameData ub = t.createNewFrame(null, f.getFileId(), 0, 0, false, true, false, s, llt);
+            ub.setSynced(false);
             setNewLB(null, ub, false);
         }
     }
@@ -216,6 +220,9 @@ public class Transaction implements Serializable {
         final SyncQueue syncq = (SyncQueue) lsync.getRunnable();
         if (remote) {
             try {
+                for (Long frameId : rframes) {
+                    Instance.getInstance().getFrameById(frameId).decreaseTcounter(this.transId);
+                }
                 this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
                 this.transType = TRAN_THR;
                 s.persist(this);
@@ -285,6 +292,9 @@ public class Transaction implements Serializable {
         final ArrayList<Long> fptr = new ArrayList<>();
         if (remote) {
             try {
+                for (Long frameId : rframes) {
+                    Instance.getInstance().getFrameById(frameId).decreaseTcounter(this.transId);
+                }
                 this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
                 this.transType = TRAN_THR;
                 s.persist(this); //update
@@ -460,6 +470,9 @@ public class Transaction implements Serializable {
         }
     }
 
+    public void storeRFrame(long frameId) {
+        rframes.add(frameId);
+    }
 
     public synchronized void startTransaction(Session s, LLT llt) throws Exception {
         final Transaction t = s.getTransaction();
@@ -498,7 +511,7 @@ public class Transaction implements Serializable {
         }
     }
 
-    private void startStatement (final Session s, LLT llt) {
+    protected void startStatement (final Session s, LLT llt) {
         final Table t = Instance.getInstance().getTableByName("su.interference.persistent.Transaction");
         if (!started) {
             try {

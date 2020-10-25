@@ -477,7 +477,6 @@ public class DataFile implements Serializable {
 
         this.file.seek(ptr);
         this.file.write(b);
-        llt.add(bd.getFrame());
         s.persist(bd, llt);
     }
 

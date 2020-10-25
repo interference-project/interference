@@ -30,8 +30,8 @@ import su.interference.exception.InternalException;
 import su.interference.persistent.*;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * @author Yuriy Glotanov
@@ -41,6 +41,7 @@ import java.util.HashMap;
 public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
 
     private final static Logger logger = LoggerFactory.getLogger(SyncFrame.class);
+    private final static long serialVersionUID = 8712349857239487289L;
     private final byte[] b;
     private final long frameId;
     private final long allocId;
@@ -53,12 +54,13 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
     private final long lcId;
     private final boolean allowR;
     private final boolean started;
-    private FrameData bd;
-    private DataFile df;
-    private Frame rFrame;
-    private final HashMap<Long, Long> imap;
-    private final HashMap<Long, Transaction> rtran;
-    private final static long serialVersionUID = 8712349857239487289L;
+    private final Map<Long, Long> imap;
+    private final Map<Long, Transaction> rtran;
+    private final Map<Long, List<Long>> uframes;
+
+    private transient FrameData bd;
+    private transient DataFile df;
+    private transient Frame rFrame;
 
     public SyncFrame(Frame frame, Session s, FreeFrame fb) throws Exception {
         final Table t = Instance.getInstance().getTableById(frame.getObjectId());
@@ -78,7 +80,10 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
         }
 
         className = bd == null ? null : t.getName();
+
         rtran = frame.getLiveTransactions();
+        uframes = allowR ? bd.getLiveUFrameAllocIds() : null;
+
         if (frame.getClass().getName().equals("su.interference.core.DataFrame")) {
             if (frame.getType()!=0) {
                 throw new InternalException();
@@ -215,12 +220,16 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
         this.df = df;
     }
 
-    public HashMap<Long, Long> getImap() {
+    public Map<Long, Long> getImap() {
         return imap;
     }
 
-    public HashMap<Long, Transaction> getRtran() {
+    public Map<Long, Transaction> getRtran() {
         return rtran;
+    }
+
+    public Map<Long, List<Long>> getUFrames() {
+        return uframes;
     }
 
     public boolean equals (SyncFrame bl) {

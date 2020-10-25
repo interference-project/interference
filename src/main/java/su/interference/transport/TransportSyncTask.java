@@ -46,7 +46,7 @@ import java.util.stream.Collectors;
 public class TransportSyncTask implements Runnable {
 
     private final static Logger logger = LoggerFactory.getLogger(TransportSyncTask.class);
-    private final static int REMOTE_SYNC_TIMEOUT = 60000;
+    private final static int REMOTE_SYNC_TIMEOUT = 120000;
     private final ArrayList<SyncFrame> frames;
     private final Session s;
 
@@ -55,6 +55,7 @@ public class TransportSyncTask implements Runnable {
         this.s = Session.getDntmSession();
     }
 
+    //todo need refactor for MT, now pesisted frame algorithm restrict this, should running in ONE thread
     public void run () {
         Thread.currentThread().setName("interference-transport-sync-thread");
 

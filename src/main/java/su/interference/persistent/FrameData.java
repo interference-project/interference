@@ -35,16 +35,10 @@ import javax.persistence.Entity;
 import javax.persistence.Column;
 import javax.persistence.Id;
 import javax.persistence.Transient;
-import java.lang.reflect.InvocationTargetException;
-import java.io.IOException;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * @author Yuriy Glotanov
@@ -217,6 +211,10 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
             }
         }
         return frame;
+    }
+
+    public boolean isFrame() {
+        return frame != null;
     }
 
     public void setFrame(Frame b) {
@@ -466,6 +464,33 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     public void decreaseTcounter(long id) {
         tcounter.remove(id);
+    }
+
+    public Map<Long, List<Long>> getLiveUFrameAllocIds() {
+        Map<Long, List<Long>> uframes = new HashMap<>();
+        for (Map.Entry<Long, Map<Long, TransFrame>> entry : tcounter.entrySet()) {
+            uframes.put(entry.getKey(), new ArrayList<>());
+            for (Map.Entry<Long, TransFrame> entry_ : entry.getValue().entrySet()) {
+                if (entry_.getValue().getUframeId() > 0) {
+                    final FrameData uframe = Instance.getInstance().getFrameById(entry_.getValue().getUframeId());
+                    // may causes NPE during rollback
+                    if (uframe != null) {
+                        uframes.get(entry.getKey()).add(uframe.getAllocId());
+                    }
+                }
+            }
+        }
+        return uframes;
+    }
+
+    public void updateTCounter(long transId, List<Long> ulist) {
+        if (this.frameId == this.allocId) {
+            throw new RuntimeException("cannot update tcounter for local frame");
+        }
+        this.tcounter.put(transId, new HashMap<>());
+        for (Long l : ulist) {
+            this.tcounter.get(transId).put(l, null);
+        }
     }
 
     public int getPriority() {
