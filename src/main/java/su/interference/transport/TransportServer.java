@@ -29,17 +29,13 @@ import org.slf4j.LoggerFactory;
 import su.interference.core.Config;
 import su.interference.core.Instance;
 
-import java.io.EOFException;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectStreamClass;
+import java.io.*;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -50,6 +46,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class TransportServer {
 
     private final static Logger logger = LoggerFactory.getLogger(TransportServer.class);
+    private final static int READ_BUFFER_SIZE = 33554432;
     private static TransportServer transportServer;
     private final AtomicBoolean started = new AtomicBoolean(true);
     private static final TransportContext transportContext = TransportContext.getInstance();
@@ -70,7 +67,7 @@ public class TransportServer {
                             try {
                                 serverSocket.setSoTimeout(10000);
                                 final Socket socket = serverSocket.accept();
-                                final ObjectInputStream ois = new ObjectInputStream(socket.getInputStream()) {
+                                final ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(socket.getInputStream(), READ_BUFFER_SIZE)) {
                                     @Override
                                     protected Class<?> resolveClass(ObjectStreamClass objectStreamClass)
                                             throws IOException, ClassNotFoundException {

@@ -77,4 +77,12 @@ public class Histogram extends Meter implements HistogramMBean {
         return avg.get();
     }
 
+    @Override
+    public void reset() {
+        cnt.set(0);
+        min.set(Long.MAX_VALUE);
+        max.set(Long.MIN_VALUE);
+        sum.set(0);
+        avg.set(0);
+    }
 }

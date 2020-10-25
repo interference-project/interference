@@ -35,4 +35,5 @@ public interface TimerMBean {
     long getMax();
     long getSum();
     long getAvg();
+    void reset();
 }

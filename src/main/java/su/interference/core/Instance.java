@@ -408,6 +408,7 @@ public class Instance implements Interference {
         Metrics.register(Metrics.TIMER, "persistGetChunk");
         Metrics.register(Metrics.TIMER, "persistInsertChunk");
         Metrics.register(Metrics.TIMER, "persistInsertIndex");
+        Metrics.register(Metrics.TIMER, "syncFrameEvent");
         Metrics.register(Metrics.HISTOGRAM, "recordRCount");
         Metrics.register(Metrics.HISTOGRAM, "recordLCount");
         Metrics.register(Metrics.HISTOGRAM, "syncQueue");
@@ -415,6 +416,9 @@ public class Instance implements Interference {
         Metrics.register(Metrics.HISTOGRAM, "сleanUpDataFrames");
         Metrics.register(Metrics.HISTOGRAM, "сleanUpIndexFrames");
         Metrics.register(Metrics.HISTOGRAM, "сleanUpUndoFrames");
+        Metrics.register(Metrics.METER, "imDataFrames");
+        Metrics.register(Metrics.METER, "imIndexFrames");
+        Metrics.register(Metrics.METER, "imUndoFrames");
     }
 
     private void checkInMemoryIndexes() {

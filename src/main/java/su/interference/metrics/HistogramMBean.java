@@ -35,4 +35,5 @@ public interface HistogramMBean {
     long getMax();
     long getSum();
     long getAvg();
+    void reset();
 }

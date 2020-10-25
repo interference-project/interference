@@ -100,16 +100,9 @@ public class IndexFrame extends Frame {
     }
 
     //constructor for replication service
-    public IndexFrame(byte[] b, int file, long pointer, HashMap<Long, Long> imap, HashMap<Long, Long> hmap, Map<Long, List<Chunk>> umap, Table t) {
+    public IndexFrame(byte[] b, int file, long pointer, Map<Long, Long> imap, Map<Long, Long> hmap, Table t) {
         super(b, file, pointer, t);
         int ptr = FRAME_HEADER_SIZE;
-
-        final Map<Integer, UndoChunk> ucmap = new HashMap<>();
-        if (umap.get(file + pointer) != null) {
-            for (Chunk c : umap.get(file + pointer)) {
-                ucmap.put(((UndoChunk) c.getEntity()).getPtr(), (UndoChunk) c.getEntity());
-            }
-        }
 
         final ByteString bs = new ByteString(this.b);
         while (ptr<this.b.length) {
@@ -124,13 +117,7 @@ public class IndexFrame extends Frame {
                         h.getFramePtrRowId().setFramePointer(bptr - (bptr % 4096));
                     }
                     final DataChunk dc = new DataChunk(bs.substring(ptr, ptr+INDEX_HEADER_SIZE+h.getLen()), this.getFile(), this.getPointer(), INDEX_HEADER_SIZE, this.getDataObject(), this.getEntityClass());
-                    dc.setUndoChunk(ucmap.get(h.getPtr()));
                     dc.setHeader(h);
-                    if (this.getType()==INDEX_FRAME_LEAF) {
-                        if (INITIALIZE_DURING_CONSTRUCT == 1) {
-                            final IndexChunk ib = (IndexChunk) dc.getEntity();
-                        }
-                    }
                     data.add(dc);
                     ptr = ptr + INDEX_HEADER_SIZE + h.getLen();
                 } else {
@@ -144,12 +131,10 @@ public class IndexFrame extends Frame {
     }
 
     public IndexFrame add (DataChunk e, Table t, Session s, LLT llt) throws Exception {
-        IndexFrame res = null;
-
         if (this.isFill(e)) {
 
             final int nfileId = t.getIndexFileId(this.getFrameData());
-            res = t.createNewFrame(this.getFrameData(), nfileId, this.getType(), 0, false, false, false, s, llt).getIndexFrame();
+            final IndexFrame res = t.createNewFrame(this.getFrameData(), nfileId, this.getType(), 0, false, false, false, s, llt).getIndexFrame();
             res.setParentF(this.getParentF());
             res.setParentB(this.getParentB());
             final ValueSet max = this.sort();
@@ -173,7 +158,8 @@ public class IndexFrame extends Frame {
                 this.setLcF(0);
                 this.setLcB(0);
             } else {
-                if (e.getDcs().compareTo(this.mv)>0) {
+                final int cmv = e.getDcs().compareTo(this.mv);
+                if (cmv > 0) {
                     throw new InternalException();
                 } else {
                     res.setDivided(1);
@@ -215,10 +201,11 @@ public class IndexFrame extends Frame {
                     }
                 }
             }
+            return res;
         } else {
             this.insertChunk(e, s, false, llt);
+            return null;
         }
-        return res;
     }
 
     public DataChunk get (int index) {

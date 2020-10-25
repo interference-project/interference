@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.core.*;
 import su.interference.exception.InternalException;
+import su.interference.metrics.Metrics;
 import su.interference.persistent.*;
 import su.interference.sql.ContainerFrame;
 import su.interference.sql.FrameApi;
@@ -68,10 +69,11 @@ public class SyncFrameEvent extends TransportEventImpl {
 
     public synchronized int rframe2(SyncFrame[] sb) throws Exception {
         Session s = Session.getDntmSession();
-        HashMap<Long, Long> hmap = new HashMap<Long, Long>();
-        HashMap<Long, Long> hmap2 = new HashMap<Long, Long>();
-//        LLT llt = LLT.getLLT();
+        Map<Long, Long> hmap = new HashMap<Long, Long>();
+        Map<Long, Long> hmap2 = new HashMap<Long, Long>();
+        Metrics.get("syncFrameEvent").start();
         final LLT llt = null;
+
         for (SyncFrame b : sb) {
             if (b.isAllowR()) {
                 updateTransactions(b.getRtran(), s);
@@ -117,9 +119,8 @@ public class SyncFrameEvent extends TransportEventImpl {
                 hmap2.put(b.getFrameId(), bd.getFrameId());
             }
         }
-        //updateTransFrames(tframes, hmap2, s);
 
-        final Map<Long, List<Chunk>> umap = new ConcurrentHashMap<>();
+        final Map<Long, Long> umap2 = new ConcurrentHashMap<>();
 
         for (SyncFrame b : sb) {
             try {
@@ -136,7 +137,7 @@ public class SyncFrameEvent extends TransportEventImpl {
                         throw new InternalException();
                     } else {
                         if (b.getFrameType() == 99) {
-                            Frame frame = new DataFrame(b.getBytes(), b.getBd().getFile(), b.getBd().getPtr(), b.getImap(), hmap, umap, t, s);
+                            Frame frame = new DataFrame(b.getBytes(), b.getBd().getFile(), b.getBd().getPtr(), b.getImap(), hmap, t, s);
                             frame.setRes01(prevF);
                             frame.setRes02(nextF);
                             frame.setRes06(prevB);
@@ -146,13 +147,38 @@ public class SyncFrameEvent extends TransportEventImpl {
                             final LLT llt_ = LLT.getLLT(); //df access reordering prevent deadlock
                             b.getDf().writeFrame(b.getBd(), b.getBd().getPtr(), frame.getFrame(), llt_, s);
                             llt_.commit();
-//                            b.getBd().setFrame(null);
+                            umap2.put(b.getBd().getFrameId(), b.getBd().getAllocId());
                             logger.debug("write undo frame with allocId "+b.getAllocId()+" ptr "+b.getBd().getFrameId());
                         }
                     }
                 }
             } catch (Exception e) {
                 e.printStackTrace();
+            }
+        }
+
+        // check and complete umap
+        // prevent unconsistency of undo data due to the fact that
+        // the one of undo frames for concrete data frame may be out
+        // of current sync pack
+        final Map<Long, Long> uframes = new HashMap<>();
+        for (SyncFrame b : sb) {
+            for (Map.Entry<Long, List<Long>> entry : b.getUFrames().entrySet()) {
+                final List<Long> ulist = new ArrayList<>();
+                final Transaction tran = Instance.getInstance().getTransactionById(entry.getKey());
+                for (Long uallocId : entry.getValue()) {
+                    final long uframeId = Instance.getInstance().getFrameByAllocId(uallocId).getFrameId();
+                    uframes.put(uframeId, uallocId);
+                    ulist.add(uframeId);
+                    tran.storeRFrame(uframeId);
+                }
+                b.getBd().updateTCounter(entry.getKey(), ulist);
+            }
+        }
+        for (Map.Entry<Long, Long> entry : umap2.entrySet()) {
+            final Long allocId = uframes.get(entry.getKey());
+            if (allocId == null) {
+                throw new RuntimeException("internal error: synced undo frame not found in uframes map");
             }
         }
 
@@ -171,7 +197,7 @@ public class SyncFrameEvent extends TransportEventImpl {
                         throw new InternalException();
                     } else {
                         if (b.getFrameType() == 0) {
-                            Frame frame = new DataFrame(b.getBytes(), b.getBd().getFile(), b.getBd().getPtr(), umap, t);
+                            Frame frame = new DataFrame(b.getBytes(), b.getBd().getFile(), b.getBd().getPtr(), t);
                             frame.setRes01(prevF);
                             frame.setRes02(nextF);
                             frame.setRes06(prevB);
@@ -181,15 +207,14 @@ public class SyncFrameEvent extends TransportEventImpl {
                             final LLT llt_ = LLT.getLLT(); //df access reordering prevent deadlock
                             b.getDf().writeFrame(b.getBd(), b.getBd().getPtr(), frame.getFrame(), llt_, s);
                             llt_.commit();
-//                            logger.debug("write data frame with allocId "+b.getAllocId()+" ptr "+b.getBd().getFrameId()+" size "+frame.getChunks().size());
-                            logger.debug("allocId "+b.getAllocId()+" ptr "+b.getBd().getFrameId());
+                            logger.debug("write data frame with allocId "+b.getAllocId()+" ptr "+b.getBd().getFrameId()+" size "+frame.getChunks().size());
+                            b.getBd().setFrame(null);
                         }
                     }
                 }
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            //b.getBd().setFrame(null);
         }
 
         final Map<Integer, List<SyncFrame>> storemap = new HashMap<>();
@@ -209,7 +234,7 @@ public class SyncFrameEvent extends TransportEventImpl {
                         throw new InternalException();
                     } else {
                         if (b.getFrameType() == 1 || b.getFrameType() == 2) {
-                            IndexFrame frame = new IndexFrame(b.getBytes(), b.getBd().getFile(), b.getBd().getPtr(), b.getImap(), hmap, umap, t);
+                            IndexFrame frame = new IndexFrame(b.getBytes(), b.getBd().getFile(), b.getBd().getPtr(), b.getImap(), hmap, t);
                             frame.setRes04(parentF);
                             frame.setRes05(lcF);
                             frame.setRes06(parentB);
@@ -226,7 +251,6 @@ public class SyncFrameEvent extends TransportEventImpl {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            //b.getBd().setFrame(null);
         }
 
         for (Map.Entry<Integer, List<SyncFrame>> entry : storemap.entrySet()) {
@@ -238,8 +262,6 @@ public class SyncFrameEvent extends TransportEventImpl {
             t.storeFrames(entry.getValue(), this.getCallbackNodeId(), llt_, s);
             llt_.commit();
         }
-
-//        llt.commit();
 
         final Map<Integer, List<FrameApi>> frames_ = new HashMap<>();
         for (SyncFrame f : sb) {
@@ -255,13 +277,13 @@ public class SyncFrameEvent extends TransportEventImpl {
             SQLCursor.addStreamFrame(new ContainerFrame(entry.getKey(), entry.getValue()));
         }
 
+        Metrics.get("syncFrameEvent").stop();
         logger.info(sb.length + " frame(s) were received and synced");
 
         return 0;
-
     }
 
-    private void updateTransactions(HashMap<Long, Transaction> rtran, Session s) {
+    private void updateTransactions(Map<Long, Transaction> rtran, Session s) {
         for (Map.Entry<Long, Transaction> entry : rtran.entrySet()) {
             Transaction tran = Instance.getInstance().getTransactionById(entry.getKey());
             if (tran==null) {

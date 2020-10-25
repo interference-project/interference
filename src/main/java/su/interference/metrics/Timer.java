@@ -58,5 +58,10 @@ public class Timer extends Histogram implements TimerMBean {
         }
     }
 
+    @Override
+    public void reset() {
+        super.reset();
+    }
+
 }
 

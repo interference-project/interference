@@ -27,6 +27,7 @@ package su.interference.transport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 
@@ -45,6 +46,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class TransportChannel {
 
     private final static Logger logger = LoggerFactory.getLogger(TransportChannel.class);
+    private final static int WRITE_BUFFER_SIZE = 33554432;
     private final int channelId;
     private final String channelUUID;
     private final ConcurrentLinkedQueue<TransportMessage> mq = new ConcurrentLinkedQueue<>();
@@ -86,7 +88,7 @@ public class TransportChannel {
                     }
                     if (sock.isConnected()) {
                         try {
-                            final ObjectOutputStream oos = new ObjectOutputStream(sock.getOutputStream());
+                            final ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(sock.getOutputStream(), WRITE_BUFFER_SIZE));
                             boolean running = true;
                             started.set(true);
                             Thread.currentThread().setName("transport channel thread 2");
@@ -96,6 +98,8 @@ public class TransportChannel {
                                     if (transportMessage != null) {
                                         if (oos != null) {
                                             oos.writeObject(transportMessage);
+                                            oos.flush();
+                                            oos.reset();
                                             transportMessage.setSendChannel(TransportChannel.this);
                                             mmap.put(transportMessage.getUuid(), transportMessage);
                                             logger.debug("channel id = " + channelId + " sent " + transportMessage + " message with UUID: " + transportMessage.getUuid());
