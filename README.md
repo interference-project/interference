@@ -1,40 +1,34 @@
 # interference
 
-##### simple distributed persistent layer for java applications
-##### (c) 2010 - 2020 head systems, ltd
-##### current revision: 2020.1 beta (unstable)
-##### for detailed information see doc/InterferenceManual.pdf
-
-##### contacts: info@inteference.su
+##### Interference is a java library enable you to run a full featured ORM database 
+##### and implement persistent layer in your distributed application
+###### (c) 2010 - 2020 head systems, ltd
+###### current revision: release 2020.2
+###### for detailed information see:
+###### http://interference.su and doc/InterferenceManual.pdf
+###### contacts: info@inteference.su
 ##### https://github.com/interference-project/interference
 
 
 ## Concepts & features
 
-- supports Base JPA annotations
-- supports local & distributed SQL queries
-- supports complex event processing and streaming SQL
+- runs in the same JVM with your application
+- operates with simple objects (POJOs)
+- uses base JPA annotations for object mapping directly to persistent storage
+- supports horizontal scaling SQL queries
 - supports transactions
-- supports unique constraints
-- supports persistent indexes
-- runs in the same JVM with local application
+- supports complex event processing (CEP) and simple streaming SQL
 - can be used as a local or distributed SQL database
-- can be used as persistent layer for a distributed application
-- operates with simple objects (POJOs), annotated primarily 
-  according to the JPA specification
-- allows you to make changes to data and query data from any node 
-  included in the cluster
-- does not contain any coordination nodes and does not require 
-  the launch of any additional coordinators. All cluster nodes are equivalent.
-
+- allows you to inserts data and run SQL queries from any node included in the cluster
+- does not require the launch of any additional coordinators
+- uses the simple and fast serialization
+- uses indices for fast access to data and increase performance of SQL joins
 
 ## NOTE:
 
 Interference is not a RDBMS in the classical sense, and it does 
 not support ddl operations (the table structure is created on the basis 
-of @Entity class JPA-compatible annotations), foreign keys. Standard 
-dml operations, like UPDATE, DELETE for bulk changes and check constraints 
-are planned to be implemented in future versions.
+of @Entity class JPA-compatible annotations). 
 
 ## Quick Start Application
 
@@ -54,7 +48,7 @@ like this:
     <dependency>
         <groupId>su.interference</groupId>
         <artifactId>interference</artifactId>
-        <version>2020.1</version>
+        <version>2020.2</version>
     </dependency>
     ...
 </dependencies>
