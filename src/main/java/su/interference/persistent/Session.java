@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -86,7 +86,6 @@ public class Session {
     @MgmtColumn(width=10, show=true, form=false, edit=false)
     private String ipAddress;
 
-    //todo in columns
     @Transient
     private Transaction transaction;
 
@@ -285,6 +284,16 @@ public class Session {
         final Table t = Instance.getInstance().getTableByName(c.getName());
         if (t != null) {
             this.startStatement();
+            final DataChunk dc = t.getChunkById(id, this);
+            return dc == null ? null : dc.getStandaloneEntity();
+        }
+        return null;
+    }
+
+    // find method for internal system mechanism
+    public Object find_ (Class c, long id) throws Exception {
+        final Table t = Instance.getInstance().getTableByName(c.getName());
+        if (t != null) {
             final DataChunk dc = t.getChunkById(id, this);
             return dc == null ? null : dc.getEntity();
         }

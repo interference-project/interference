@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -38,7 +38,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.InvocationTargetException;
-import java.net.MalformedURLException;
 import javax.persistence.*;
 
 /**
@@ -127,7 +126,7 @@ public class DataFile implements Serializable {
     }
 
     //constructor for low-level storage function (initial first-time load table descriptions from datafile)
-    public DataFile (DataChunk chunk) throws ClassNotFoundException, IllegalAccessException, InternalException, MalformedURLException {
+    public DataFile (DataChunk chunk) throws IllegalAccessException, InternalException {
         final Object[] dcs = chunk.getDcs().getValueSet();
         final Class c = this.getClass();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
@@ -413,14 +412,16 @@ public class DataFile implements Serializable {
     }
 
     //todo main method must incapsulate all cache-depends functional
-    public synchronized byte[] readData(final long ptr, final int size) throws IOException, InternalException {
+    public byte[] readData(final long ptr, final int size) throws IOException, InternalException {
         final long rest = this.file.length() - ptr;
         if (rest < size) {
             throw new InternalException();
         }
         final byte[] b = new byte[size];
-        this.file.seek(ptr);
-        this.file.read(b, 0, size);
+        synchronized (this) {
+            this.file.seek(ptr);
+            this.file.read(b, 0, size);
+        }
         return b;
     }
 

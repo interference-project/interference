@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -36,7 +36,6 @@ import java.util.concurrent.Callable;
 import java.util.ArrayList;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.net.MalformedURLException;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -97,22 +96,6 @@ public class FrameJoinTask implements Callable<List<Object>> {
         final Class c2 = bd2==null?null:Instance.getInstance().getTableById(t2).getTableClass();
         ResultSetEntity rsa = (ResultSetEntity)c1.getAnnotation(ResultSetEntity.class);
         final boolean c1rs = rsa!=null?true:false;
-
-/*
-        if (cur.getType() == Cursor.MASTER_TYPE && nodeId != Config.getConfig().LOCAL_NODE_ID && this.leftfs) {
-            Metrics.get("remoteTask").start();
-            final TransportEvent transportEvent = new SQLEvent(nodeId, cur.getCursorId(), bd1.getAllocId(), bd2==null?0:bd2.getAllocId(), bd2==null?null:bd2.getClass().getSimpleName(), 0, null, null, 0, true);
-            TransportContext.getInstance().send(transportEvent);
-            transportEvent.getLatch().await();
-            Metrics.get("remoteTask").stop();
-            if (!transportEvent.isFail()) {
-                final List<Object> rs = ((SQLEvent) transportEvent).getCallback().getResult().getResultSet();
-                Metrics.get("recordRCount").put(rs.size());
-                // logger.info(rs.size()+" records returns from node " + nodeId);
-                return rs;
-            }
-        }
-*/
 
         final ArrayList<Object> drs1 = bd1.getFrameEntities(s);
         final ArrayList<Object> drs2 = bd2==null?null:bd2.getFrameEntities(s);
@@ -182,7 +165,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
                 if (drs2==null) {
                     //HashFrame returns null drs
                     if (bd2 != null && bd2.getImpl() == FrameApi.IMPL_HASH) {
-                        final Comparable key = getKeyValue(c1, o1, ((SQLHashMapFrame) bd2).getCkey(), s);
+                        final Comparable key = getHashKeyValue(c1, o1, ((SQLHashMapFrame) bd2).getCkey(), s);
                         final List<Object> o2 = ((SQLHashMapFrame) bd2).get(key, s);
                         if (o2 != null) {
                             if (!(o2.get(0) == null && last)) {
@@ -197,7 +180,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
                             }
                         }
                     } else if (bd2 != null && bd2.getImpl() == FrameApi.IMPL_INDEX) {
-                        final Comparable key = getKeyValue(c1, o1, ((SQLIndexFrame) bd2).getLkey(), s);
+                        final Comparable key = getHashKeyValue(c1, o1, ((SQLIndexFrame) bd2).getLkey(), s);
                         final List<Object> o2 = ((SQLIndexFrame) bd2).get(key, s);
                         //todo may cause wrong (cutted) resultsets in non-last cursors for (OR) conditions - see hashmap impl above
                         if (o2 != null) {
@@ -241,48 +224,41 @@ public class FrameJoinTask implements Callable<List<Object>> {
             }
         }
         Metrics.get("recordLCount").put(res.size());
-        // logger.info(res.size()+" records returns from local node " + nodeId);
         return res;
     }
 
     public Object joinDataRecords (Class r, Class c1, Class c2, int t1, int t2, Object o1, Object o2, List<SQLColumn> cols, boolean isrs, Session s)
-        throws NoSuchMethodException, IllegalAccessException, InstantiationException, InvocationTargetException, MalformedURLException, ClassNotFoundException {
+        throws NoSuchMethodException, IllegalAccessException, InstantiationException, InvocationTargetException, ClassNotFoundException {
         final GenericResult ret = (GenericResult)r.newInstance();
         if (isrs) {
             for (SQLColumn sqlc : cols) {
-                final Method y = c1.getMethod("get"+sqlc.getAlias().substring(0,1).toUpperCase()+sqlc.getAlias().substring(1,sqlc.getAlias().length()), null);
-                final Method z = r.getMethod("set"+sqlc.getAlias().substring(0,1).toUpperCase()+sqlc.getAlias().substring(1,sqlc.getAlias().length()), new Class<?>[]{getClassByName(sqlc.getResultSetType())});
-                z.invoke(ret, new Object[]{y.invoke(o1, null)});
-                //fill genericResult
-                //ret.setValueByName(sqlc.getAlias(), y.invoke(o1, null));
+                if (sqlc.getObjectId() == t1) {
+                    final Method y = sqlc.getAliasGetter();
+                    final Method z = sqlc.getSetter(r);
+                    z.invoke(ret, new Object[]{y.invoke(o1, null)});
+                }
             }
             if (c2!=null) {
                 for (SQLColumn sqlc : cols) {
                     if (sqlc.getObjectId() == t2) {
-                        final Method y = c2.getMethod("get" + sqlc.getColumn().getName().substring(0, 1).toUpperCase() + sqlc.getColumn().getName().substring(1, sqlc.getColumn().getName().length()), new Class<?>[]{Session.class});
-                        final Method z = r.getMethod("set" + sqlc.getAlias().substring(0, 1).toUpperCase() + sqlc.getAlias().substring(1, sqlc.getAlias().length()), new Class<?>[]{getClassByName(sqlc.getResultSetType())});
+                        final Method y = sqlc.getGetter();
+                        final Method z = sqlc.getSetter(r);
                         z.invoke(ret, new Object[]{y.invoke(o2, new Object[]{s})});
-                        //fill genericResult
-                        //ret.setValueByName(sqlc.getAlias(), y.invoke(o2, new Object[]{s}));
                     }
                 }
             }
         } else {
             for (SQLColumn sqlc : cols) {
                 if (sqlc.getObjectId()==t1) {
-                    final Method y = c1.getMethod("get"+sqlc.getColumn().getName().substring(0,1).toUpperCase()+sqlc.getColumn().getName().substring(1,sqlc.getColumn().getName().length()), new Class<?>[]{Session.class});
-                    final Method z = r.getMethod("set"+sqlc.getAlias().substring(0,1).toUpperCase()+sqlc.getAlias().substring(1,sqlc.getAlias().length()), new Class<?>[]{getClassByName(sqlc.getResultSetType())});
+                    final Method y = sqlc.getGetter();
+                    final Method z = sqlc.getSetter(r);
                     z.invoke(ret, new Object[]{y.invoke(o1, new Object[]{s})});
-                    //fill genericResult
-                    //ret.setValueByName(sqlc.getAlias(), y.invoke(o1, new Object[]{s}));
                 }
                 if (c2 != null && o2 != null) {
                     if (sqlc.getObjectId() == t2) {
-                        final Method y = c2.getMethod("get" + sqlc.getColumn().getName().substring(0, 1).toUpperCase() + sqlc.getColumn().getName().substring(1, sqlc.getColumn().getName().length()), new Class<?>[]{Session.class});
-                        final Method z = r.getMethod("set" + sqlc.getAlias().substring(0, 1).toUpperCase() + sqlc.getAlias().substring(1, sqlc.getAlias().length()), new Class<?>[]{getClassByName(sqlc.getResultSetType())});
+                        final Method y = sqlc.getGetter();
+                        final Method z = sqlc.getSetter(r);
                         z.invoke(ret, new Object[]{y.invoke(o2, new Object[]{s})});
-                        //fill genericResult
-                        //ret.setValueByName(sqlc.getAlias(), y.invoke(o2, new Object[]{s}));
                     }
                 }
             }
@@ -291,18 +267,13 @@ public class FrameJoinTask implements Callable<List<Object>> {
         return ret;
     }
 
-    public Class getClassByName(String name) throws ClassNotFoundException {
-        final Class c = cache.get(name);
-        if (c!=null) {
-            return c;
-        }
-        final Class lc = Class.forName(name);
-        return lc;
+    private Comparable getKeyValue(Class c, Object o, SQLColumn sqlc, Session s) throws InvocationTargetException, IllegalAccessException {
+        final Method y = sqlc.getKeyGetter();
+        return sqlc.isCursor() ? (Comparable) y.invoke(o, null) : (Comparable) y.invoke(o, new Object[]{s});
     }
 
-    public Comparable getKeyValue(Class c, Object o, SQLColumn sqlc, Session s) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
-        final Method y = sqlc.isCursor() ? c.getMethod("get" + sqlc.getColumn().getName().substring(0, 1).toUpperCase() + sqlc.getColumn().getName().substring(1, sqlc.getColumn().getName().length()), null)
-                : c.getMethod("get" + sqlc.getColumn().getName().substring(0, 1).toUpperCase() + sqlc.getColumn().getName().substring(1, sqlc.getColumn().getName().length()), new Class<?>[]{Session.class});
+    private Comparable getHashKeyValue(Class c, Object o, SQLColumn sqlc, Session s) throws InvocationTargetException, IllegalAccessException {
+        final Method y = sqlc.getGetter();
         return sqlc.isCursor() ? (Comparable) y.invoke(o, null) : (Comparable) y.invoke(o, new Object[]{s});
     }
 

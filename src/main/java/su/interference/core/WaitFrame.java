@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -47,9 +47,13 @@ public class WaitFrame {
         this.busy = new AtomicLong(0);
     }
 
-    public synchronized WaitFrame acquire() {
+    public synchronized WaitFrame acquire(boolean force) {
         if (this.bd == null) {
             return null;
+        }
+        if (force) {
+            this.busy.set(Thread.currentThread().getId());
+            return this;
         }
         if (this.busy.compareAndSet(0, Thread.currentThread().getId())) {
             return this;
@@ -57,11 +61,15 @@ public class WaitFrame {
         return null;
     }
 
-    public synchronized WaitFrame acquire(final int fileId) {
+    public synchronized WaitFrame acquire(final int fileId, boolean force) {
         if (this.bd == null) {
             return null;
         }
         if (this.bd.getFile() == fileId) {
+            if (force) {
+                this.busy.set(Thread.currentThread().getId());
+                return this;
+            }
             if (this.busy.compareAndSet(0, Thread.currentThread().getId()) || this.busy.compareAndSet(Thread.currentThread().getId(), Thread.currentThread().getId())) {
                 return this;
             }

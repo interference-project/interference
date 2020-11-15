@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -93,7 +93,7 @@ public class Table implements ResultSet {
     @Column
     private long   frameLast;
     @Column
-    private long   frameAmount;
+    private AtomicLong frameAmount = new AtomicLong(0L);
     @Column
     private long   ltran;
     @Column
@@ -220,12 +220,12 @@ public class Table implements ResultSet {
         this.incValue = incValue;
     }
 
-    protected synchronized void incFrameAmount () {
-        frameAmount++;
+    protected void incFrameAmount () {
+        frameAmount.incrementAndGet();
     }
 
-    protected synchronized void decFrameAmount () {
-        frameAmount--;
+    protected  void decFrameAmount () {
+        frameAmount.decrementAndGet();
     }
 
     public static int getCLASS_ID() {
@@ -1021,7 +1021,7 @@ public class Table implements ResultSet {
                     s.persist(nb, llt); //update
                     s.persist(fb, llt); //insert
                     s.delete(bd, llt);
-                    this.frameAmount--;
+                    this.frameAmount.decrementAndGet();
                     s.persist(this, llt);
                     logger.debug("deallocate frame " + bd.getObjectId() + ":" + bd.getFile() + ":" + bd.getPtr() + " " + Thread.currentThread().getName());
                 } catch (Exception e) {
@@ -1046,10 +1046,8 @@ public class Table implements ResultSet {
         Metrics.get("getAvailableFrame").start();
         final long st = System.currentTimeMillis();
 
-
         //todo move to config
-        final long timeout = 5000;
-
+        final long timeout = 100;
 
         final int a = avframeStart.get()%this.lbs.length;
         while (true) {
@@ -1057,7 +1055,7 @@ public class Table implements ResultSet {
             for (int i = 0; i < this.lbs.length; i++) {
                 final int i_ = (a + i) % this.lbs.length;
                 final WaitFrame wb = this.lbs[i_];
-                final WaitFrame bd = fpart ? wb.acquire(getTargetFileId(((FilePartitioned) o).getFile())) : wb.acquire();
+                final WaitFrame bd = fpart ? wb.acquire(getTargetFileId(((FilePartitioned) o).getFile()), false) : wb.acquire(false);
                 if (bd != null) {
                     avframeStart.getAndIncrement();
                     Metrics.get("getAvailableFrame").stop();
@@ -1066,10 +1064,21 @@ public class Table implements ResultSet {
             }
             if (tp > timeout) {
                 for (int i = 0; i < this.lbs.length; i++) {
-                    logger.error("lbs: "+lbs[i].getBd().getFrameId()+":"+lbs[i].getBusy().get());
+                    logger.warn("lbs: "+lbs[i].getBd().getFrameId()+":"+lbs[i].getBusy().get());
                 }
-                logger.error("avframestart: "+avframeStart.get());
-                logger.error("get available frame method failed by timeout=" + timeout);
+                logger.warn("avframestart: "+avframeStart.get());
+                logger.warn("timeout occured during getavailableframe method: " + timeout);
+                for (int i = 0; i < this.lbs.length; i++) {
+                    final int i_ = (a + i) % this.lbs.length;
+                    final WaitFrame wb = this.lbs[i_];
+                    final WaitFrame bd = fpart ? wb.acquire(getTargetFileId(((FilePartitioned) o).getFile()), true) : wb.acquire(true);
+                    if (bd != null) {
+                        logger.warn("forced acquire: "+bd.getBd().getFrameId());
+                        avframeStart.getAndIncrement();
+                        Metrics.get("getAvailableFrame").stop();
+                        return bd;
+                    }
+                }
                 break;
             }
         }
@@ -1122,10 +1131,11 @@ public class Table implements ResultSet {
                 throw new InternalException();
             }
             final EntityContainer to = (EntityContainer)o;
-            //todo this check may be wrong - to.tran may contain already committed transaction
-            if (to.getTran().getTransId()!=s.getTransaction().getTransId()) {
-                logger.error("unable to persist an object that has not been changed by current transaction");
-                return null;
+            if (to.getTran() != null && to.getTran().getCid() == 0) {
+                if (to.getTran().getTransId() != s.getTransaction().getTransId()) {
+                    logger.error("unable to persist an object that has not been changed by current transaction");
+                    return null;
+                }
             }
         }
 
@@ -1195,7 +1205,6 @@ public class Table implements ResultSet {
                 DataChunk udc = null;
 
                 if (!isNoTran()) { //save undo information
-                    //logger.info("try to lock "+dc.getHeader().getRowID().getFileId()+" "+dc.getHeader().getRowID().getFramePointer()+" "+dc.getHeader().getRowID().getRowPointer());
                     udc = dc.lock(s, llt);
                 }
 
@@ -1375,37 +1384,39 @@ public class Table implements ResultSet {
     }
 
     //todo deprecated started param
-    public synchronized FrameData createNewFrame(final FrameData frame, final int fileId, final int frameType, final long allocId, final boolean started, final boolean setlbs, final boolean external, final Session s, final LLT llt) throws Exception {
+    public FrameData createNewFrame(final FrameData frame, final int fileId, final int frameType, final long allocId, final boolean started, final boolean setlbs, final boolean external, final Session s, final LLT llt) throws Exception {
         final DataFile df = Storage.getStorage().getDataFileById(fileId);
         final FrameData bd = df.createNewFrame(frame, frameType, allocId, started, external, this, s, llt);
         if (!external) {
-            boolean done = true;
+            synchronized (this) {
+                boolean done = true;
 //System.out.println("Table.createNewFrame: old="+(frame==null?"null":frame.getFrameId())+" frame="+(frame.getFrame()==null?"null":(frame.getFrame().getFrameData()==null?":null":frame.getFrame().getFrameData().getFrameId())));
-            if (setlbs && !this.getName().equals(UndoChunk.class.getName())) {
-                done = false;
-                for (WaitFrame wb : this.lbs) {
-                    if (wb.trySetBd(frame, bd, frameType)) {
-                        done = true;
-                        break;
+                if (setlbs && !this.getName().equals(UndoChunk.class.getName())) {
+                    done = false;
+                    for (WaitFrame wb : this.lbs) {
+                        if (wb.trySetBd(frame, bd, frameType)) {
+                            done = true;
+                            break;
+                        }
                     }
                 }
-            }
-            if (!done) {
-                // todo evicted frame -> metric
-                for (WaitFrame wb : this.lbs) {
-                    if (wb.getBd().getFile() == bd.getFile()) {
-                        // remove evicted ptr from prevframe
-                        frame.setNextFrame(wb.getBd().getPtr());
-                        s.persist(frame, llt);
+                if (!done) {
+                    // todo evicted frame -> metric
+                    for (WaitFrame wb : this.lbs) {
+                        if (wb.getBd().getFile() == bd.getFile()) {
+                            // remove evicted ptr from prevframe
+                            frame.setNextFrame(wb.getBd().getPtr());
+                            s.persist(frame, llt);
+                        }
                     }
-                }
-                bd.clearCurrent();
-                s.persist(bd, llt);
-                logger.info("evict frame " + bd.getObjectId() + ":" + bd.getFile() + ":" + bd.getPtr() + " " + Thread.currentThread().getName());
-                for (WaitFrame wb : this.lbs) {
-                    final WaitFrame bd_ = wb.acquire(fileId);
-                    if (bd_ != null) {
-                        return bd_.getBd();
+                    bd.clearCurrent();
+                    s.persist(bd, llt);
+                    logger.info("evict frame " + bd.getObjectId() + ":" + bd.getFile() + ":" + bd.getPtr() + " " + Thread.currentThread().getName());
+                    for (WaitFrame wb : this.lbs) {
+                        final WaitFrame bd_ = wb.acquire(fileId, false);
+                        if (bd_ != null) {
+                            return bd_.getBd();
+                        }
                     }
                 }
             }
@@ -1792,7 +1803,7 @@ public class Table implements ResultSet {
                     final long parentB = target.getIndexFrame().getPointer();
                     if (cc != null) {
                         target = Instance.getInstance().getFrameById(cc.getHeader().getFramePtr());
-                        target.getIndexFrame().setMv(cc.getDcs()); //set non-persitent maxvalue
+                        target.setMv(cc.getDcs()); //set non-persitent maxvalue
                     } else {
                         final long lcId = target.getIndexFrame().getLcF() + target.getIndexFrame().getLcB();
                         target = Instance.getInstance().getFrameById(lcId); //get by last child
@@ -2216,11 +2227,11 @@ public class Table implements ResultSet {
     }
 
     public long getFrameAmount() {
-        return frameAmount;
+        return frameAmount.get();
     }
 
     public void setFrameAmount(long frameAmount) {
-        this.frameAmount = frameAmount;
+        this.frameAmount.set(frameAmount);
     }
 
     public long getLtran() {

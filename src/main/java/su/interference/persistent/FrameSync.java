@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -33,7 +33,6 @@ import su.interference.mgmt.MgmtColumn;
 
 import javax.persistence.*;
 import java.lang.reflect.Modifier;
-import java.net.MalformedURLException;
 
 /**
  * @author Yuriy Glotanov
@@ -43,7 +42,7 @@ import java.net.MalformedURLException;
 @Entity
 @SystemEntity
 @DisableSync
-public class FrameSync {
+public class FrameSync implements Comparable {
     @Column
     @Id
     @IndexColumn
@@ -61,6 +60,10 @@ public class FrameSync {
     @Column
     @IndexColumn
     @MgmtColumn(width=20, show=true, form=false, edit=false)
+    private String syncUUID;
+    @Column
+    @IndexColumn
+    @MgmtColumn(width=20, show=true, form=false, edit=false)
     private long frameId;
     @Transient
     public static final int CLASS_ID = 15;
@@ -69,14 +72,15 @@ public class FrameSync {
 
     }
 
-    public FrameSync(long allocId, int nodeId, long frameId) {
+    public FrameSync(long allocId, int nodeId, long frameId, String syncUUID) {
         this.allocId = allocId;
         this.nodeId = nodeId;
         this.frameId = frameId;
+        this.syncUUID = syncUUID;
     }
 
     //constructor for low-level storage function (initial first-time load table descriptions from datafile)
-    public FrameSync(DataChunk chunk) throws ClassNotFoundException, IllegalAccessException, InternalException, MalformedURLException {
+    public FrameSync(DataChunk chunk) throws IllegalAccessException, InternalException {
         final Object[] dcs = chunk.getDcs().getValueSet();
         final Class c = this.getClass();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
@@ -92,6 +96,21 @@ public class FrameSync {
                 x++;
             }
         }
+    }
+
+    public int compareTo(Object obj) {
+        final FrameSync c = (FrameSync)obj;
+        if (this.getSyncId() < c.getSyncId()) {
+            return -1;
+        } else if (this.getSyncId() > c.getSyncId()) {
+            return 1;
+        }
+        return 0;
+    }
+
+    @Override
+    public String toString() {
+        return this.nodeId + ":" + this.syncUUID + ":" + this.allocId + ":" + this.syncId;
     }
 
     public long getSyncId() {
@@ -116,6 +135,14 @@ public class FrameSync {
 
     public void setNodeId(int nodeId) {
         this.nodeId = nodeId;
+    }
+
+    public String getSyncUUID() {
+        return syncUUID;
+    }
+
+    public void setSyncUUID(String syncUUID) {
+        this.syncUUID = syncUUID;
     }
 
     public long getFrameId() {

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -25,12 +25,15 @@
 package su.interference.sql;
 
 import su.interference.core.IndexDescript;
+import su.interference.persistent.Session;
 import su.interference.persistent.Table;
 import su.interference.exception.InternalException;
 
 import javax.persistence.Id;
+import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.lang.reflect.Field;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author Yuriy Glotanov
@@ -44,8 +47,14 @@ public class SQLColumn implements Comparable {
     private int objectId;
 
     private final Table table;
+    private final Class cl;
+    private final Class keycl;
     private final Field column;
+    private final Method getter;
+    private final Method keyGetter;
+    private final Method aliasGetter;
     private final String alias; //alias must be equals with tempColumn.getName()
+    private Method setter;
     private boolean result;
     private boolean where;
     private boolean order;
@@ -60,6 +69,7 @@ public class SQLColumn implements Comparable {
     private final boolean cursor;
     private final boolean useUC;
     private boolean mergeIX;
+    private final static ConcurrentHashMap<String, Class> cache = new ConcurrentHashMap<String, Class>();
 
     // group function
     public static final int F_COUNT = SQLGroupFunction.F_COUNT;
@@ -75,8 +85,21 @@ public class SQLColumn implements Comparable {
     public static final int F_TO_CHAR = 3;
     public static final int F_TO_DATE = 4;
 
-    public SQLColumn (Table table, int columnid, Field c, String alias, int ftype, int loc, int orderOrd, int groupOrd, int windowInterval, boolean cursor, boolean useUC) {
+    static {
+        cache.put("int", int.class);
+        cache.put("long", long.class);
+        cache.put("float", float.class);
+        cache.put("double", double.class);
+    }
+
+    public SQLColumn (Table table, int columnid, Field c, String alias, int ftype, int loc, int orderOrd, int groupOrd, int windowInterval, boolean cursor, boolean useUC) throws Exception {
         this.table = table;
+        this.cl = table.getTableClass();
+        //todo MJ keys may be more than one
+        this.keycl = table.getFirstIndexByColumnName(c.getName()) == null ? null : table.getFirstIndexByColumnName(c.getName()).getTableClass();
+        this.getter = this.cl.getMethod("get" + c.getName().substring(0, 1).toUpperCase() + c.getName().substring(1, c.getName().length()), cursor ? null : new Class<?>[]{Session.class});
+        this.aliasGetter = cursor ? this.cl.getMethod("get" + alias.substring(0, 1).toUpperCase() + alias.substring(1, alias.length()), cursor ? null : new Class<?>[]{Session.class}) : null;
+        this.keyGetter = this.keycl == null ? null : this.keycl.getMethod("get" + c.getName().substring(0, 1).toUpperCase() + c.getName().substring(1, c.getName().length()), cursor ? null : new Class<?>[]{Session.class});
         this.objectId = table.getObjectId();
         this.id = columnid;
         this.column = c;
@@ -165,6 +188,16 @@ public class SQLColumn implements Comparable {
         }
 
         return 0;
+    }
+
+    private Class getClassByName(String name) throws ClassNotFoundException {
+        final Class c = cache.get(name);
+        if (c != null) {
+            return c;
+        }
+        final Class lc = Class.forName(name);
+        cache.put(name, lc);
+        return lc;
     }
 
     public int getId() {
@@ -277,5 +310,24 @@ public class SQLColumn implements Comparable {
 
     public void setMergeIX(boolean mergeIX) {
         this.mergeIX = mergeIX;
+    }
+
+    public Method getGetter() {
+        return getter;
+    }
+
+    public Method getKeyGetter() {
+        return keyGetter;
+    }
+
+    public Method getAliasGetter() {
+        return aliasGetter;
+    }
+
+    protected Method getSetter(Class r) throws ClassNotFoundException, NoSuchMethodException {
+        if (setter == null) {
+            setter = r.getMethod("set"+this.alias.substring(0,1).toUpperCase()+this.alias.substring(1,this.alias.length()), new Class<?>[]{getClassByName(getResultSetType())});
+        }
+        return setter;
     }
 }

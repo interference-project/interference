@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -509,6 +509,34 @@ public class DataChunk implements Chunk {
         return entity;
     }
 
+    public Object getStandaloneEntity() {
+        try {
+            final ValueSet dcs = getDcs();
+            final Object o = t.getInstance(); //returns empty instance
+            final Field[] cs = t.getFields();
+            for (int i=0; i<cs.length; i++) {
+                final int m = cs[i].getModifiers();
+                if (Modifier.isPrivate(m)) {
+                    cs[i].setAccessible(true);
+                }
+                if (dcs.getValueSet()[i]!=null) {
+                    cs[i].set(o, dcs.getValueSet()[i]);
+                }
+            }
+            if (!t.isNoTran()) {
+                ((EntityContainer) o).setRowId(header.getRowID());
+                ((EntityContainer) o).setTran(header.getTran());
+                if (!t.isIndex()) {
+                    ((EntityContainer) o).setDataChunk(this);
+                }
+            }
+            return o;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
     //for bootstrap system / not use table objects
     public Object getEntity (Class c, Object[] params) {
         SystemEntity ca = (SystemEntity)c.getAnnotation(SystemEntity.class);
@@ -622,7 +650,7 @@ public class DataChunk implements Chunk {
     }
 
     public DataChunk restore(UndoChunk uc) throws Exception {
-        // second, since we are using a dirty hack with changing the header in a source chunk for rollback his,
+        // since we are using a dirty hack with changing the header in a source chunk for rollback his,
         // we need to first delete the source chunk in the target block to prevent inconsistency within ChunkMap / chunk headers
         if (!(this.getHeader().getRowID().getFileId() == uc.getFile() && this.getHeader().getRowID().getFramePointer() == uc.getFrame())) {
             final long srcFrameId = uc.getFile() + uc.getFrame();

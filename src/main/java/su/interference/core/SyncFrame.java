@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -53,6 +53,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
     private final long parentId;
     private final long lcId;
     private final boolean allowR;
+    private final boolean proc;
     private final boolean started;
     private final Map<Long, Long> imap;
     private final Map<Long, Transaction> rtran;
@@ -63,9 +64,14 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
     private transient Frame rFrame;
 
     public SyncFrame(Frame frame, Session s, FreeFrame fb) throws Exception {
+        this(frame, s, fb, true);
+    }
+
+    public SyncFrame(Frame frame, Session s, FreeFrame fb, boolean proc) throws Exception {
         final Table t = Instance.getInstance().getTableById(frame.getObjectId());
         final FrameData bd = Instance.getInstance().getFrameById(frame.getPtr());
         allowR = frame.isLocal() ? !t.isNoTran() || t.getName().equals("su.interference.persistent.UndoChunk") : false;
+        this.proc = proc;
 
         if (bd == null && allowR) {
             final FreeFrame fframe = Instance.getInstance().getFreeFrameById(frame.getPtr());
@@ -198,6 +204,10 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
 
     public boolean isAllowR() {
         return allowR;
+    }
+
+    public boolean isProc() {
+        return proc;
     }
 
     public boolean isStarted() {

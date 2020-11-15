@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -124,7 +124,7 @@ public class SyncFrameEvent extends TransportEventImpl {
 
         for (SyncFrame b : sb) {
             try {
-                if (b.isAllowR()) {
+                if (b.isAllowR() && b.isProc()) {
                     final Table t = Instance.getInstance().getTableByName(b.getClassName());
                     final long prevId_ = b.getPrevId() == 0 ? 0 : hmap.get(b.getPrevId()) != null ? hmap.get(b.getPrevId()) : Instance.getInstance().getFrameByAllocId(b.getPrevId()).getFrameId();
                     final long nextId_ = b.getNextId() == 0 ? 0 : hmap.get(b.getNextId()) != null ? hmap.get(b.getNextId()) : Instance.getInstance().getFrameByAllocId(b.getNextId()).getFrameId();
@@ -163,16 +163,18 @@ public class SyncFrameEvent extends TransportEventImpl {
         // of current sync pack
         final Map<Long, Long> uframes = new HashMap<>();
         for (SyncFrame b : sb) {
-            for (Map.Entry<Long, List<Long>> entry : b.getUFrames().entrySet()) {
-                final List<Long> ulist = new ArrayList<>();
-                final Transaction tran = Instance.getInstance().getTransactionById(entry.getKey());
-                for (Long uallocId : entry.getValue()) {
-                    final long uframeId = Instance.getInstance().getFrameByAllocId(uallocId).getFrameId();
-                    uframes.put(uframeId, uallocId);
-                    ulist.add(uframeId);
-                    tran.storeRFrame(uframeId);
+            if (b.isProc()) {
+                for (Map.Entry<Long, List<Long>> entry : b.getUFrames().entrySet()) {
+                    final List<Long> ulist = new ArrayList<>();
+                    final Transaction tran = Instance.getInstance().getTransactionById(entry.getKey());
+                    for (Long uallocId : entry.getValue()) {
+                        final long uframeId = Instance.getInstance().getFrameByAllocId(uallocId).getFrameId();
+                        uframes.put(uframeId, uallocId);
+                        ulist.add(uframeId);
+                        tran.storeRFrame(uframeId);
+                    }
+                    b.getBd().updateTCounter(entry.getKey(), ulist);
                 }
-                b.getBd().updateTCounter(entry.getKey(), ulist);
             }
         }
         for (Map.Entry<Long, Long> entry : umap2.entrySet()) {
@@ -184,7 +186,7 @@ public class SyncFrameEvent extends TransportEventImpl {
 
         for (SyncFrame b : sb) {
             try {
-                if (b.isAllowR()) {
+                if (b.isAllowR() && b.isProc()) {
                     final Table t = Instance.getInstance().getTableByName(b.getClassName());
                     final long prevId_ = b.getPrevId() == 0 ? 0 : hmap.get(b.getPrevId()) != null ? hmap.get(b.getPrevId()) : Instance.getInstance().getFrameByAllocId(b.getPrevId()).getFrameId();
                     final long nextId_ = b.getNextId() == 0 ? 0 : hmap.get(b.getNextId()) != null ? hmap.get(b.getNextId()) : Instance.getInstance().getFrameByAllocId(b.getNextId()).getFrameId();
@@ -221,7 +223,7 @@ public class SyncFrameEvent extends TransportEventImpl {
 
         for (SyncFrame b : sb) {
             try {
-                if (b.isAllowR()) {
+                if (b.isAllowR() && b.isProc()) {
                     final Table t = Instance.getInstance().getTableByName(b.getClassName());
                     final long parentId_ = b.getParentId() == 0 ? 0 : hmap.get(b.getParentId()) != null ? hmap.get(b.getParentId()) : Instance.getInstance().getFrameByAllocId(b.getParentId()).getFrameId();
                     final long lcId_ = b.getLcId() == 0 ? 0 : hmap.get(b.getLcId()) != null ? hmap.get(b.getLcId()) : Instance.getInstance().getFrameByAllocId(b.getLcId()).getFrameId();
@@ -265,7 +267,7 @@ public class SyncFrameEvent extends TransportEventImpl {
 
         final Map<Integer, List<FrameApi>> frames_ = new HashMap<>();
         for (SyncFrame f : sb) {
-            if (f.isAllowR()) {
+            if (f.isAllowR() && f.isProc()) {
                 final Table t = Instance.getInstance().getTableByName(f.getClassName());
                 if (frames_.get(t.getObjectId()) == null) {
                     frames_.put(t.getObjectId(), new ArrayList<>());
