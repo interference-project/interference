@@ -1,7 +1,7 @@
 /**
 The MIT License (MIT)
 
-Copyright (c) 2010-2019 head systems, ltd
+Copyright (c) 2010-2020 head systems, ltd
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -492,9 +492,6 @@ public class Frame implements Comparable {
     }
 
     public synchronized void removeChunk (int ptr, LLT llt, boolean ignore) {
-        if (!this.isLocal()) {
-            throw new CannotAccessToForeignRecord();
-        }
         final long sync = LLT.getSyncId();
         final Chunk chunk = data.getByPtr(ptr);
         if (chunk == null) {
@@ -577,6 +574,7 @@ public class Frame implements Comparable {
         for (Chunk c : data.getChunks()) {
             if (c.getHeader().getTran().getTransId() == tran.getTransId()) {
                 ((DataChunk) c).setUndoChunk(null);
+                // todo ((DataChunk) c).cleanUpIcs();
                 r.add(c.getHeader().getPtr());
             }
         }

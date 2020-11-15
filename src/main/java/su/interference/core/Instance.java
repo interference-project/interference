@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -635,10 +635,32 @@ public class Instance implements Interference {
         return (FreeFrame)dc.getEntity();
     }
 
-    public ArrayList<FrameSync> getSyncFrames(int nodeId) {
+    @Deprecated
+    public ArrayList<FrameSync> getSyncFrames(int nodeId, int amount, boolean bulk) {
         final Table t = getTableByName("su.interference.persistent.FrameSync");
-        final ArrayList<FrameSync> r = new ArrayList<FrameSync>();
-        for (Object o : t.getIndexFieldByColumn("nodeId").getIndex().getObjectsByKey(nodeId)) {
+        final ArrayList<FrameSync> r = new ArrayList<>();
+        for (Object o : t.getIndexFieldByColumn("nodeId").getIndex().getObjectsByKey(nodeId, amount)) {
+            r.add((FrameSync)((DataChunk)o).getEntity());
+        }
+        return r;
+    }
+
+    public ArrayList<FrameSync> getSyncFrames(int nodeId, int amount) {
+        final Table t = getTableByName("su.interference.persistent.FrameSync");
+        final ArrayList<FrameSync> r = new ArrayList<>();
+        for (Object o : t.getIndexFieldByColumn("syncId").getIndex().getContent(amount)) {
+            final FrameSync fs = (FrameSync)((DataChunk)o).getEntity();
+            if (fs.getNodeId() == nodeId) {
+                r.add(fs);
+            }
+        }
+        return r;
+    }
+
+    public ArrayList<FrameSync> getSyncFramesByUUID(String UUID) {
+        final Table t = getTableByName("su.interference.persistent.FrameSync");
+        final ArrayList<FrameSync> r = new ArrayList<>();
+        for (Object o : t.getIndexFieldByColumn("syncUUID").getIndex().getObjectsByKey(UUID)) {
             r.add((FrameSync)((DataChunk)o).getEntity());
         }
         return r;
@@ -646,7 +668,7 @@ public class Instance implements Interference {
 
     public ArrayList<FrameSync> getSyncFramesById(long frameId) {
         final Table t = getTableByName("su.interference.persistent.FrameSync");
-        final ArrayList<FrameSync> r = new ArrayList<FrameSync>();
+        final ArrayList<FrameSync> r = new ArrayList<>();
         for (Object o : t.getIndexFieldByColumn("frameId").getIndex().getObjectsByKey(frameId)) {
             r.add((FrameSync)((DataChunk)o).getEntity());
         }

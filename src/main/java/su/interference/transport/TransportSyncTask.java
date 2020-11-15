@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -29,12 +29,9 @@ import org.slf4j.LoggerFactory;
 import su.interference.core.*;
 import su.interference.exception.InternalException;
 import su.interference.metrics.Metrics;
-import su.interference.persistent.FrameSync;
-import su.interference.persistent.FreeFrame;
-import su.interference.persistent.Session;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import su.interference.persistent.*;
+
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -47,6 +44,7 @@ public class TransportSyncTask implements Runnable {
 
     private final static Logger logger = LoggerFactory.getLogger(TransportSyncTask.class);
     private final static int REMOTE_SYNC_TIMEOUT = 120000;
+    private final static int REMOTE_SYNC_DEFERRED_AMOUNT = 10000;
     private final ArrayList<SyncFrame> frames;
     private final Session s;
 
@@ -64,45 +62,54 @@ public class TransportSyncTask implements Runnable {
             for (Map.Entry<Integer, TransportChannel> entry : HeartBeatProcess.channels.entrySet()) {
                 final TransportChannel channel = entry.getValue();
                 if (channel.isStarted() && channel.isConnected()) {
-                    final List<FrameSync> lbs = Instance.getInstance().getSyncFrames(channel.getChannelId());
-                    logger.info(lbs.size() + " persisted sync frame(s) found (node id = " + channel.getChannelId() + ")");
-                    final List<SyncFrame> psb_ = new ArrayList<>();
+                    final List<FrameSync> lbs_ = Instance.getInstance().getSyncFrames(channel.getChannelId(), REMOTE_SYNC_DEFERRED_AMOUNT);
+                    final String lbsUUID = lbs_.size() > 0 ? lbs_.get(0).getSyncUUID() : "NONE";
+                    if (lbs_.size() > 0) {
+                        logger.debug("retrieve first framesync: " + lbs_.get(0));
+                    }
+                    final List<FrameSync> lbs = lbs_.size() == 0 ? new ArrayList<>() : Instance.getInstance().getSyncFramesByUUID(lbs_.get(0).getSyncUUID());
+                    Collections.sort(lbs);
+                    logger.info(lbs.size() + " persisted sync frame(s) found (node id = " + channel.getChannelId() + ", UUID = " + lbsUUID + ")");
+                    final List<SyncFrame> psb = new ArrayList<>();
                     for (FrameSync bs : lbs) {
-                        if (bs.getAllocId() == CommandEvent.COMMIT || bs.getAllocId() == CommandEvent.ROLLBACK) { //command
+                        if (bs.getAllocId() == CommandEvent.INITTRAN || bs.getAllocId() == CommandEvent.COMMIT || bs.getAllocId() == CommandEvent.ROLLBACK) { //command
                             final CommandEvent command = new CommandEvent((int)bs.getAllocId(), bs.getFrameId(), channel.getChannelId());
                             TransportContext.getInstance().send(command);
                             final boolean sent = command.getLatch().await(REMOTE_SYNC_TIMEOUT, TimeUnit.MILLISECONDS);
                             if (!command.isFail() && sent) {
+                                logger.debug("sent persisted command sync: " + bs);
                                 s.delete(bs);
-                                logger.info("sent persisted command sync to node " + channel.getChannelId());
                             }
                         } else {
                             FreeFrame fb = null;
                             final Frame b = Instance.getInstance().getFrameById(bs.getFrameId()).getFrame();
                             final SyncFrame sb_ = new SyncFrame(b, s, fb);
-                            psb_.add(sb_);
+                            psb.add(sb_);
                         }
                     }
                     boolean done_ = true;
-                    final SyncFrame[] psb = psb_.stream().filter(b -> b.isAllowR()).collect(Collectors.toList()).toArray(new SyncFrame[]{});
                     try {
-                        if (psb.length > 0) {
-                            final SyncFrameEvent event = new SyncFrameEvent(channel.getChannelId(), psb);
+                        if (psb.size() > 0) {
+                            Collection<SyncFrame> psb_ = retrieveAdditionalFrames(psb, s);
+                            final SyncFrameEvent event = new SyncFrameEvent(channel.getChannelId(), psb_.toArray(new SyncFrame[]{}));
                             TransportContext.getInstance().send(event);
                             final boolean sent = event.getLatch().await(REMOTE_SYNC_TIMEOUT, TimeUnit.MILLISECONDS);
                             if (!event.isFail() && sent) {
-                                logger.info(psb.length + " persisted sync frame(s) were sent and synced (node id = " + channel.getChannelId() + ")");
+                                logger.info(psb.size() + "(" + psb_.size() + ") persisted sync frame(s) were sent and synced (node id = " + channel.getChannelId() + ")");
                             }
                         }
                     } catch (Exception e) {
                         done_ = false;
-                        logger.error(psb.length+" persisted sync frame(s) were not sync due to channel failure (node id = " + channel.getChannelId() + ")");
+                        logger.error(psb.size()+" persisted sync frame(s) were not sync due to channel failure (node id = " + channel.getChannelId() + ")");
                     }
                     if (done_) {
                         for (FrameSync bs : lbs) {
                             if (bs.getAllocId() > CommandEvent.MAX_COMMAND) { //command
-                                s.delete(bs);
-                                logger.info("sent persisted framesync with allocId = " + bs.getAllocId() + " to node " + channel.getChannelId());
+                                final FrameSync f_ = (FrameSync) s.find_(FrameSync.class, bs.getSyncId());
+                                if (f_ != null) {
+                                    logger.debug("sent persisted framesync: " + bs);
+                                    s.delete(bs);
+                                }
                             }
                         }
                     }
@@ -120,40 +127,24 @@ public class TransportSyncTask implements Runnable {
                             logger.info(sb.length + " frame(s) were sent and synced (node id = " + channel.getChannelId() + ")");
                         }
                     } catch (Exception e) {
+                        final String syncUUID = UUID.randomUUID().toString();
+                        createInitTranCommands(sb, channel.getChannelId(), s);
                         for (SyncFrame b : sb) {
-                            final ArrayList<FrameSync> sbs = Instance.getInstance().getSyncFramesById(b.getFrameId());
-                            boolean persist = true;
-                            for (FrameSync bs_ : sbs) {
-                                if (bs_.getNodeId() == channel.getChannelId()) {
-                                    persist = false;
-                                    break;
-                                }
-                            }
-                            if (persist) {
-                                FrameSync bs = new FrameSync(b.getAllocId(), channel.getChannelId(), b.getFrameId());
-                                s.persist(bs);
-                                logger.debug("persist framesync with allocId = "+b.getAllocId()+" for channel " + channel.getChannelId());
-                            }
+                            FrameSync bs = new FrameSync(b.getAllocId(), channel.getChannelId(), b.getFrameId(), syncUUID);
+                            s.persist(bs);
+                            logger.debug("persist framesync " + bs);
                             Metrics.get("syncQueue").put(1);
                         }
                         logger.error(sb.length+" frame(s) were not sync due to channel failure (channel id = " + channel.getChannelId() + ")");
                     }
                 } else {
                     logger.info("node "+channel.getChannelId()+" unavailable");
+                    final String syncUUID = UUID.randomUUID().toString();
+                    createInitTranCommands(sb, channel.getChannelId(), s);
                     for (SyncFrame b : sb) {
-                        final ArrayList<FrameSync> sbs = Instance.getInstance().getSyncFramesById(b.getFrameId());
-                        boolean persist = true;
-                        for (FrameSync bs_ : sbs) {
-                            if (bs_.getNodeId() == channel.getChannelId()) {
-                                persist = false;
-                                break;
-                            }
-                        }
-                        if (persist) {
-                            FrameSync bs = new FrameSync(b.getAllocId(), channel.getChannelId(), b.getFrameId());
-                            s.persist(bs);
-                            logger.debug("persist framesync with allocId = "+b.getAllocId()+" for channel " + channel.getChannelId());
-                        }
+                        FrameSync bs = new FrameSync(b.getAllocId(), channel.getChannelId(), b.getFrameId(), syncUUID);
+                        s.persist(bs);
+                        logger.debug("persist framesync: " + bs);
                     }
                     logger.info(sb.length+" frame(s) were not sync due to node unavailable (channel id = " + channel.getChannelId() + ")");
                 }
@@ -171,11 +162,64 @@ public class TransportSyncTask implements Runnable {
             TransportContext.getInstance().send(event);
             event.getLatch().await();
             if (event.isFail()) {
-                FrameSync bs = new FrameSync(command, channel.getChannelId(), id);
+                FrameSync bs = new FrameSync(command, channel.getChannelId(), id, UUID.randomUUID().toString());
                 s.persist(bs);
                 logger.debug("persist command sync for channelId " + channel.getChannelId());
             }
         }
+    }
+
+    private void createInitTranCommands(SyncFrame[] sb, int channelId, Session s) throws Exception {
+        final Map<Long, Transaction> tmap = new HashMap<>();
+        final List<CommandEvent> events = new ArrayList<>();
+        for (SyncFrame b : sb) {
+            for (Map.Entry<Long, Transaction> entry : b.getRtran().entrySet()) {
+                tmap.put(entry.getKey(), entry.getValue());
+            }
+        }
+        for (Map.Entry<Long, Transaction> entry : tmap.entrySet()) {
+            final FrameSync fs = new FrameSync(CommandEvent.INITTRAN, channelId, entry.getKey(), UUID.randomUUID().toString());
+            s.persist(fs);
+        }
+    }
+
+    private Collection<SyncFrame> retrieveAdditionalFrames(List<SyncFrame> sb, Session s) throws Exception {
+        Map<Long, SyncFrame> add = new HashMap<>();
+        for (SyncFrame f : sb) {
+            add.put(f.getAllocId(), f);
+        }
+        FreeFrame fb = null;
+        for (SyncFrame f : sb) {
+            if (add.get(f.getNextId()) == null) {
+                final FrameData nextF = f.getNextId() == 0 ? null : Instance.getInstance().getFrameByAllocId(f.getNextId());
+                if (nextF != null) {
+                    add.put(f.getNextId(), new SyncFrame(nextF.getFrame(), s, fb, false));
+                }
+            }
+            if (add.get(f.getParentId()) == null) {
+                final FrameData parentF = f.getParentId() == 0 ? null : Instance.getInstance().getFrameByAllocId(f.getParentId());
+                if (parentF != null) {
+                    add.put(f.getParentId(), new SyncFrame(parentF.getFrame(), s, fb, false));
+                }
+            }
+            if (add.get(f.getLcId()) == null) {
+                final FrameData lcF = f.getLcId() == 0 ? null : Instance.getInstance().getFrameByAllocId(f.getLcId());
+                if (lcF != null) {
+                    add.put(f.getLcId(), new SyncFrame(lcF.getFrame(), s, fb, false));
+                }
+            }
+            if (f.getImap() != null) {
+                for (Map.Entry<Long, Long> entry : f.getImap().entrySet()) {
+                    if (add.get(entry.getValue()) == null) {
+                        final FrameData allocF = entry.getValue() == 0 ? null : Instance.getInstance().getFrameByAllocId(entry.getValue());
+                        if (allocF != null) {
+                            add.put(entry.getValue(), new SyncFrame(allocF.getFrame(), s, fb, false));
+                        }
+                    }
+                }
+            }
+        }
+        return add.values();
     }
 
 }

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -43,9 +43,6 @@ public class IndexFrame extends Frame {
     public static final int INDEX_FRAME_NODE = 2;
     public static final int INDEX_FRAME_LEAF = 1;
     public static final int INITIALIZE_DURING_CONSTRUCT = 1;
-
-    //non-persistent value (must set if hasMv=1)
-    private ValueSet mv;
 
     public IndexFrame(int file, long pointer, int size, int objectId, Table t) throws InternalException {
         super(file, pointer, size, t);
@@ -158,7 +155,7 @@ public class IndexFrame extends Frame {
                 this.setLcF(0);
                 this.setLcB(0);
             } else {
-                final int cmv = e.getDcs().compareTo(this.mv);
+                final int cmv = e.getDcs().compareTo(this.getFrameData().getMv());
                 if (cmv > 0) {
                     throw new InternalException();
                 } else {
@@ -277,7 +274,7 @@ public class IndexFrame extends Frame {
                 if (dc.getUndoChunk() != null && dc.getHeader().getTran().getCid() == 0) { //updated chunk in live transaction
                     return dc;
                 } else {
-                    if (dc.getHeader().getTran() == null) {
+                    if (dc.getHeader().getTran() == null || s.isStream()) {
                         return dc;
                     } else {
                         if ((tr == dc.getHeader().getTran().getTransId()) || (dc.getHeader().getTran().getCid() > 0 && dc.getHeader().getTran().getCid() <= mtran)) {
@@ -308,7 +305,7 @@ public class IndexFrame extends Frame {
                     if (((DataChunk) ie).getUndoChunk() != null && ((DataChunk) ie).getHeader().getTran().getCid() == 0) { //updated chunk in live transaction
                         r.add((DataChunk) ie);
                     } else {
-                        if (((DataChunk) ie).getHeader().getTran() == null) {
+                        if (((DataChunk) ie).getHeader().getTran() == null || s.isStream()) {
                             r.add((DataChunk) ie);
                         } else {
                             if ((tr == ((DataChunk) ie).getHeader().getTran().getTransId()) || (((DataChunk) ie).getHeader().getTran().getCid() > 0 && ((DataChunk) ie).getHeader().getTran().getCid() <= mtran)) {
@@ -416,13 +413,4 @@ public class IndexFrame extends Frame {
     public void setLcB(long lcB) {
         this.setRes07(lcB);
     }
-
-    public ValueSet getMv() {
-        return mv;
-    }
-
-    public void setMv(ValueSet mv) {
-        this.mv = mv;
-    }
-    
 }

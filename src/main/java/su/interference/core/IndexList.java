@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -119,28 +119,42 @@ public class IndexList {
         removeObjects(key, o);
     }
 
-    public synchronized List<Object> getObjectsByKey (final IndexElementKey key) {
+    public synchronized List<Object> getObjectsByKey (final IndexElementKey key, final int amount) {
         final ArrayList<Object> r = new ArrayList<Object>();
         boolean cnue = true;
         ArrayList<IndexElementList> targets = new ArrayList<IndexElementList>();
         IndexElementList el = list.get(start);
         //el.sort();
         targets.add(el);
+        int amount_ = 0;
         while (cnue) {
             final ArrayList<IndexElementList> ntargets = new ArrayList<IndexElementList>();
             for (IndexElementList target : targets) {
                 //target.sort();
-                if (target.getType()==1) { //leaf
-                    r.addAll(target.getObjectsByKey(key));
+                if (target.getType() == 1) { //leaf
+                    if (amount == 0) {
+                        final List<Object> list = target.getObjectsByKey(key);
+                        r.addAll(list);
+                    } else {
+                        if (amount - amount_ > 0) {
+                            final List<Object> list = target.getObjectsByKey(key);
+                            for (Object o : list) {
+                                if (amount - amount_ > 0) {
+                                    r.add(o);
+                                }
+                                amount_++;
+                            }
+                        }
+                    }
                     cnue = false;
                 } else {
                     final ArrayList<Integer> cptr = target.getChildElementsPtr(key);
-                    if (cptr.size()>0) {
+                    if (cptr.size() > 0) {
                         for (Integer i : cptr) {
                             ntargets.add(list.get(i));
                         }
                     }
-                    if (target.getLc()>0) {
+                    if (target.getLc() > 0) {
                         ntargets.add(list.get(target.getLc())); //get by last child
                     }
                 }
@@ -151,24 +165,38 @@ public class IndexList {
     }
 
     public synchronized List<Object> getContent() {
-        ArrayList<Object> res = new ArrayList<Object>();
-        ArrayList<IndexElementList> levelNodes = new ArrayList<IndexElementList>();
+        return getContent(0);
+    }
+
+    public synchronized List<Object> getContent(int amount) {
+        ArrayList<Object> res = new ArrayList<>();
+        ArrayList<IndexElementList> levelNodes = new ArrayList<>();
         boolean cnue = true;
         IndexElementList el = list.get(start);
         el.sort();
         levelNodes.add(el);
+        int amount_ = 0;
         while (cnue) {
-            ArrayList<IndexElementList> inNodes = new ArrayList<IndexElementList>();
+            ArrayList<IndexElementList> inNodes = new ArrayList<>();
             int lc = 0;
             for (int k=0; k<levelNodes.size(); k++) {
                 levelNodes.get(k).sort();
-                if (levelNodes.get(k).getType()==1) {
-                    cnue = false;
-                    for (IndexElement ie : levelNodes.get(k).getElementList()) {
-                        if (levelNodes.get(k).getType()==1) {
+                if (levelNodes.get(k).getType() == 1) {
+                    if (amount == 0) {
+                        for (IndexElement ie : levelNodes.get(k).getElementList()) {
                             res.add(ie.getElement());
                         }
+                    } else {
+                        if (amount - amount_ > 0) {
+                            for (IndexElement ie : levelNodes.get(k).getElementList()) {
+                                if (amount - amount_ > 0) {
+                                    res.add(ie.getElement());
+                                }
+                                amount_++;
+                            }
+                        }
                     }
+                    cnue = false;
                 } else {
                     for (int i=0; i<levelNodes.get(k).getElementList().size(); i++) {
                         inNodes.add(this.list.get((Integer)levelNodes.get(k).getElementList().get(i).getElement()));
@@ -302,11 +330,23 @@ public class IndexList {
 
 
     public synchronized List<Object> getObjectsByKey (final int obj) {
-        return getObjectsByKey (new IndexElementKey(new Integer[]{obj}));
+        return getObjectsByKey (new IndexElementKey(new Integer[]{obj}), 0);
     }
 
     public synchronized List<Object> getObjectsByKey (final long obj) {
-        return getObjectsByKey (new IndexElementKey(new Long[]{obj}));
+        return getObjectsByKey (new IndexElementKey(new Long[]{obj}), 0);
+    }
+
+    public synchronized List<Object> getObjectsByKey (final String obj) {
+        return getObjectsByKey (new IndexElementKey(new String[]{obj}), 0);
+    }
+
+    public synchronized List<Object> getObjectsByKey (final int obj, final int amount) {
+        return getObjectsByKey (new IndexElementKey(new Integer[]{obj}), amount);
+    }
+
+    public synchronized List<Object> getObjectsByKey (final long obj, final int amount) {
+        return getObjectsByKey (new IndexElementKey(new Long[]{obj}), amount);
     }
 
     //for non-unique indexes

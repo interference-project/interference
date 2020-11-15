@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -37,7 +37,6 @@ import javax.persistence.*;
 import java.io.Serializable;
 import java.util.*;
 import java.lang.reflect.Modifier;
-import java.net.MalformedURLException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -53,9 +52,9 @@ public class Transaction implements Serializable {
     @Transient
     public static final int TRAN_READ_COMMITTED = 0;
     @Transient
-    public static final int TRAN_SERIALIZABLE   = 1;
+    public static final int TRAN_SERIALIZABLE = 1;
     @Transient
-    public static final int TRAN_THR            = 9;
+    public static final int TRAN_THR = 9;
 
     @Id
     @Column
@@ -113,7 +112,7 @@ public class Transaction implements Serializable {
     }
 
     //constructor for low-level storage function (initial first-time load table descriptions from datafile)
-    public Transaction (DataChunk chunk) throws ClassNotFoundException, IllegalAccessException, InternalException, MalformedURLException {
+    public Transaction (DataChunk chunk) throws IllegalAccessException, InternalException {
         final Object[] dcs = chunk.getDcs().getValueSet();
         final Class c = this.getClass();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
@@ -165,7 +164,7 @@ public class Transaction implements Serializable {
         while (true) {
 //            for (int i=0; i<this.lbs.length; i++) {
             final WaitFrame wb = this.lbs[i.get()];
-            final WaitFrame bd = fpart?wb.acquire(getTargetFileId(o.getFile())):wb.acquire();
+            final WaitFrame bd = fpart?wb.acquire(getTargetFileId(o.getFile()), false):wb.acquire(false);
             if (bd != null) {
                 if (avframeStart.get()==this.lbs.length-1) { avframeStart.set(0); }
                 else { avframeStart.getAndIncrement(); }
