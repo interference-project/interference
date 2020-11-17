@@ -127,6 +127,15 @@ public class IndexFrame extends Frame {
         this.b = null; //throw bytes to GC
     }
 
+    public void cleanICEntities() {
+        for (Chunk c : this.data.getChunks()) {
+            final Object e = ((DataChunk) c).getExistingEntity();
+            if (e != null) {
+                ((IndexChunk) e).setDataChunk(null);
+            }
+        }
+    }
+
     public IndexFrame add (DataChunk e, Table t, Session s, LLT llt) throws Exception {
         if (this.isFill(e)) {
 

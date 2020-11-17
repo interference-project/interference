@@ -574,7 +574,7 @@ public class Frame implements Comparable {
         for (Chunk c : data.getChunks()) {
             if (c.getHeader().getTran().getTransId() == tran.getTransId()) {
                 ((DataChunk) c).setUndoChunk(null);
-                // todo ((DataChunk) c).cleanUpIcs();
+                ((DataChunk) c).cleanUpIcs();
                 r.add(c.getHeader().getPtr());
             }
         }
@@ -591,7 +591,11 @@ public class Frame implements Comparable {
                         final int ucfile = uc.getDataChunk().getHeader().getRowID().getFileId();
                         final long frameptr = uc.getDataChunk().getHeader().getRowID().getFramePointer();
                         if (uc.getTransId() == tran.getTransId() && ucfile == this.file && frameptr == this.pointer) {
-                            data.add(uc.getDataChunk().restore(uc));
+                            final DataChunk rc = uc.getDataChunk().restore(uc);
+                            if (this instanceof IndexFrame && rc.getExistingEntity() != null) {
+                                ((IndexChunk) rc.getExistingEntity()).setDataChunk(null);
+                            }
+                            data.add(rc);
                         }
                     }
                 }
