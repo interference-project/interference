@@ -355,6 +355,12 @@ public class Transaction implements Serializable {
                         frame_.rollbackTransaction(this, ubs, s);
                     }
                 }
+                for (FrameData ub : ubd2) {
+                    final Frame frame_ = ub.getFrame();
+                    if (frame_ instanceof IndexFrame) {
+                        ((IndexFrame) frame_).cleanICEntities();
+                    }
+                }
 
                 for (TransFrame tb : tframes) {
                     boolean hasfb = false;

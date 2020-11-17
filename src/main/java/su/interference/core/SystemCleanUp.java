@@ -45,7 +45,7 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
     public static final int DATA_RETRIEVED_PRIORITY = 6;
     public static final int INDEX_RETRIEVED_PRIORITY = 9;
     private static final int CLEANUP_PROTECTION_THR = 1000;
-    private static final int IX_CLEANUP_PROTECTION_THR = 20000;
+    private static final int IX_CLEANUP_PROTECTION_THR = 5000;
 
     public void run () {
         Thread.currentThread().setName("interference-cleanup-thread");
@@ -138,5 +138,12 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
         Metrics.get("imUndoFrames").put(u_);
         Metrics.get("systemCleanUp").stop();
 
+    }
+
+    public static void forceCleanUp() {
+        for (Object entry : Instance.getInstance().getFramesMap().entrySet()) {
+            final FrameData f = (FrameData) ((DataChunk) ((Map.Entry) entry).getValue()).getEntity();
+            f.clearFrame();
+        }
     }
 }

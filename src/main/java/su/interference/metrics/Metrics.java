@@ -24,10 +24,11 @@
 
 package su.interference.metrics;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import java.lang.management.ManagementFactory;
-import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -40,15 +41,26 @@ public class Metrics {
     public static final int COUNTER = 1;
     public static final int HISTOGRAM = 2;
     public static final int TIMER = 3;
+    public static final int CALL = 4;
     public static final int METER = 10;
     private static final ConcurrentHashMap<String, Meter> metrics = new ConcurrentHashMap<String, Meter>();
     private static final MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+    private final static Logger logger = LoggerFactory.getLogger(Metrics.class);
+
+    static {
+        try {
+            register(CALL, "systemCalls");
+        } catch (Exception e) {
+            logger.error("Exception in metrics static intializer", e);
+        }
+    }
 
     public static void register(int type, String name) throws Exception {
         if (type == COUNTER) { metrics.put(name, new Counter(name)); }
         if (type == HISTOGRAM) { metrics.put(name, new Histogram(name)); }
         if (type == TIMER) { metrics.put(name, new Timer(name)); }
         if (type == METER) { metrics.put(name, new Meter(name)); }
+        if (type == CALL) { metrics.put(name, new Call(name)); }
 
         ObjectName obj = new ObjectName("su.interference:type="+name+metrics.get(name).getClass().getSimpleName());
         mbs.registerMBean(metrics.get(name), obj);

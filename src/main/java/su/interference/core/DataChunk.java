@@ -466,6 +466,10 @@ public class DataChunk implements Chunk {
         return 0;
     }
 
+    public Object getExistingEntity() {
+        return this.entity;
+    }
+
     public Object getEntity () {
         if (entity==null) {
             try {
