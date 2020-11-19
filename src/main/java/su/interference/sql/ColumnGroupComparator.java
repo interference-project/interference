@@ -31,7 +31,7 @@ import java.util.Comparator;
  * @since 1.0
  */
 
-public class ColumnGroupComparator implements Comparator<SQLColumn> {
+class ColumnGroupComparator implements Comparator<SQLColumn> {
     
     public int compare(SQLColumn o1, SQLColumn o2) {
         if (o1.getGroupOrd() < o2.getGroupOrd()) {

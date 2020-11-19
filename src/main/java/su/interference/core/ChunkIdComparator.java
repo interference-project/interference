@@ -39,6 +39,7 @@ public class ChunkIdComparator implements Comparator<Chunk> {
         this.s = s;
     }
 
+    @SuppressWarnings("unchecked")
     public int compare(Chunk c1, Chunk c2) {
         try {
             return c1.getId(null, s).compareTo(c2.getId(null, s));

@@ -100,6 +100,7 @@ public class SystemInit {
         return null;
     }
 
+    @SuppressWarnings("unchecked")
     public static Table createInitialFrames(boolean initStorage, int nodeType, Session s) throws Exception {
 
         ClassLoader cl = Instance.getInstance().getClass().getClassLoader();
@@ -288,46 +289,6 @@ public class SystemInit {
             for (Frame b : ret) {
                 Storage.getStorage().writeFrame(b);
             }
-            //Storage.getStorage().writeInitData(undo, f);
-            //insert datafiles
-//            for (int i=1; i<dfs.length; i++) {
-//                DataChunk dc = new DataChunk(dfs[i], s);
-//                ret[3].insertChunk(dc, s, true);
-//            }
-
-            //insert process
-//            ret[9].insertChunk(new DataChunk(new Process(1, "lsync","su.interference.core.SyncQueue"), s), s, true);
-//            ret[9].insertChunk(new DataChunk(new Process(2, "rsync","su.interference.remote.RemoteSync"), s), s, true);
-            //insert node
-//            Node n = RemoteUtils.getLocalNode();
-//            n.setType(nodeType);
-//            ret[11].insertChunk(new DataChunk(n, s), s, true);
-            //insert modules
-//            ret[12].insertChunk(new DataChunk(new MgmtModule(1,"Instance","su.interference.mgmt.InstanceMgmt",1),s),s,true);
-//            ret[12].insertChunk(new DataChunk(new MgmtModule(2,"Cluster","su.interference.persistent.Node",1),s),s,true);
-//            ret[12].insertChunk(new DataChunk(new MgmtModule(3,"Datafiles","su.interference.persistent.DataFile",1),s),s,true);
-//            ret[12].insertChunk(new DataChunk(new MgmtModule(4,"Tables","su.interference.persistent.Table",1),s),s,true);
-//            ret[12].insertChunk(new DataChunk(new MgmtModule(5,"Frames","su.interference.persistent.FrameData",1),s),s,true);
-//            ret[12].insertChunk(new DataChunk(new MgmtModule(6,"Processes","su.interference.persistent.Process",1),s),s,true);
-//            ret[12].insertChunk(new DataChunk(new MgmtModule(7,"Session","su.interference.persistent.Session",1),s),s,true);
-//            ret[12].insertChunk(new DataChunk(new MgmtModule(8,"Transactions","su.interference.persistent.Transaction",1),s),s,true);
-//            ret[12].insertChunk(new DataChunk(new MgmtModule(9,"Sources","su.interference.persistent.Source",1),s),s,true);
-//            ret[12].insertChunk(new DataChunk(new MgmtModule(10,"Modules","su.interference.persistent.MgmtModule",1),s),s,true);
-
-            //insert frames
-//            for (int i=0; i<ts.length; i++) {
-//                //insert frames into datafile exclude UndoChunk
-//                if (!ts[i].getName().equals("su.interference.persistent.UndoChunk")) {
-//                    DataChunk dc = new DataChunk(bds[i], s);
-//                    if (ts[i].getName().equals("su.interference.persistent.FrameData")) {
-//                        bds[i].setUsed(dc.getBytesAmount()*(ts.length-1));
-//                    } else {
-//                        bds[i].setUsed(ret[i].getBytesAmountWoHead());
-//                    }
-//                    dc = new DataChunk(bds[i], s);
-//                    ret[0].insertChunk(dc, s, true);
-//                }
-//            }
 
             for (int i=0; i<bds.length; i++) {
                 if (getTableById(ts, bds[i].getObjectId()).getName().equals("su.interference.persistent.FrameData")) {

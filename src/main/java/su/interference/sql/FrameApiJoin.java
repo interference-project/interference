@@ -39,7 +39,6 @@ import java.util.concurrent.CountDownLatch;
 
 public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
     private final int nodeId;
-    private final transient SQLCursor cur;
     private final transient FrameApi bd1;
     private final transient FrameApi bd2;
     private final transient FrameJoinTask frameJoinTask;
@@ -51,7 +50,6 @@ public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
 
     public FrameApiJoin(int nodeId, SQLCursor cur, FrameApi bd1, FrameApi bd2) {
         this.nodeId = nodeId;
-        this.cur = cur;
         this.bd1 = bd1;
         this.bd2 = bd2;
         this.leftAllocId = bd1.getAllocId();

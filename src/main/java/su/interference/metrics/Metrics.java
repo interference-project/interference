@@ -49,7 +49,7 @@ public class Metrics {
 
     static {
         try {
-            register(CALL, "systemCalls");
+            register(CALL, "system");
         } catch (Exception e) {
             logger.error("Exception in metrics static intializer", e);
         }

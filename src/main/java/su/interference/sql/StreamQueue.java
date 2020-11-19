@@ -43,6 +43,7 @@ public class StreamQueue implements ResultSet {
     //private final PriorityBlockingQueue<Comparable> q = new PriorityBlockingQueue();
     private final List<SQLColumn> rscols;
     private final Table rstable;
+    @SuppressWarnings("unchecked")
     private final ConcurrentLinkedQueue<Object> q = new ConcurrentLinkedQueue();
     private final Session s;
     private SQLColumn windowColumn;

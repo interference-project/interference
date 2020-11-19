@@ -53,6 +53,7 @@ public class IndexElementKey implements Comparable {
         this.key[1] = p2;
     }
 
+    @SuppressWarnings("unchecked")
     public int compareTo(final Object obj) {
         final IndexElementKey j = (IndexElementKey)obj;
 
@@ -72,8 +73,7 @@ public class IndexElementKey implements Comparable {
 
     public boolean equals(final Object obj) {
         final IndexElementKey j = (IndexElementKey)obj;
-        if (this.compareTo(j) == 0) { return true; }
-        return false;
+        return this.compareTo(j) == 0;
     }
 
     public Object[] getKey() {

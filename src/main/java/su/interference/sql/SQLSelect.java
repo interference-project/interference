@@ -148,6 +148,7 @@ public class SQLSelect implements SQLStatement {
         return new DataSet(result.toArray(new Object[]{}), t, message);
     }
 
+    @SuppressWarnings("unchecked")
     private final void parseSQL (String s, Cursor cur, Session sn) throws Exception {
 
         final String sql = s.trim();
@@ -339,6 +340,7 @@ public class SQLSelect implements SQLStatement {
             for (SQLColumn rsc : rscl) {
                 if (rsc.getId() == grc.getId()) {
                     chk = true;
+                    break;
                 }
             }
             if (!chk) {
@@ -412,10 +414,7 @@ public class SQLSelect implements SQLStatement {
     }
 
     public boolean isGroupedResult() {
-        if (cols.getGroupColumns().size() > 0 || cols.getFResultColumns().size() > 0) {
-            return true;
-        }
-        return false;
+        return cols.getGroupColumns().size() > 0 || cols.getFResultColumns().size() > 0;
     }
 
     public Table getEntityTable() {

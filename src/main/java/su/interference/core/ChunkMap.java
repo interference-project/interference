@@ -47,6 +47,7 @@ public class ChunkMap {
         this.frame = frame;
     }
 
+    @SuppressWarnings("unchecked")
     public synchronized void sort() {
         Collections.sort(list);
         sorted = true;

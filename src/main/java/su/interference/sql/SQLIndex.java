@@ -124,16 +124,10 @@ public class SQLIndex implements FrameIterator, Finder {
 
     public boolean hasNextFrame() {
         if (left) {
-            if (terminate.get()) {
-                return false;
-            }
-            return true;
+            return !terminate.get();
         } else {
-            if (!returned.get()) {
-                return true;
-            }
+            return !returned.get();
         }
-        return false;
     }
 
     public int getType() {

@@ -289,9 +289,7 @@ public class SQLCursor implements FrameIterator {
                         final Future<List<Object>> ft = exec.submit(task);
 
                         if (cur.getSqlStmt().isGroupedResult()) {
-                            for (Object o : ft.get()) {
-                                q_in.add(o);
-                            }
+                            q_in.addAll(ft.get());
                         } else {
                             for (Object o : ft.get()) {
                                 target.persist(o, s);
@@ -306,9 +304,7 @@ public class SQLCursor implements FrameIterator {
                             final Future<List<Object>> ft = exec.submit(task);
 
                             if (cur.getSqlStmt().isGroupedResult()) {
-                                for (Object o : ft.get()) {
-                                    q_in.add(o);
-                                }
+                                q_in.addAll(ft.get());
                             } else {
                                 for (Object o : ft.get()) {
                                     target.persist(o, s);
@@ -431,10 +427,7 @@ public class SQLCursor implements FrameIterator {
 
     public synchronized boolean hasNextFrame() throws InternalException {
         bdnext = nextFrame2();
-        if (bdnext!=null) {
-            return true;
-        }
-        return false;
+        return bdnext != null;
     }
 
     public synchronized void resetIterator() {
@@ -449,8 +442,9 @@ public class SQLCursor implements FrameIterator {
         for (SQLColumn c : sl) {
             boolean chk = true;
             for (SQLColumn mc : ml) {
-                if (mc.getId()==c.getId()) {
+                if (mc.getId() == c.getId()) {
                     chk = false;
+                    break;
                 }
             }
             if (chk) res.add(c);

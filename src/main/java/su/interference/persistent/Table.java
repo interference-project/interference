@@ -492,8 +492,7 @@ public class Table implements ResultSet {
                 res.add(f[i]);
             }
         }
-        java.lang.reflect.Field[] fields = res.toArray(new java.lang.reflect.Field[]{});
-        return fields;
+        return res.toArray(new java.lang.reflect.Field[]{});
     }
 
     private String[] getTableFieldTypes() throws ClassNotFoundException, MalformedURLException {
@@ -525,7 +524,7 @@ public class Table implements ResultSet {
         java.lang.reflect.Field f = getTableIdField();
         if (f != null) {
             NoCheck a = f.getAnnotation(NoCheck.class);
-            return a == null ? false : true;
+            return a != null;
         }
         return true;
     }
@@ -1510,8 +1509,7 @@ public class Table implements ResultSet {
                 stopped.set(false);
             }
         };
-        RetrieveQueue rq = new RetrieveQueue(q, r);
-        return rq;
+        return new RetrieveQueue(q, r);
     }
 
     protected synchronized RetrieveQueue getIndexContentQueue(Session s) {
@@ -1587,8 +1585,7 @@ public class Table implements ResultSet {
                 stopped.set(false);
             }
         };
-        RetrieveQueue rq = new RetrieveQueue(q, r);
-        return rq;
+        return new RetrieveQueue(q, r);
     }
 
     public Object poll(Session s) {

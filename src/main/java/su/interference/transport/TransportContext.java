@@ -198,6 +198,7 @@ public class TransportContext implements TransportApi {
         return HeartBeatProcess.channels.keySet().toArray(new Integer[]{});
     }
 
+    @SuppressWarnings("unchecked")
     public Integer[] getOnlineNodesWithLocal() {
         List<Integer> ns = Arrays.asList(HeartBeatProcess.channels.keySet().toArray(new Integer[]{}));
         List<Integer> ns_ = new ArrayList();

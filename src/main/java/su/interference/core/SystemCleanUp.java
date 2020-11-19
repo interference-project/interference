@@ -143,7 +143,9 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
     public static void forceCleanUp() {
         for (Object entry : Instance.getInstance().getFramesMap().entrySet()) {
             final FrameData f = (FrameData) ((DataChunk) ((Map.Entry) entry).getValue()).getEntity();
-            f.clearFrame();
+            if (f.isSynced()) {
+                f.clearFrame();
+            }
         }
     }
 }

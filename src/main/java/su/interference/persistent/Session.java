@@ -178,6 +178,7 @@ public class Session {
         return registerTable (n, s, null, null, null, false);
     }
 
+    @SuppressWarnings("unchecked")
     public Table registerTable (String n, Session s, List<SQLColumn> cols, java.lang.reflect.Field[] flds, Table pt, boolean ixflag) throws Exception {
         final ClassLoader cl = this.getClass().getClassLoader();
         final POJOProxyFactory ppf = POJOProxyFactory.getInstance();
@@ -257,8 +258,7 @@ public class Session {
     public Object newEntity (Class c) {
         final Table t = Instance.getInstance().getTableByName(c.getName());
         try {
-            final Object o = t.isNoTran() ? t.newInstance() : t.newInstance(this);
-            return o;
+            return t.isNoTran() ? t.newInstance() : t.newInstance(this);
         } catch (Exception e) {
             logger.error("proxy instantiation fails", e);
         }
@@ -268,14 +268,14 @@ public class Session {
     public Object newEntity (Class c, Object[] params) {
         final Table t = Instance.getInstance().getTableByName(c.getName());
         try {
-            final Object o = t.isNoTran() ? t.newInstance(params) : t.newInstance(params, this);
-            return o;
+            return t.isNoTran() ? t.newInstance(params) : t.newInstance(params, this);
         } catch (Exception e) {
             logger.error("proxy instantiation fails", e);
         }
         return null;
     }
 
+    @SuppressWarnings("unchecked")
     public EntityFactory getEntityFactory(Class c) {
         return new EntityFactory(c, this);
     }
@@ -300,6 +300,7 @@ public class Session {
         return null;
     }
 
+    @SuppressWarnings("unchecked")
     protected synchronized RetrieveQueue getContentQueue(Table t) {
         if (t != null) {
             try {

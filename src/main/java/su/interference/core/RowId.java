@@ -56,10 +56,7 @@ public class RowId implements Comparable {
     }
 
     public boolean equals (RowId r) {
-        if ((this.getFileId() == r.getFileId())&&(this.getFramePointer() == r.getFramePointer())&&(this.getRowPointer() == r.getRowPointer())) {
-            return true;
-        }
-        return false;
+        return (this.getFileId() == r.getFileId()) && (this.getFramePointer() == r.getFramePointer()) && (this.getRowPointer() == r.getRowPointer());
     }
 
     public int compareTo (Object o) {

@@ -476,6 +476,7 @@ public class Storage {
     }
 
     //bootstrap subsystem - first index generate by objectId
+    @SuppressWarnings("ConditionalBreakInInfiniteLoop")
     private synchronized IndexList bootstrapFrameLoad() throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, NoSuchMethodException {
 //        ArrayList<FrameData> res = new ArrayList<FrameData>();
         final IndexList res = new IndexList();

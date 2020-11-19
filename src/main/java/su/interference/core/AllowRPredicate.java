@@ -29,6 +29,6 @@ package su.interference.core;
  * @since 1.0
  */
 
-public interface AllowRPredicate {
+interface AllowRPredicate {
     boolean isAllowR();
 }

@@ -91,10 +91,7 @@ public class DataFile implements Serializable {
     }
 
     public boolean isOpen() {
-        if (file==null) {
-            return false;
-        }
-        return true;
+        return file != null;
     }
 
     public SystemFrame getSframe() {
@@ -412,16 +409,14 @@ public class DataFile implements Serializable {
     }
 
     //todo main method must incapsulate all cache-depends functional
-    public byte[] readData(final long ptr, final int size) throws IOException, InternalException {
+    public synchronized byte[] readData(final long ptr, final int size) throws IOException, InternalException {
         final long rest = this.file.length() - ptr;
         if (rest < size) {
             throw new InternalException();
         }
         final byte[] b = new byte[size];
-        synchronized (this) {
-            this.file.seek(ptr);
-            this.file.read(b, 0, size);
-        }
+        this.file.seek(ptr);
+        this.file.read(b, 0, size);
         return b;
     }
 

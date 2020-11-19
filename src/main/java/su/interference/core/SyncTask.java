@@ -37,6 +37,7 @@ import java.util.concurrent.Callable;
 
 public class SyncTask implements Callable<Integer> {
 
+    @SuppressWarnings("unchecked")
     private final PriorityBlockingQueue<SyncFrame> pq = new PriorityBlockingQueue();
     private final DataFile df;
 

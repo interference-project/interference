@@ -60,11 +60,8 @@ public class Types {
           &&(t2.equals(p_int)||t2.equals(t_int)||t2.equals(c_int)||t2.equals(p_long)||t2.equals(t_long)||t2.equals(c_long))) {
             return true;
         }
-        if ((t1.equals(p_float)||t1.equals(t_float)||t1.equals(p_double)||t1.equals(t_double))
-          &&(t2.equals(p_float)||t2.equals(t_float)||t2.equals(p_double)||t2.equals(t_double))) {
-            return true;
-        }
-        return false;
+        return (t1.equals(p_float) || t1.equals(t_float) || t1.equals(p_double) || t1.equals(t_double))
+                && (t2.equals(p_float) || t2.equals(t_float) || t2.equals(p_double) || t2.equals(t_double));
     }
 
     public static synchronized int getTypeLength(String type, int l) {
@@ -106,11 +103,7 @@ public class Types {
     }
 
     public static synchronized boolean isVarType (String type) {
-        if (getTypeLength(type, 0)==0) {
-            return true;
-        } else {
-            return false;
-        }
+        return getTypeLength(type, 0) == 0;
     }
 
     public static synchronized boolean isVarType (Field f) {
@@ -129,11 +122,7 @@ public class Types {
             return true;
         } else if (type.equals("float")) {
             return true;
-        } else if (type.equals("double")) {
-            return true;
-        } else {
-            return false;
-        }
+        } else return type.equals("double");
     }
 
     public static synchronized boolean isPrimitiveType (Field f) {

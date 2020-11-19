@@ -187,6 +187,7 @@ public class CList {
         return null;
     }
 
+    @SuppressWarnings("unchecked")
     public void sort () {
         Collections.sort(this.columns);
     }

@@ -62,6 +62,7 @@ public class DataChunkId {
     }
 
     //serializer
+    @SuppressWarnings("unchecked")
     public DataChunkId (Object o, Session s) throws IOException, InvocationTargetException, NoSuchMethodException, InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         Class c = o.getClass();
         final SystemEntity sa = (SystemEntity)c.getAnnotation(SystemEntity.class);

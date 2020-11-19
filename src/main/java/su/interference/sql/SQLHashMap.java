@@ -65,6 +65,7 @@ public class SQLHashMap implements FrameIterator {
         this.s = s;
     }
 
+    @SuppressWarnings("unchecked")
     public Comparable getKeyValue(Class c, Object o, SQLColumn sqlc, Session s) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         Method y = c.getMethod("get"+sqlc.getColumn().getName().substring(0,1).toUpperCase()+sqlc.getColumn().getName().substring(1,sqlc.getColumn().getName().length()), new Class<?>[]{Session.class});
         return (Comparable)y.invoke(o, new Object[]{s});

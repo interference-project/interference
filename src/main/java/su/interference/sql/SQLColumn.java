@@ -92,6 +92,7 @@ public class SQLColumn implements Comparable {
         cache.put("double", double.class);
     }
 
+    @SuppressWarnings("unchecked")
     public SQLColumn (Table table, int columnid, Field c, String alias, int ftype, int loc, int orderOrd, int groupOrd, int windowInterval, boolean cursor, boolean useUC) throws Exception {
         this.table = table;
         this.cl = table.getTableClass();
@@ -126,9 +127,7 @@ public class SQLColumn implements Comparable {
             Id a1 = (Id) column.getAnnotation(Id.class);
             IndexDescript ids = table.getIndexDescriptByColumnName(column.getName());
             final boolean uix = ids == null ? false : ids.isUnique();
-            if (a1 != null || uix) {
-                return true;
-            }
+            return a1 != null || uix;
         }
         return false;
     }
@@ -324,6 +323,7 @@ public class SQLColumn implements Comparable {
         return aliasGetter;
     }
 
+    @SuppressWarnings("unchecked")
     protected Method getSetter(Class r) throws ClassNotFoundException, NoSuchMethodException {
         if (setter == null) {
             setter = r.getMethod("set"+this.alias.substring(0,1).toUpperCase()+this.alias.substring(1,this.alias.length()), new Class<?>[]{getClassByName(getResultSetType())});

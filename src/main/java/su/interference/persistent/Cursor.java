@@ -215,7 +215,7 @@ public class Cursor implements Serializable {
     }
 
     public boolean isStream() {
-        return this.type == STREAM_TYPE ? true : false;
+        return this.type == STREAM_TYPE;
     }
 
 }
