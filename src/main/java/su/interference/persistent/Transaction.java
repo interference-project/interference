@@ -241,8 +241,9 @@ public class Transaction implements Serializable {
                     boolean hasfb = false;
                     if (tb.getUframeId() > 0) { // undo transframe record
                         for (Long f : fptr) {
-                            if (f==tb.getUframeId()) {
+                            if (f == tb.getUframeId()) {
                                 hasfb = true;
+                                break;
                             }
                         }
                         final List<RetrieveLock> rls = Instance.getInstance().getRetrieveLocksByObjectId(tb.getObjectId());
@@ -285,6 +286,7 @@ public class Transaction implements Serializable {
         logger.info("Transaction committed");
     }
 
+    @SuppressWarnings("unchecked")
     public synchronized void rollback (Session s, boolean remote) {
         final ArrayList<FrameData> ubd1 = new ArrayList<>();
         final ArrayList<FrameData> ubd2 = new ArrayList<>();
@@ -366,8 +368,9 @@ public class Transaction implements Serializable {
                     boolean hasfb = false;
                     if (tb.getUframeId()>0) { // undo transframe record
                         for (Long f : fptr) {
-                            if (f==tb.getUframeId()) {
+                            if (f == tb.getUframeId()) {
                                 hasfb = true;
+                                break;
                             }
                         }
                         final List<RetrieveLock> rls = Instance.getInstance().getRetrieveLocksByObjectId(tb.getObjectId());
@@ -424,8 +427,9 @@ public class Transaction implements Serializable {
                     boolean hasfb = false;
                     if (tb.getUframeId() >0 ) { // undo transframe record
                         for (Long f : fptr) {
-                            if (f==tb.getUframeId()) {
+                            if (f == tb.getUframeId()) {
                                 hasfb = true;
+                                break;
                             }
                         }
                         if (!hasfb) {

@@ -57,19 +57,11 @@ public class Condition {
     }
 
     public static boolean isNumericCondition (int ctype) {
-        if ((ctype == C_EQUAL)||(ctype == C_NOT_EQUAL)||(ctype == C_IN)||(ctype == C_NOT_IN)||(ctype == C_LESS)||(ctype == C_MORE)||(ctype == C_LESS_EQUAL)||(ctype == C_MORE_EQUAL)) {
-            return true;
-        } else {
-            return false;
-        }
+        return (ctype == C_EQUAL) || (ctype == C_NOT_EQUAL) || (ctype == C_IN) || (ctype == C_NOT_IN) || (ctype == C_LESS) || (ctype == C_MORE) || (ctype == C_LESS_EQUAL) || (ctype == C_MORE_EQUAL);
     }
 
     public static boolean isStringCondition (int ctype) {
-        if ((ctype == C_EQUAL)||(ctype == C_NOT_EQUAL)||(ctype == C_IN)||(ctype == C_NOT_IN)||(ctype == C_LIKE)||(ctype == C_NOT_LIKE)) {
-            return true;
-        } else {
-            return false;
-        }
+        return (ctype == C_EQUAL) || (ctype == C_NOT_EQUAL) || (ctype == C_IN) || (ctype == C_NOT_IN) || (ctype == C_LIKE) || (ctype == C_NOT_LIKE);
     }
 
     public SQLColumn getConditionColumn() {

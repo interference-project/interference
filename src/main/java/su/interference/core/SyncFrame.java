@@ -67,6 +67,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
         this(frame, s, fb, true);
     }
 
+    @SuppressWarnings("unchecked")
     public SyncFrame(Frame frame, Session s, FreeFrame fb, boolean proc) throws Exception {
         final Table t = Instance.getInstance().getTableById(frame.getObjectId());
         final FrameData bd = Instance.getInstance().getFrameById(frame.getPtr());
@@ -123,11 +124,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
             }
             final int fileId = (int) frame.getPtr()%4096;
             final long ptr = frame.getPtr() - frame.getPtr()%4096;
-            if (t.getFileStart()==fileId&&t.getFrameStart()==ptr) {
-                started = true;
-            } else {
-                started = false;
-            }
+            started = t.getFileStart() == fileId && t.getFrameStart() == ptr;
             final IndexFrame ib = (IndexFrame) frame;
             imap = allowR ? ib.getAllocateMap() : null;
             prevId = 0;
@@ -243,11 +240,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
     }
 
     public boolean equals (SyncFrame bl) {
-        if ((this.getFile()==bl.getFile())&&(this.getPointer()==bl.getPointer())) {
-            return true;
-        } else {
-            return false;
-        }
+        return (this.getFile() == bl.getFile()) && (this.getPointer() == bl.getPointer());
     }
 
     public int compareTo(Object obj) {

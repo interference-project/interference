@@ -62,6 +62,7 @@ public class SQLGroupFunction {
         this.f = F_CUSTOM;
     }
 
+    @SuppressWarnings("unchecked")
     public void add (Object o) {
         if (f==F_COUNT || f==F_AVG) { cnt++; }
         if (f==F_SUM || f==F_AVG)   { sum = sum + checkNum(o); }
@@ -96,8 +97,7 @@ public class SQLGroupFunction {
             return (Long)o;
         }
         if (o.getClass().getName().equals("java.lang.Integer")) {
-            final long v = (Integer)o;
-            return v;
+            return (long) (Integer)o;
         }
         return 0L;
     }

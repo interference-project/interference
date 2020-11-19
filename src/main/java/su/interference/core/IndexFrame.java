@@ -219,10 +219,7 @@ public class IndexFrame extends Frame {
     }
 
     private boolean isFill(DataChunk ie) {
-        if (ie.getBytesAmount()>this.getFrameFree()) {
-            return true;
-        }
-        return false;
+        return ie.getBytesAmount() > this.getFrameFree();
     }
 
     public ValueSet sort() throws InternalException {

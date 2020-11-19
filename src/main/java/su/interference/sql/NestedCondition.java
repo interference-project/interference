@@ -43,6 +43,7 @@ import java.lang.reflect.InvocationTargetException;
  * @since 1.0
  */
 
+@SuppressWarnings("unchecked")
 public class NestedCondition extends Condition {
 
     public static final int C_SINGLE  = 0;
@@ -613,7 +614,7 @@ public class NestedCondition extends Condition {
                 } else if (c.getClass().getName().equals("su.interference.sql.JoinCondition")) {
                     final JoinCondition jc = (JoinCondition)c;
                     final SQLColumn cc = getSQLColumnByAlias(rscols, jc.getConditionColumn().getAlias());
-                    final SQLColumn ccr = getSQLColumnByAlias(rscols, jc.getConditionColumnRight().getAlias());;
+                    final SQLColumn ccr = getSQLColumnByAlias(rscols, jc.getConditionColumnRight().getAlias());
                     //if (jc.getConditionColumn().isIndexOrUnique()||jc.getConditionColumnRight().isIndexOrUnique()) {
                         if (lbi.getObjectIds().contains(jc.getConditionColumn().getObjectId()) && rbi.getObjectIds().contains(jc.getConditionColumnRight().getObjectId())) {
                             jlist.add(new SQLJoinDispatcher(lbi, rbi, cc, ccr, getSkipCheck(jc), this, s));

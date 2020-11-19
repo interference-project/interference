@@ -43,14 +43,14 @@ public class FrameHolder {
     private final AtomicInteger ccntr = new AtomicInteger(0);
     private final boolean persistent;
 
+    @SuppressWarnings("unchecked")
     public FrameHolder(ResultSet rs) {
         final Table t = rs instanceof ResultSetImpl ? ((ResultSetImpl)rs).getTarget() : null;
         if (t != null && t instanceof Table) {
-            Table tt = (Table)t;
-            cframes = new AtomicReference[tt.getLbs().length];
-            for (int i=0; i<tt.getLbs().length; i++) {
+            cframes = new AtomicReference[((Table)t).getLbs().length];
+            for (int i = 0; i< ((Table)t).getLbs().length; i++) {
                 cframes[i] = new AtomicReference<FrameData>();
-                cframes[i].set(tt.getLbs()[i].getBd());
+                cframes[i].set(((Table)t).getLbs()[i].getBd());
             }
             persistent = true;
         } else {

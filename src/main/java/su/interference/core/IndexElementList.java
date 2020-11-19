@@ -127,12 +127,10 @@ public class IndexElementList {
     }
 
     private boolean isFill() {
-        if (this.elementList.size()>=MAX_LIST_SIZE) {
-            return true;
-        }
-        return false;
+        return this.elementList.size() >= MAX_LIST_SIZE;
     }
 
+    @SuppressWarnings("unchecked")
     public synchronized IndexElementKey sort() {
         Collections.sort(this.elementList);
         this.sorted = true;

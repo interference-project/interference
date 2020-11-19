@@ -59,6 +59,7 @@ public class ResultSetImpl implements ResultSet {
         this.sqlc = sqlc;
     }
 
+    @SuppressWarnings("unchecked")
     public DataChunk persist(Object o, Session s) throws Exception {
         if (persistent) {
             return target.persist(o, s);

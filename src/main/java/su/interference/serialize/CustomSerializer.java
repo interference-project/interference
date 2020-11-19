@@ -121,17 +121,12 @@ public class CustomSerializer implements SerializerApi {
         if (!Types.isPrimitiveType(t)) {
             switch (t) {
                 case ("java.lang.Integer"):
-                    return 5;
-                case ("java.lang.Long"):
-                    return 9;
                 case ("java.util.concurrent.atomic.AtomicInteger"):
-                    return 5;
-                case ("java.util.concurrent.atomic.AtomicLong"):
-                    return 9;
                 case ("java.lang.Float"):
                     return 5;
+                case ("java.lang.Long"):
+                case ("java.util.concurrent.atomic.AtomicLong"):
                 case ("java.lang.Double"):
-                    return 9;
                 case ("java.util.Date"):
                     return 9;
                 case ("java.lang.String"):
@@ -152,11 +147,9 @@ public class CustomSerializer implements SerializerApi {
                 case ("char"):
                     return getBytesFromChar((Character) fo).length;
                 case ("int"):
-                    return 4;
-                case ("long"):
-                    return 8;
                 case ("float"):
                     return 4;
+                case ("long"):
                 case ("double"):
                     return 8;
             }
@@ -362,6 +355,7 @@ public class CustomSerializer implements SerializerApi {
         return new String(b,Instance.getInstance().getCodePage());
     }
 
+    @SuppressWarnings("unchecked")
     private ArrayList getArrayListFromBytes (byte[] b, String t) throws UnsupportedEncodingException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
         final ArrayList r = new ArrayList();
         if (b!=null) {

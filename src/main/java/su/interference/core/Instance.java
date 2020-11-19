@@ -421,6 +421,7 @@ public class Instance implements Interference {
         Metrics.register(Metrics.METER, "imUndoFrames");
     }
 
+    @SuppressWarnings("unchecked")
     private void checkInMemoryIndexes() {
         final MapField map = tt.getMapFieldByColumn("name");
         final Set<Map.Entry> xx = map.getMap().entrySet();
@@ -430,6 +431,7 @@ public class Instance implements Interference {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private void startProcesses(Session s) throws Exception {
         final Table t = getTableByName("su.interference.persistent.Process");
         final List<Process> pss = Instance.getInstance().getProcesses();
@@ -704,8 +706,7 @@ public class Instance implements Interference {
     @Deprecated
     public synchronized ArrayList<TransFrame> getTransFrameByObjectId (int objectId) {
         //final Table t = getTableByName("su.interference.persistent.TransFrame");
-        final ArrayList<TransFrame> r = new ArrayList<TransFrame>();
-        return r;
+        return new ArrayList<TransFrame>();
     }
 
     public RetrieveLock getRetrieveLockById(RetrieveLock p) {

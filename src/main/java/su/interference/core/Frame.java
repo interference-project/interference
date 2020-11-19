@@ -360,11 +360,7 @@ public class Frame implements Comparable {
     }
 
     public boolean equals (Frame bl) {
-        if ((this.file==bl.getFile())&&(this.pointer==bl.getPointer())) {
-            return true;
-        } else {
-            return false;
-        }
+        return (this.file == bl.getFile()) && (this.pointer == bl.getPointer());
     }
 
     public int compareTo(Object obj) {
@@ -456,8 +452,7 @@ public class Frame implements Comparable {
         // chunk.getHeader().setState(Header.RECORD_UPDATED_STATE);
         chunk.getHeader().setLen(ncb.length);
         chunk.getHeader().setTran(tran);
-        final int newlen = chunk.getBytesAmount();
-        return newlen;
+        return chunk.getBytesAmount();
     }
 
     public synchronized void deleteChunk (int ptr, Session s, LLT llt) {
@@ -608,6 +603,7 @@ public class Frame implements Comparable {
         llt.commit();
     }
 
+    @SuppressWarnings("unchecked")
     public HashMap getLiveTransactions() {
         final HashMap rtran = new HashMap<Long, Transaction>();
         for (Chunk c : data.getChunks()) {

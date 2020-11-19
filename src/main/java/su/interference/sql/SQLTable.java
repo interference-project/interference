@@ -120,10 +120,7 @@ public class SQLTable implements Comparable, FrameIterator {
     }
 
     public synchronized boolean hasNextFrame() {
-        if (terminate.get()) {
-            return false;
-        }
-        return true;
+        return !terminate.get();
     }
 
     public Table getTable() {

@@ -15,8 +15,7 @@ public class TransFrameId implements Serializable {
 
     public boolean equals(final Object obj) {
         final TransFrameId id = (TransFrameId)obj;
-        if (this.cframeId == id.cframeId && this.uframeId == id.uframeId && this.transId == id.transId) { return true; }
-        return false;
+        return this.cframeId == id.cframeId && this.uframeId == id.uframeId && this.transId == id.transId;
     }
 
     public int hashCode() {

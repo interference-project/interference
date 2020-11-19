@@ -71,6 +71,7 @@ public class EntityFactory<T> {
         this.s = s;
     }
 
+    @SuppressWarnings("unchecked")
     public T get(Object[] params) {
         T o = null;
         try {

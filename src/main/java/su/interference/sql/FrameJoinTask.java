@@ -46,19 +46,15 @@ import java.util.concurrent.ConcurrentHashMap;
 public class FrameJoinTask implements Callable<List<Object>> {
 
     private final static Logger logger = LoggerFactory.getLogger(FrameJoinTask.class);
-    private final Cursor cur;
     private final FrameApi bd1;
     private final FrameApi bd2;
     private final ResultSet target;
     private final List<SQLColumn> cols;
     private final NestedCondition nc;
     private final Session s;
-    private final int nodeId;
     private final List<Object> res;
-    private final String taskName;
     private final int sqlcid;
     private final boolean last;
-    private final boolean leftfs;
     private final static ConcurrentHashMap<String, Class> cache = new ConcurrentHashMap<String, Class>();
     private final SQLJoinDispatcher hmap;
 
@@ -70,7 +66,6 @@ public class FrameJoinTask implements Callable<List<Object>> {
     }
 
     public FrameJoinTask(Cursor cur, FrameApi bd1, FrameApi bd2, ResultSet target, List<SQLColumn> cols, NestedCondition nc, int sqlcid, int nodeId, boolean last, boolean leftfs, SQLJoinDispatcher hmap, Session s) {
-        this.cur = cur;
         this.bd1 = bd1;
         this.bd2 = bd2;
         this.target = target;
@@ -78,14 +73,12 @@ public class FrameJoinTask implements Callable<List<Object>> {
         this.nc = nc;
         this.s = s;
         this.res = new ArrayList<Object>();
-        this.taskName = bd2==null?bd1.getFrameId()+"":bd1.getFrameId()+"-"+bd2.getFrameId();
         this.sqlcid = sqlcid;
-        this.nodeId = nodeId;
         this.last = last;
-        this.leftfs = leftfs;
         this.hmap = hmap;
     }
 
+    @SuppressWarnings("unchecked")
     public List<Object> call() throws Exception {
         final Thread thread = Thread.currentThread();
         thread.setName("interference-sql-join-task-" + thread.getId());
@@ -95,7 +88,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
         final Class c1 = Instance.getInstance().getTableById(t1).getTableClass();
         final Class c2 = bd2==null?null:Instance.getInstance().getTableById(t2).getTableClass();
         ResultSetEntity rsa = (ResultSetEntity)c1.getAnnotation(ResultSetEntity.class);
-        final boolean c1rs = rsa!=null?true:false;
+        final boolean c1rs = rsa != null;
 
         final ArrayList<Object> drs1 = bd1.getFrameEntities(s);
         final ArrayList<Object> drs2 = bd2==null?null:bd2.getFrameEntities(s);

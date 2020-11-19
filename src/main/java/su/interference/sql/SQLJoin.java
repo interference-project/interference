@@ -75,7 +75,7 @@ public class SQLJoin {
         }
 
         int i = 0;
-        boolean ixflag = ocs.size()==0&&gcs.size()==0?false:true;
+        boolean ixflag = ocs.size() != 0 || gcs.size() != 0;
         for (SQLTable sqlt : this.tables) {
             if (t1==null) {
                 t1 = sqlt;
@@ -142,7 +142,7 @@ public class SQLJoin {
 
         if (this.cur.getType()==Cursor.MASTER_TYPE) {
             if (gcs.size()>0||fcs.size()>0) {
-                boolean ixflag = ocs.size() > 0 ? true : false;
+                boolean ixflag = ocs.size() > 0;
 
                 //todo getall
                 gtemp = new ResultSetImpl(s.registerTable("su.interference.persistent.G$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols, null, null, ixflag), null, false);
@@ -222,8 +222,9 @@ public class SQLJoin {
         for (SQLColumn c : sl) {
             boolean chk = true;
             for (SQLColumn mc : ml) {
-                if (mc.getId()==c.getId()) {
+                if (mc.getId() == c.getId()) {
                     chk = false;
+                    break;
                 }
             }
             if (chk) res.add(c);

@@ -114,7 +114,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @Transient
     private final Map<Long, Map<Long, TransFrame>> tcounter = new ConcurrentHashMap<>();
     @Transient
-    private volatile int priority = 2;
+    private AtomicInteger priority = new AtomicInteger(2);
     @Transient
     private volatile boolean synced = true;
     @Transient
@@ -160,7 +160,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     public synchronized DataFrame getDataFrame() throws Exception {
         if (frame == null) {
-            this.priority = SystemCleanUp.DATA_RETRIEVED_PRIORITY;
+            this.priority.set(SystemCleanUp.DATA_RETRIEVED_PRIORITY);
             List<FrameData> uframes = new ArrayList<>();
             for (Map.Entry<Long, Map<Long, TransFrame>> entry : tcounter.entrySet()) {
                 for (Map.Entry<Long, TransFrame> entry_ : entry.getValue().entrySet()) {
@@ -176,7 +176,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     public IndexFrame getIndexFrame() throws Exception {
         if (frame == null) {
-            this.priority = SystemCleanUp.INDEX_RETRIEVED_PRIORITY;
+            this.priority.set(SystemCleanUp.INDEX_RETRIEVED_PRIORITY);
             List<FrameData> uframes = new ArrayList<>();
             for (Map.Entry<Long, Map<Long, TransFrame>> entry : tcounter.entrySet()) {
                 for (Map.Entry<Long, TransFrame> entry_ : entry.getValue().entrySet()) {
@@ -321,8 +321,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     }
 
     public int insertChunk(Chunk c, Session s, boolean check, LLT llt) throws Exception {
-        int p = this.getDataFrame().insertChunk(c, s, check, llt);
-        return p;
+        return this.getDataFrame().insertChunk(c, s, check, llt);
     }
 
     public int updateChunk(DataChunk chunk, Object o, Session s, LLT llt) throws Exception {
@@ -499,16 +498,16 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     }
 
     public int getPriority() {
-        return priority;
+        return priority.get();
     }
 
     public void setPriority(int priority) {
-        this.priority = priority;
+        this.priority.set(priority);
     }
 
     public void decreasePriority() {
-        if (this.priority > 0) {
-            this.priority--;
+        if (this.priority.get() > 0) {
+            this.priority.decrementAndGet();
         }
     }
 

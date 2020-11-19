@@ -51,6 +51,7 @@ public class ValueSet implements Comparable {
 
     //used in partial compare datachunks in sql group algorithm
     //thr = threshold for set (actual fields amount)
+    @SuppressWarnings("unchecked")
     public int compare (Object obj, int thr) {
         final ValueSet j = (ValueSet)obj;
 
@@ -68,7 +69,7 @@ public class ValueSet implements Comparable {
 
     public boolean equals (Object obj) {
         final ValueSet j = (ValueSet)obj;
-        return  this.compareTo(j)==0?true:false;
+        return this.compareTo(j) == 0;
     }
 
     public int hashCode() {
