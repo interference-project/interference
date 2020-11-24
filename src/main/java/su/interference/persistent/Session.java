@@ -111,7 +111,7 @@ public class Session {
     @Transient
     private static final ExecutorService rqpool = Executors.newCachedThreadPool();
     @Transient
-    private volatile RetrieveQueue retrieveQueue;
+    private volatile Map<Integer, RetrieveQueue> retrieveQueue = new ConcurrentHashMap<>();
     @Transient
     private static final ExecutorService streampool = Executors.newCachedThreadPool();
     @Transient
@@ -301,12 +301,15 @@ public class Session {
     }
 
     @SuppressWarnings("unchecked")
-    protected synchronized RetrieveQueue getContentQueue(Table t) {
+    public synchronized RetrieveQueue getContentQueue(Table t) {
         if (t != null) {
             try {
-                retrieveQueue = t.getContentQueue(this);
-                Future f = rqpool.submit(retrieveQueue.getR());
-                return retrieveQueue;
+                if (retrieveQueue.get(t.getObjectId()) == null || !retrieveQueue.get(t.getObjectId()).isRetrieve()) {
+                    final RetrieveQueue rq = t.getContentQueue(this);
+                    Future f = rqpool.submit(rq.getR());
+                    retrieveQueue.put(t.getObjectId(), rq);
+                }
+                return retrieveQueue.get(t.getObjectId());
             } catch (Exception e) {
                 if (e instanceof ExecutionException) {
                     e.getCause().printStackTrace();
@@ -318,11 +321,10 @@ public class Session {
         return null;
     }
 
-    public void closeQueue() {
-        if (this.retrieveQueue != null) {
-            retrieveQueue.stop();
+    public void closeQueue(int objectId) {
+        if (this.retrieveQueue.get(objectId) != null) {
+            retrieveQueue.get(objectId).stop();
         }
-        retrieveQueue = null;
     }
 
     public void closeStreamQueue() {
@@ -594,8 +596,8 @@ public class Session {
         Session.dntmSession = dntmSession;
     }
 
-    public RetrieveQueue getRetrieveQueue() {
-        return retrieveQueue;
+    public RetrieveQueue getRetrieveQueue(int objectId) {
+        return retrieveQueue.get(objectId);
     }
 
     public void streamFramePtr(Frame f, int ptr) {

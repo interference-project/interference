@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -53,8 +53,9 @@ public class SQLHashMap implements FrameIterator {
     private final Table t;
     private final Class c;
     private final Session s;
+    private SQLHashMapFrame hframe;
 
-    public SQLHashMap(SQLColumn cmap, SQLColumn ckey, FrameIterator rbi, Table t, Session s) throws MalformedURLException, ClassNotFoundException {
+    public SQLHashMap(SQLColumn cmap, SQLColumn ckey, FrameIterator rbi, Table t, Session s) {
         this.cmap = cmap;
         this.ckey = ckey;
         this.rbi = rbi;
@@ -72,26 +73,31 @@ public class SQLHashMap implements FrameIterator {
     }
 
     public FrameApi nextFrame() throws Exception {
-        if (!complete.get()) {
-            while (rbi.hasNextFrame()) {
-                FrameApi bd = rbi.nextFrame();
-                if (bd != null) {
-                    ArrayList<Object> drs = bd.getFrameEntities(s);
-                    for (Object o : drs) {
-                        if (bd.getImpl() == FrameApi.IMPL_INDEX) {
-                            final IndexChunk ib1 = (IndexChunk) o;
-                            o = ib1.getDataChunk().getEntity();
-                        }
-
-                        hmap.put(getKeyValue(c, o, cmap, s), o);
-                    }
-                }
-            }
-            complete.compareAndSet(false, true);
-        }
         if (!returned.get()) {
-            returned.compareAndSet(false, true);
-            return new SQLHashMapFrame(hmap, cmap, ckey, t);
+            synchronized (this) {
+                if (hframe == null) {
+                    if (!complete.get()) {
+                        while (rbi.hasNextFrame()) {
+                            FrameApi bd = rbi.nextFrame();
+                            if (bd != null) {
+                                ArrayList<Object> drs = bd.getFrameEntities(s);
+                                for (Object o : drs) {
+                                    if (bd.getImpl() == FrameApi.IMPL_INDEX) {
+                                        final IndexChunk ib1 = (IndexChunk) o;
+                                        o = ib1.getDataChunk().getEntity();
+                                    }
+
+                                    hmap.put(getKeyValue(c, o, cmap, s), o);
+                                }
+                            }
+                        }
+                        complete.compareAndSet(false, true);
+                    }
+                    hframe = new SQLHashMapFrame(hmap, cmap, ckey, t);
+                }
+                returned.compareAndSet(false, true);
+                return hframe;
+            }
         }
         return null;
     }
@@ -108,7 +114,7 @@ public class SQLHashMap implements FrameIterator {
         return FrameIterator.TYPE_TABLE;
     }
 
-    public boolean isIndex() throws MalformedURLException, ClassNotFoundException {
+    public boolean isIndex() {
         return false;
     }
 

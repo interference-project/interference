@@ -263,8 +263,7 @@ public class Table implements ResultSet {
         return this.name;
     }
 
-    public LinkedBlockingQueue<FrameData> getFrames(Session s)
-            throws IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InternalException, IllegalAccessException, InstantiationException {
+    public LinkedBlockingQueue<FrameData> getFrames(Session s) {
         if (this.isIndex()) {
             //get ordered frame sequence
             return this.getLeafFrames(s);
@@ -1506,7 +1505,7 @@ public class Table implements ResultSet {
 
             @Override
             public void stop() {
-                stopped.set(false);
+                stopped.set(true);
             }
         };
         return new RetrieveQueue(q, r);
@@ -1582,7 +1581,7 @@ public class Table implements ResultSet {
 
             @Override
             public void stop() {
-                stopped.set(false);
+                stopped.set(true);
             }
         };
         return new RetrieveQueue(q, r);
@@ -1590,10 +1589,8 @@ public class Table implements ResultSet {
 
     public Object poll(Session s) {
         try {
-            if (s.getRetrieveQueue() == null || !s.getRetrieveQueue().isRetrieve()) {
-                s.getContentQueue(this);
-            }
-            return s.getRetrieveQueue().poll();
+            final RetrieveQueue rq = s.getContentQueue(this);
+            return rq.poll();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1602,10 +1599,8 @@ public class Table implements ResultSet {
 
     public Chunk cpoll(Session s) {
         try {
-            if (s.getRetrieveQueue() == null || !s.getRetrieveQueue().isRetrieve()) {
-                s.getContentQueue(this);
-            }
-            return s.getRetrieveQueue().cpoll();
+            final RetrieveQueue rq = s.getContentQueue(this);
+            return rq.cpoll();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1613,7 +1608,7 @@ public class Table implements ResultSet {
     }
 
     protected ArrayList<FrameData> getStream (Map<Long, Long> retrieved, Session s) throws Exception {
-        final ArrayList<FrameData> r = new ArrayList<FrameData>();
+        final ArrayList<FrameData> r = new ArrayList<>();
         if (this.isIndex()) { //index table
             throw new InternalException();
         } else {
@@ -1952,7 +1947,7 @@ public class Table implements ResultSet {
         return res;
     }
 
-    private synchronized LinkedBlockingQueue<FrameData> getLeafFrames (Session s) throws IOException, InternalException,  NoSuchMethodException, InvocationTargetException, EmptyFrameHeaderFound, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    private synchronized LinkedBlockingQueue<FrameData> getLeafFrames (Session s) throws InternalException, EmptyFrameHeaderFound {
         final LinkedBlockingQueue<FrameData> q = new LinkedBlockingQueue<>(1000);
         final ArrayList<Long> startfs = new ArrayList<>();
         startfs.add(this.fileStart+this.frameStart);

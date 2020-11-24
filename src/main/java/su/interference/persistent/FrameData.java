@@ -192,7 +192,9 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     public synchronized ArrayList<Chunk> getFrameChunks(Session s) throws Exception {
         if (getDataObject().isIndex()) {
-            return getIndexFrame().getFrameChunks(s);
+            final IndexFrame f = getIndexFrame();
+            f.sort();
+            return f.getFrameChunks(s);
         } else {
             return getDataFrame().getFrameChunks(s);
         }

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -32,7 +32,6 @@ import su.interference.persistent.Table;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -47,6 +46,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class SQLIndex implements FrameIterator, Finder {
     private final Table t;
     private final Session s;
+    private final int join;
     private final Table parent;
     private final SQLColumn lkey;
     private final SQLColumn rkey;
@@ -57,18 +57,20 @@ public class SQLIndex implements FrameIterator, Finder {
     private final AtomicBoolean returned;
     private final AtomicBoolean terminate;
     private final ValueCondition vc;
+    private SQLIndexFrame mframe;
 
-    public SQLIndex(Table t, Table parent, boolean left, SQLColumn lkey, SQLColumn rkey, boolean merged, NestedCondition nc, Session s) throws InternalException, IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    public SQLIndex(Table t, Table parent, boolean left, SQLColumn lkey, SQLColumn rkey, boolean merged, NestedCondition nc, int join, Session s) throws InternalException, IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         if (!t.isIndex()) throw new InternalException();
         this.t = t;
         this.s = s;
+        this.join = join;
         this.lkey = lkey;
         this.rkey = rkey;
         this.parent = parent;
         this.left = left;
         this.unique = left?lkey.isUnique():rkey.isUnique();
         this.merged = merged;
-        this.frames = left ? t.getFrames(s) : null;
+        this.frames = join == SQLJoinDispatcher.MERGE ? null : left ? t.getFrames(s) : null;
         this.returned = new AtomicBoolean(false);
         this.terminate = new AtomicBoolean(false);
         this.vc = nc.getIndexVC(this, t);
@@ -88,19 +90,28 @@ public class SQLIndex implements FrameIterator, Finder {
 
     //may returns null
     public FrameApi nextFrame() throws Exception {
-        if (left) {
+        if (!left || join == SQLJoinDispatcher.MERGE) {
+            if (!returned.get()) {
+                returned.compareAndSet(false, true);
+                if (merged) {
+                    synchronized (this) {
+                        if (mframe == null) {
+                            mframe = new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join);
+                        }
+                        return mframe;
+                    }
+                } else {
+                    return new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join);
+                }
+            }
+        } else {
             if (hasNextFrame()) {
                 final FrameData bd = frames.take();
                 if (bd.getObjectId() == 0 && bd.getFrameId() == 0) {
                     terminate.compareAndSet(false, true);
                     return null;
                 }
-                return new SQLIndexFrame(t, parent, bd, lkey, rkey, vc, left, unique, merged);
-            }
-        } else {
-            if (!returned.get()) {
-                returned.compareAndSet(false, true);
-                return new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged);
+                return new SQLIndexFrame(t, parent, bd, lkey, rkey, vc, left, unique, merged, join);
             }
         }
         return null;
@@ -123,10 +134,10 @@ public class SQLIndex implements FrameIterator, Finder {
     }
 
     public boolean hasNextFrame() {
-        if (left) {
-            return !terminate.get();
-        } else {
+        if (!left || join == SQLJoinDispatcher.MERGE) {
             return !returned.get();
+        } else {
+            return !terminate.get();
         }
     }
 
@@ -134,7 +145,7 @@ public class SQLIndex implements FrameIterator, Finder {
         return FrameIterator.TYPE_TABLE;
     }
 
-    public boolean isIndex() throws MalformedURLException, ClassNotFoundException {
+    public boolean isIndex() {
         return t.isIndex();
     }
 

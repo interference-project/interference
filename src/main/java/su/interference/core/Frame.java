@@ -508,7 +508,7 @@ public class Frame implements Comparable {
 
     //returns all actual records
     public synchronized ArrayList<Chunk> getFrameChunks (Session s) {
-        final ArrayList<Chunk> res = new ArrayList<Chunk>();
+        final ArrayList<Chunk> res = new ArrayList<>();
 
         if (dataObject==null) {
             dataObject = Instance.getInstance().getTableById(this.objectId);

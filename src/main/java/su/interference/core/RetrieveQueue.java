@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -34,14 +34,14 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class RetrieveQueue {
     private final LinkedBlockingQueue<Chunk> q;
     private final ManagedCallable r;
-    private boolean retrieve = true;
+    private volatile boolean retrieve = true;
 
     public RetrieveQueue(LinkedBlockingQueue<Chunk> q, ManagedCallable r) {
         this.q = q;
         this.r = r;
     }
 
-    public Object poll() {
+    public synchronized Object poll() {
         try {
             if (retrieve) {
                 Chunk c = q.take();
@@ -57,7 +57,7 @@ public class RetrieveQueue {
         return null;
     }
 
-    public Chunk cpoll() {
+    public synchronized Chunk cpoll() {
         try {
             if (retrieve) {
                 Chunk c = q.take();
@@ -73,7 +73,7 @@ public class RetrieveQueue {
         return null;
     }
 
-    public void stop() {
+    public synchronized void stop() {
         retrieve = false;
         if (r != null) {
             r.stop();
@@ -88,7 +88,7 @@ public class RetrieveQueue {
         return r;
     }
 
-    public boolean isRetrieve() {
+    public synchronized boolean isRetrieve() {
         return retrieve;
     }
 }

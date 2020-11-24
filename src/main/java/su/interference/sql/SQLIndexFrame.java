@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -25,17 +25,16 @@
 package su.interference.sql;
 
 import su.interference.core.Chunk;
+import su.interference.core.RetrieveQueue;
 import su.interference.core.ValueSet;
 import su.interference.exception.InternalException;
 import su.interference.persistent.FrameData;
 import su.interference.persistent.Session;
 import su.interference.persistent.Table;
 
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author Yuriy Glotanov
@@ -51,10 +50,14 @@ public class SQLIndexFrame implements FrameApi, Finder {
     private final boolean left;
     private final boolean unique;
     private final boolean merged;
+    private final int join;
+    private ArrayList<Object> mcontent;
+    private RetrieveQueue rqueue;
+    private AtomicInteger mptr = new AtomicInteger();
     private final ValueCondition vc;
 
-    public SQLIndexFrame(Table t, Table parent, FrameData bd, SQLColumn lkey, SQLColumn rkey, ValueCondition vc, boolean left, boolean unique, boolean merged)
-            throws InternalException, MalformedURLException, ClassNotFoundException {
+    public SQLIndexFrame(Table t, Table parent, FrameData bd, SQLColumn lkey, SQLColumn rkey, ValueCondition vc, boolean left, boolean unique, boolean merged, int join)
+            throws InternalException {
         if (!t.isIndex()) {
             throw new InternalException();
         }
@@ -67,6 +70,7 @@ public class SQLIndexFrame implements FrameApi, Finder {
         this.vc = vc;
         this.unique = unique;
         this.merged = merged;
+        this.join = join;
     }
 
     public int getImpl() {
@@ -107,27 +111,55 @@ public class SQLIndexFrame implements FrameApi, Finder {
 
     public ArrayList<Object> getFrameEntities(Session s) throws Exception {
         //todo wrong condition???
-        if (vc != null && (vc.getCondition() == Condition.C_EQUAL || vc.getCondition() == Condition.C_IN)) {
-            ArrayList<Object> res = new ArrayList<Object>();
-            for (Object o : vc.getValues()) {
-                for (Chunk c : t.getObjectsByKey(new ValueSet(o), s)) {
-                    res.add(c.getEntity());
-                }
-            }
-            return res;
-        } else {
-            if (left) {
-                return bd.getFrameEntities(s);
-            } else {
-                if (merged) {
-                    ArrayList<Object> res = new ArrayList<Object>();
-                    for (Chunk c : t.getContent(s)) {
+        synchronized (this) {
+            if (vc != null && (vc.getCondition() == Condition.C_EQUAL || vc.getCondition() == Condition.C_IN)) {
+                ArrayList<Object> res = new ArrayList<>();
+                for (Object o : vc.getValues()) {
+                    for (Chunk c : t.getObjectsByKey(new ValueSet(o), s)) {
                         res.add(c.getEntity());
                     }
-                    return res;
+                }
+                return res;
+            } else {
+                if (left) {
+                    return bd.getFrameEntities(s);
+                } else {
+                    if (merged) {
+                        //todo deprecated implementation
+                        if (mcontent == null) {
+                            mcontent = new ArrayList<>();
+                            for (Chunk c : t.getContent(s)) {
+                                mcontent.add(c.getEntity());
+                            }
+                        }
+                        return mcontent;
+                    }
+                }
+                return null;
+            }
+        }
+    }
+
+    public Object poll(Session s) throws Exception {
+        if (!left || join == SQLJoinDispatcher.MERGE) {
+            if (rqueue == null) {
+                rqueue = s.getContentQueue(t);
+            }
+            return rqueue.poll();
+        } else {
+            synchronized (this) {
+                if (mcontent == null) {
+                    mcontent = new ArrayList<>();
+                    for (Chunk c : t.getContent(s)) {
+                        mcontent.add(c.getEntity());
+                    }
                 }
             }
-            return null;
+            if (mptr.get() == mcontent.size()) {
+                return null;
+            } else {
+                return mcontent.get(mptr.getAndIncrement());
+            }
         }
     }
 
