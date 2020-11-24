@@ -102,8 +102,8 @@ public class FrameJoinTask implements Callable<List<Object>> {
                 boolean cnue = true;
                 while (cnue) {
                     if (s1 > 0 && s2 > 0) {
-                        final Comparable o1 = getKeyValue(drs1.get(p1).getClass(), drs1.get(p1), ((SQLIndexFrame)bd2).getLkey(), s);
-                        final Comparable o2 = getKeyValue(drs2.get(p2).getClass(), drs2.get(p2), ((SQLIndexFrame)bd2).getRkey(), s);
+                        final Comparable o1 = getKeyValue(drs1.get(p1), ((SQLIndexFrame)bd2).getLkey(), s);
+                        final Comparable o2 = getKeyValue(drs2.get(p2), ((SQLIndexFrame)bd2).getRkey(), s);
                         final int cmp = o1.compareTo(o2);
                         if (cmp < 0) {
                             p1++;
@@ -133,7 +133,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
                             if (n==s2) {
                                 p1++;
                             } else {
-                                final Comparable next = getKeyValue(drs2.get(n).getClass(), drs2.get(n), ((SQLIndexFrame)bd2).getRkey(), s);
+                                final Comparable next = getKeyValue(drs2.get(n), ((SQLIndexFrame)bd2).getRkey(), s);
                                 if (o1.compareTo(next)<0) {
                                     p1++;
                                 } else {
@@ -260,7 +260,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
         return ret;
     }
 
-    private Comparable getKeyValue(Class c, Object o, SQLColumn sqlc, Session s) throws InvocationTargetException, IllegalAccessException {
+    private Comparable getKeyValue(Object o, SQLColumn sqlc, Session s) throws InvocationTargetException, IllegalAccessException {
         final Method y = sqlc.getKeyGetter();
         return sqlc.isCursor() ? (Comparable) y.invoke(o, null) : (Comparable) y.invoke(o, new Object[]{s});
     }

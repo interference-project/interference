@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -147,7 +147,7 @@ public class SQLCursor implements FrameIterator {
             final ValueCondition vc = nc.getIndexVC(lbi, null);
             if (vc != null) {
                 final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
-                this.lbi = new SQLIndex(vc.getConditionColumn().getIndex(), lt, false, vc.getConditionColumn(), vc.getConditionColumn(), true, nc, s);
+                this.lbi = new SQLIndex(vc.getConditionColumn().getIndex(), lt, false, vc.getConditionColumn(), vc.getConditionColumn(), true, nc, 0, s);
                 this.rbi = rbi;
             } else {
                 this.lbi = lbi;

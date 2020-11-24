@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -52,8 +52,14 @@ public class SQLJoinDispatcher implements Comparable {
     private final boolean furtherUseUC;
     private final SQLColumn joinedCC;
     private final int weight;
+    private final int join;
     private final Session s;
     private final static Logger logger = LoggerFactory.getLogger(SQLJoinDispatcher.class);
+    public final static int MERGE = 1;
+    public final static int RIGHT_MERGE = 2;
+    public final static int RIGHT_HASH = 3;
+    public final static int RIGHT_INDEX = 4;
+    public final static int NESTED_LOOPS = 10;
 
     public SQLJoinDispatcher(FrameIterator lbi, FrameIterator rbi, SQLColumn c1, SQLColumn c2, boolean skip, NestedCondition nc, Session s)
             throws IOException, ClassNotFoundException, InternalException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
@@ -74,17 +80,19 @@ public class SQLJoinDispatcher implements Comparable {
 
         if (c1.isIndexOrUnique()||c2.isIndexOrUnique()) {
             if (merged && ix1 != null && ix2 != null) {
+                this.join = RIGHT_MERGE;
                 final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
                 final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
                 logger.info("use merge join for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
-                lbi_ = new SQLIndex(ix1, lt, true, c1, c2, true, nc, s);
-                rbi_ = new SQLIndex(ix2, rt, false, c1, c2, true, nc, s);
+                lbi_ = new SQLIndex(ix1, lt, true, c1, c2, true, nc, RIGHT_MERGE, s);
+                rbi_ = new SQLIndex(ix2, rt, false, c1, c2, true, nc, RIGHT_MERGE, s);
                 this.weight = 100;
             } else if (c1.isUnique() || c2.isUnique()) {
+                this.join = RIGHT_HASH;
                 final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
                 final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
-                final FrameIterator lbi__ = ix1 == null ? lbi : new SQLIndex(ix1, lt, false, c1, c2, true, nc, s);
-                final FrameIterator rbi__ = ix2 == null ? rbi : new SQLIndex(ix2, rt, false, c1, c2, true, nc, s);
+                final FrameIterator lbi__ = ix1 == null ? lbi : new SQLIndex(ix1, lt, false, c1, c2, true, nc, RIGHT_HASH, s);
+                final FrameIterator rbi__ = ix2 == null ? rbi : new SQLIndex(ix2, rt, false, c1, c2, true, nc, RIGHT_HASH, s);
                 final FrameIterator hbi = c1.isUnique() ? lbi__ : c2.isUnique() ? rbi__ : null;
                 lbi_ = hbi == lbi__ ? rbi__ : lbi__;
                 final Table lt_ = Instance.getInstance().getTableById(lbi_.getObjectId());
@@ -95,15 +103,16 @@ public class SQLJoinDispatcher implements Comparable {
                 rbi_ = new SQLHashMap(cmap_, ckey_, hbi, rt_, s);
                 this.weight = 60;
             } else {
+                this.join = RIGHT_INDEX;
                 final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
                 final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
                 logger.info("use index scan for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
                 if (ix1 != null) {
                     lbi_ = rbi;
-                    rbi_ = new SQLIndex(ix1, lt, false, c2, c1, false, nc, s);
+                    rbi_ = new SQLIndex(ix1, lt, false, c2, c1, false, nc, RIGHT_INDEX, s);
                 } else if (ix2 != null) {
                     lbi_ = lbi;
-                    rbi_ = new SQLIndex(ix2, rt, false, c1, c2, false, nc, s);
+                    rbi_ = new SQLIndex(ix2, rt, false, c1, c2, false, nc, RIGHT_INDEX, s);
                 }
                 this.weight = 30;
             }
@@ -113,6 +122,7 @@ public class SQLJoinDispatcher implements Comparable {
             logger.info("use nested loops for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
             lbi_ = lbi;
             rbi_ = rbi;
+            this.join = NESTED_LOOPS;
             this.weight = 0;
         }
         this.lbi = lbi_;

@@ -28,10 +28,6 @@ import su.interference.metrics.Metrics;
 import su.interference.persistent.*;
 import su.interference.persistent.Process;
 import su.interference.exception.*;
-import javax.management.InstanceAlreadyExistsException;
-import javax.management.MBeanRegistrationException;
-import javax.management.MalformedObjectNameException;
-import javax.management.NotCompliantMBeanException;
 import java.io.IOException;
 import java.io.File;
 import java.net.URL;
@@ -62,7 +58,7 @@ public class Instance implements Interference {
     private static final int MAX_NODE_ID = 32;
     public static final int SESSION_EXPIRE = 7200000; //in ms
 
-    public static final int SYSTEM_VERSION = 20200920;
+    public static final int SYSTEM_VERSION = 20201122;
 
     public static final int SYSTEM_STATE_ONLINE = 1;
     public static final int SYSTEM_STATE_UP = 2;
@@ -100,26 +96,26 @@ public class Instance implements Interference {
         //public static Instance instance = new Instance();
     }
 
-    private Instance() throws MalformedObjectNameException, NotCompliantMBeanException, InstanceAlreadyExistsException, MBeanRegistrationException, IOException {
+    private Instance() {
 
     }
 
-    public boolean isStarted () throws InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    public boolean isStarted () throws InternalException {
         //checkInstance();
         return this.getSystemState()==SYSTEM_STATE_UP;
     }
 
-    public boolean isStopped () throws InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    public boolean isStopped () throws InternalException {
         //checkInstance();
         return this.getSystemState()==SYSTEM_STATE_DOWN;
     }
 
-    public boolean isCreated () throws InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    public boolean isCreated () throws InternalException {
         //checkInstance();
         return !(this.getSystemState()==SYSTEM_STATE_IDLE);
     }
 
-    public boolean isIdle () throws InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    public boolean isIdle () throws InternalException {
         //checkInstance();
         return (this.getSystemState()==SYSTEM_STATE_IDLE);
     }
@@ -457,7 +453,7 @@ public class Instance implements Interference {
         }
     }
 
-    private static int ccheckInstance() throws IOException, InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    private static int ccheckInstance() throws InternalException {
         final int sstate = Storage.getStorage().getState();
         if (sstate==Storage.STORAGE_STATE_OPEN) {
             return Instance.SYSTEM_STATE_UP;
