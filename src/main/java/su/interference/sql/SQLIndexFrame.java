@@ -110,7 +110,7 @@ public class SQLIndexFrame implements FrameApi, Finder {
     }
 
     public ArrayList<Object> getFrameEntities(Session s) throws Exception {
-        //todo wrong condition???
+        //todo need refactor on SQLIndex level - returns one to many frames by value
         synchronized (this) {
             if (vc != null && (vc.getCondition() == Condition.C_EQUAL || vc.getCondition() == Condition.C_IN)) {
                 ArrayList<Object> res = new ArrayList<>();

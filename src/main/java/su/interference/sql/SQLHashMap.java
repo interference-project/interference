@@ -29,10 +29,8 @@ import su.interference.exception.InternalException;
 import su.interference.persistent.Session;
 import su.interference.persistent.Table;
 
-import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -134,6 +132,11 @@ public class SQLHashMap implements FrameIterator {
     @Override
     public void setLeftfs(boolean leftfs) {
 
+    }
+
+    @Override
+    public boolean noDistribute() {
+        return false;
     }
 
 }

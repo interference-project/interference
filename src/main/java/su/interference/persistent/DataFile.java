@@ -217,7 +217,6 @@ public class DataFile implements Serializable {
             //replace chunk after usedSpace
             dc = new DataChunk(bd, s);
             db.insertChunk(dc, s, true, llt);
-            dc.setFrameData(bd);
             t.addIndexValue(dc);
         } else {
             //syncframe event should not persist new frame

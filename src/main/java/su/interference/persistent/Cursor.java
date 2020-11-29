@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -32,7 +32,7 @@ import su.interference.sql.SQLSelect;
 import javax.persistence.*;
 import java.io.Serializable;
 import java.lang.reflect.Modifier;
-import java.net.MalformedURLException;
+import java.util.List;
 
 /**
  * @author Yuriy Glotanov
@@ -87,7 +87,7 @@ public class Cursor implements Serializable {
     @Transient
     private SQLSelect sqlStmt;
     @Transient
-    private String resultTargetName;
+    private List<String> resultTargetNames;
     @Transient
     private Session session;
     @Transient
@@ -101,22 +101,21 @@ public class Cursor implements Serializable {
         this.state = STATE_IDLE;
     }
 
-    public Cursor(String sql, String resultTargetName, int type) {
+    public Cursor(String sql, List<String> resultTargetNames, int type) {
         this.state = STATE_IDLE;
         this.sql = sql;
-        this.resultTargetName = resultTargetName;
+        this.resultTargetNames = resultTargetNames;
         this.type = type;
     }
 
     public Cursor(String sql, int type) {
         this.state = STATE_IDLE;
-        this.cursorId = cursorId;
         this.sql = sql;
         this.type = type;
     }
 
     //constructor for low-level storage function (initial first-time load table descriptions from datafile)
-    public Cursor (DataChunk chunk) throws IllegalAccessException, ClassNotFoundException, InternalException, MalformedURLException {
+    public Cursor (DataChunk chunk) throws IllegalAccessException, InternalException {
         final Object[] dcs = chunk.getDcs().getValueSet();
         final Class c = this.getClass();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
@@ -174,8 +173,8 @@ public class Cursor implements Serializable {
         this.sqlStmt = sqlStmt;
     }
 
-    public String getResultTargetName() {
-        return resultTargetName;
+    public List<String> getResultTargetNames() {
+        return resultTargetNames;
     }
 
     public Session getSession() {

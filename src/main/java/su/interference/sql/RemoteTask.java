@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -24,7 +24,6 @@
 
 package su.interference.sql;
 
-import su.interference.core.Config;
 import su.interference.exception.InternalException;
 import su.interference.metrics.Metrics;
 import su.interference.persistent.Cursor;
@@ -46,12 +45,14 @@ public class RemoteTask implements Callable<Boolean> {
     private final int nodeId;
     private final Map<String, FrameApiJoin> joins;
     private final String rightType;
+    private final String targetClassName;
 
-    public RemoteTask(Cursor cur, int nodeId, Map<String, FrameApiJoin> joins, String rightType) {
+    public RemoteTask(Cursor cur, int nodeId, Map<String, FrameApiJoin> joins, String rightType, String targetClassName) {
         this.cur = cur;
         this.nodeId = nodeId;
         this.joins = joins;
         this.rightType = rightType;
+        this.targetClassName = targetClassName;
     }
 
     public Boolean call() throws Exception {

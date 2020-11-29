@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -199,11 +199,23 @@ public class TransportContext implements TransportApi {
     }
 
     @SuppressWarnings("unchecked")
-    public Integer[] getOnlineNodesWithLocal() {
+    public Integer[] getNodesWithLocal() {
         List<Integer> ns = Arrays.asList(HeartBeatProcess.channels.keySet().toArray(new Integer[]{}));
         List<Integer> ns_ = new ArrayList();
         ns_.addAll(ns);
         ns_.add(Config.getConfig().LOCAL_NODE_ID);
+        return ns_.toArray(new Integer[]{});
+    }
+
+    @SuppressWarnings("unchecked")
+    public Integer[] getOnlineNodesWithLocal() {
+        List<Integer> ns_ = new ArrayList();
+        ns_.add(Config.getConfig().LOCAL_NODE_ID);
+        for (Map.Entry<Integer, TransportChannel> entry : HeartBeatProcess.channels.entrySet()) {
+            if (entry.getValue().isConnected() && entry.getValue().isStarted()) {
+                ns_.add(entry.getKey());
+            }
+        }
         return ns_.toArray(new Integer[]{});
     }
 

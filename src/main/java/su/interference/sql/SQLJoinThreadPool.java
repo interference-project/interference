@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -24,6 +24,8 @@
 
 package su.interference.sql;
 
+import su.interference.core.Config;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -34,8 +36,8 @@ import java.util.concurrent.Executors;
 
 public class SQLJoinThreadPool {
 
-    private static ExecutorService exec = Executors.newFixedThreadPool(8);
-    private static ExecutorService exec2 = Executors.newFixedThreadPool(8);
+    private static ExecutorService exec = Executors.newFixedThreadPool(Config.getConfig().RETRIEVE_THREADS_AMOUNT);
+    private static ExecutorService exec2 = Executors.newFixedThreadPool(Config.getConfig().RETRIEVE_THREADS_AMOUNT);
 
     public static ExecutorService getThreadPool() {
         return exec;

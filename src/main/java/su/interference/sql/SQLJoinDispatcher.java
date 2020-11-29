@@ -80,13 +80,23 @@ public class SQLJoinDispatcher implements Comparable {
 
         if (c1.isIndexOrUnique()||c2.isIndexOrUnique()) {
             if (merged && ix1 != null && ix2 != null) {
-                this.join = RIGHT_MERGE;
-                final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
-                final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
-                logger.info("use merge join for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
-                lbi_ = new SQLIndex(ix1, lt, true, c1, c2, true, nc, RIGHT_MERGE, s);
-                rbi_ = new SQLIndex(ix2, rt, false, c1, c2, true, nc, RIGHT_MERGE, s);
-                this.weight = 100;
+                if (c1.isUnique()) {
+                    this.join = MERGE;
+                    final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
+                    final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
+                    logger.info("use merge join for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
+                    lbi_ = new SQLIndex(ix1, lt, true, c1, c2, true, nc, MERGE, s);
+                    rbi_ = new SQLIndex(ix2, rt, false, c1, c2, true, nc, MERGE, s);
+                    this.weight = 100;
+                } else {
+                    this.join = RIGHT_MERGE;
+                    final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
+                    final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
+                    logger.info("use right merge join for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
+                    lbi_ = new SQLIndex(ix1, lt, true, c1, c2, true, nc, RIGHT_MERGE, s);
+                    rbi_ = new SQLIndex(ix2, rt, false, c1, c2, true, nc, RIGHT_MERGE, s);
+                    this.weight = 90;
+                }
             } else if (c1.isUnique() || c2.isUnique()) {
                 this.join = RIGHT_HASH;
                 final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
@@ -132,11 +142,11 @@ public class SQLJoinDispatcher implements Comparable {
         this.s = s;
     }
 
-    public FrameIterator getLbi() {
+    protected FrameIterator getLbi() {
         return lbi;
     }
 
-    public FrameIterator getRbi() {
+    protected FrameIterator getRbi() {
         return rbi;
     }
 
@@ -161,6 +171,10 @@ public class SQLJoinDispatcher implements Comparable {
             return 1;
         }
         return 0;
+    }
+
+    public int getJoin() {
+        return join;
     }
 
     public int getWeight() {
