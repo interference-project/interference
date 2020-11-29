@@ -24,6 +24,7 @@
 
 package su.interference.sql;
 
+import su.interference.core.Instance;
 import su.interference.core.ValueSet;
 import su.interference.exception.InternalException;
 import su.interference.persistent.FrameData;
@@ -117,6 +118,11 @@ public class SQLIndex implements FrameIterator, Finder {
         return null;
     }
 
+    public FrameApi getFrameByAllocId(long allocId) {
+        final FrameData bd = Instance.getInstance().getFrameByAllocId(allocId);
+        return new SQLIndexFrame(t, parent, bd, lkey, rkey, vc, left, unique, merged, join);
+    }
+
     public void resetIterator() {
         if (left) {
 /* optional (possibly will be need)
@@ -165,6 +171,11 @@ public class SQLIndex implements FrameIterator, Finder {
     @Override
     public void setLeftfs(boolean leftfs) {
 
+    }
+
+    @Override
+    public boolean noDistribute() {
+        return this.vc != null || this.join == SQLJoinDispatcher.MERGE;
     }
 
 }

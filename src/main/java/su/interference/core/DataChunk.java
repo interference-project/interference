@@ -63,7 +63,7 @@ public class DataChunk implements Chunk {
     private volatile byte[] chunk;
     private Comparable id;
     private byte[] serializedId;
-    private Object entity;
+    private volatile Object entity;
     private Object undoentity;
     private Map<Integer, DataChunk> ics = new HashMap<>();
     private UndoChunk uc;
@@ -470,7 +470,7 @@ public class DataChunk implements Chunk {
         return this.entity;
     }
 
-    public Object getEntity () {
+    public synchronized Object getEntity () {
         if (entity==null) {
             try {
                 final ValueSet dcs = getDcsFromBytes();
@@ -578,10 +578,6 @@ public class DataChunk implements Chunk {
         this.chunk = null;
         this.state = NORMAL_STATE;
         return entity;
-    }
-
-    public void setFrameData(FrameData b) {
-        entity = b;
     }
 
     @Deprecated
@@ -713,10 +709,6 @@ public class DataChunk implements Chunk {
         if (entity instanceof UndoChunk) {
             this.entity = entity;
         }
-    }
-
-    protected void setEntity(Object entity, boolean z) {
-        this.entity = entity;
     }
 
     //method for transactional objects ONLY

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -24,6 +24,8 @@
 
 package su.interference.sql;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import su.interference.core.Config;
 import su.interference.metrics.Metrics;
 
@@ -38,6 +40,7 @@ import java.util.concurrent.CountDownLatch;
  */
 
 public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
+    private final static Logger logger = LoggerFactory.getLogger(FrameApiJoin.class);
     private final int nodeId;
     private final transient FrameApi bd1;
     private final transient FrameApi bd2;
@@ -61,12 +64,20 @@ public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
         }
     }
 
-    public FrameApiJoin call() throws Exception {
+    public FrameApiJoin call() throws InterruptedException {
+        final Thread thread = Thread.currentThread();
         if (nodeId == Config.getConfig().LOCAL_NODE_ID) {
+            thread.setName("interference-sql-join-task-" + thread.getId());
             Metrics.get("localTask").start();
-            result = frameJoinTask.call();
+            try {
+                result = frameJoinTask.call();
+            } catch (Exception e) {
+                failed = true;
+                logger.error("join task", e);
+            }
             Metrics.get("localTask").stop();
         } else {
+            thread.setName("interference-sql-remote-task-" + thread.getId());
             Metrics.get("remoteTask").start();
             latch.await();
             Metrics.get("remoteTask").stop();

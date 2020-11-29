@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -362,7 +362,7 @@ public class SQLSelect implements SQLStatement {
             final Integer[] ns = TransportContext.getInstance().getOnlineNodes();
             for (Integer nodeId : TransportContext.getInstance().getOnlineNodes()) {
                 final TransportEvent transportEvent = new SQLEvent(nodeId, cursor.getCursorId(), null, null,
-                        this.join.getTargetId(), cursor.getSql(), this.join.getResultTargetName(), sn.getTransaction().getTransId(), false);
+                        this.join.getTargetId(), cursor.getSql(), this.join.getResultTargetNames(), sn.getTransaction().getTransId(), false);
                 TransportContext.getInstance().send(transportEvent);
                 logger.debug("create remote cursor on node " + nodeId);
                 transportEvent.getLatch().await();

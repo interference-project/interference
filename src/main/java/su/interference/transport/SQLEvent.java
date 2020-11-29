@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -26,7 +26,6 @@ package su.interference.transport;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import su.interference.core.Frame;
 import su.interference.core.Instance;
 import su.interference.persistent.Cursor;
 import su.interference.persistent.Session;
@@ -36,6 +35,7 @@ import su.interference.sqlexception.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Future;
 
 /**
  * @author Yuriy Glotanov
@@ -50,18 +50,18 @@ public class SQLEvent extends TransportEventImpl {
     private final Map<String, FrameApiJoin> joins;
     private final String rightType;
     private final String sql;
-    private final String resultTargetName;
+    private final List<String> resultTargetNames;
     private final long tranId;
     private final boolean execute;
 
-    public SQLEvent(int channelId, long cursorId, Map<String, FrameApiJoin> joins, String rightType, int targetId, String sql, String resultTargetName, long tranId, boolean execute) {
+    public SQLEvent(int channelId, long cursorId, Map<String, FrameApiJoin> joins, String rightType, int targetId, String sql, List<String> resultTargetNames, long tranId, boolean execute) {
         super(channelId);
         this.cursorId = cursorId;
         this.joins = joins;
         this.rightType = rightType;
         this.targetId = targetId;
         this.sql = sql;
-        this.resultTargetName = resultTargetName;
+        this.resultTargetNames = resultTargetNames;
         this.tranId = tranId;
         this.execute = execute;
     }
@@ -74,32 +74,47 @@ public class SQLEvent extends TransportEventImpl {
             //now, only first cursor mau contains left FS table
             final SQLCursor c = sql.getSQLCursorById(1);
             final SQLJoinDispatcher d = c.getHmap();
-            final FrameIterator rbi = d == null ? null : d.getRbi();
             final List<FrameApiJoin> res = new ArrayList<>();
-            for (Map.Entry<String, FrameApiJoin> entry : joins.entrySet()) {
-                final FrameApiJoin j = entry.getValue();
-                FrameApi b_ = null;
-                if (j.getRightAllocId() == 0 && rbi != null && (rightType.equals("SQLHashMapFrame") || rightType.equals("SQLIndexFrame"))) {
-                    rbi.resetIterator();
-                    try {
-                        b_ = rbi.nextFrame();
-                    } catch (Exception e) {
-                        e.printStackTrace();
+            final List<Future> flist = new ArrayList<>();
+            try {
+                for (Map.Entry<String, FrameApiJoin> entry : joins.entrySet()) {
+                    final FrameApiJoin j = entry.getValue();
+                    FrameApi b = null;
+                    FrameApi b_ = null;
+                    if (c.getLbi() instanceof SQLIndex) {
+                        if (d != null && d.getJoin() == SQLJoinDispatcher.RIGHT_MERGE) {
+                            b = ((SQLIndex) c.getLbi()).getFrameByAllocId(j.getLeftAllocId());
+                        } else {
+                            b = c.getLbi().nextFrame();
+                        }
                     }
-                }
-                final FrameApi bd1 = Instance.getInstance().getFrameByAllocId(j.getLeftAllocId());
-                final FrameApi bd2 = j.getRightAllocId() == 0 ? b_ : Instance.getInstance().getFrameByAllocId(j.getRightAllocId());
-                try {
-                    j.setResult(c.execute(bd1, bd2));
+                    if (j.getRightAllocId() == 0 && c.getRbi() != null && (rightType.equals("SQLHashMapFrame") || rightType.equals("SQLIndexFrame"))) {
+                        c.getRbi().resetIterator();
+                        b_ = c.getRbi().nextFrame();
+                    }
+                    final FrameApi bd1 = c.getLbi() instanceof SQLIndex ? b : Instance.getInstance().getFrameByAllocId(j.getLeftAllocId());
+                    final FrameApi bd2 = j.getRightAllocId() == 0 ? b_ : Instance.getInstance().getFrameByAllocId(j.getRightAllocId());
+                    flist.add(c.execute(bd1, bd2, j));
                     res.add(j);
-                } catch (Exception e) {
-                    return new EventResult(TransportCallback.FAILURE, this.cursorId, null, e);
                 }
+                boolean cnue = true;
+                while (cnue) {
+                    cnue = false;
+                    for (Future f : flist) {
+                        if (!f.isDone()) {
+                            cnue = true;
+                        }
+                    }
+                    Thread.sleep(10);
+                }
+            } catch (Exception e) {
+                logger.error("SQLEvent process: ", e);
+                return new EventResult(TransportCallback.FAILURE, this.cursorId, res, null);
             }
             return new EventResult(TransportCallback.SUCCESS, this.cursorId, res, null);
         } else {
             final Session s = Session.getSession();
-            final Cursor cur = this.cursorId == 0 ? null : new Cursor(this.sql, this.resultTargetName, Cursor.SLAVE_TYPE);
+            final Cursor cur = this.cursorId == 0 ? null : new Cursor(this.sql, this.resultTargetNames, Cursor.SLAVE_TYPE);
             if (cur != null) {
                 cur.setCursorId(cursorId);
 
@@ -112,7 +127,7 @@ public class SQLEvent extends TransportEventImpl {
 
                     cur.startStatement(this.tranId);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    logger.error("SQLEvent process: ", e);
                 }
 
             }

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2020 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -31,7 +31,6 @@ import java.util.ArrayList;
 import java.util.Properties;
 import java.io.FileInputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.StringTokenizer;
 
@@ -104,8 +103,10 @@ public class Config {
     public final boolean SYNC_LOCK_ENABLE;
     public final int SYNC_PERIOD;
     public final int RETRIEVE_QUEUE_SIZE;
+    public final int RETRIEVE_THREADS_AMOUNT = 8;
     public final String CODEPAGE;
     public final String DATEFORMAT;
+    public final int TEST_DISTRIBUTE_MODE = 1;
 
     private final Properties p;
 
