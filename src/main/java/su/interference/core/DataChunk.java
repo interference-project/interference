@@ -84,7 +84,6 @@ public class DataChunk implements Chunk {
 
     //returns datacolumn set
     private ValueSet getDcsFromEntity() {
-        ValueSet dcs = null;
         try {
             final Field[] f = this.t == null ? this.entity.getClass().getDeclaredFields() : t.getFields();
             final List<Object> vs = new ArrayList<>();
@@ -98,11 +97,10 @@ public class DataChunk implements Chunk {
                     vs.add(f[i].get(entity));
                 }
             }
-            dcs = new ValueSet(vs.toArray(new Object[]{}));
+            return new ValueSet(vs.toArray(new Object[]{}));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        return dcs;
     }
 
     private ValueSet getDcsFromBytes() {
@@ -111,12 +109,12 @@ public class DataChunk implements Chunk {
         }
 
         try {
-            Field[] cs = null;
+            Field[] cs;
             if (t != null) {
                 cs = t.getFields();
             } else {
-                Field[] f = class_.getDeclaredFields();
-                List<Field> ff = new ArrayList<Field>();
+                final Field[] f = class_.getDeclaredFields();
+                final List<Field> ff = new ArrayList<>();
                 for (int i = 0; i < f.length; i++) {
                     int m = f[i].getModifiers();
                     Transient ta = f[i].getAnnotation(Transient.class);
@@ -489,10 +487,10 @@ public class DataChunk implements Chunk {
                     final ResultSetEntity rsa = (ResultSetEntity) ((Table) this.t).getTableClass().getAnnotation(ResultSetEntity.class);
                     final DataChunk dc = rsa == null ? (DataChunk) Instance.getInstance().getChunkByPointer(this.getHeader().getFramePtr(), this.getHeader().getFramePtrRowId().getRowPointer()) : this;
                     if (dc == null) {
-                        // todo during rframe.IndexFrame.init system directory not yet contains replicated FrameData objects
-                        logger.error("null datachunk found");
+                        logger.warn("null data record found during index entity construct");
+                    } else {
+                        dc.setIc(this);
                     }
-                    dc.setIc(this);
                     ((IndexChunk)o).setFramePtrRowId(this.getHeader().getFramePtrRowId());
                     ((IndexChunk)o).setDataChunk(dc);
                 }
@@ -546,7 +544,7 @@ public class DataChunk implements Chunk {
         SystemEntity ca = (SystemEntity)c.getAnnotation(SystemEntity.class);
         try {
             if (ca!=null) { //System non-transactional
-                Object o = null;
+                Object o;
                 if (params!=null) {
                     final Class<?>[] cs = new Class<?>[params.length];
                     for (int i=0; i<params.length; i++) {

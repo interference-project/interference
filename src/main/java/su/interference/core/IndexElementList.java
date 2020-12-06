@@ -49,7 +49,7 @@ public class IndexElementList {
 
     public IndexElementList (int type) {
         this.type = type;
-        elementList = new CopyOnWriteArrayList<IndexElement>();
+        elementList = new CopyOnWriteArrayList<>();
     }
 
     private void _add (IndexElement e) {
@@ -79,7 +79,7 @@ public class IndexElementList {
                 this.lc = 0;
             } else {
                 if (e.getKey().compareTo(this.maxValue)>0) {
-
+                    throw new RuntimeException("internal error");
                 } else {
                     res.divided = true;
                     this._add(e);

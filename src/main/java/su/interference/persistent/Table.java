@@ -360,7 +360,7 @@ public class Table implements ResultSet {
     }
 
     //used in DataChunk.getEntity
-    public Object getInstance() throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
+    public Object getInstance() throws InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
         final Class c = this.getTableClass();
         final SystemEntity ca = (SystemEntity)c.getAnnotation(SystemEntity.class);
         final IndexEntity xa = (IndexEntity)c.getAnnotation(IndexEntity.class);
@@ -378,7 +378,7 @@ public class Table implements ResultSet {
         return null;
     }
 
-    public IndexDescript[] getIndexNames() throws ClassNotFoundException, InternalException, MalformedURLException {
+    public IndexDescript[] getIndexNames() throws InternalException {
         final Class c = this.getTableClass();
         final Annotation[] ca = c.getAnnotations();
         final ArrayList<IndexDescript> r = new ArrayList<IndexDescript>();
@@ -399,7 +399,7 @@ public class Table implements ResultSet {
         return r.toArray(new IndexDescript[]{});
     }
 
-    public IndexDescript getIndexDescriptByColumnName(String name) throws ClassNotFoundException, InternalException, MalformedURLException {
+    public IndexDescript getIndexDescriptByColumnName(String name) throws InternalException {
         final Class c = this.getTableClass();
         final Annotation[] ca = c.getAnnotations();
         for (int i=0; i<ca.length; i++) {
@@ -425,7 +425,7 @@ public class Table implements ResultSet {
         return null;
     }
 
-    public Table getFirstIndexByColumnName(String name) throws ClassNotFoundException, InternalException, MalformedURLException {
+    public Table getFirstIndexByColumnName(String name) throws InternalException {
         final Class c = this.getTableClass();
         final Annotation[] ca = c.getAnnotations();
         for (int i=0; i<ca.length; i++) {
@@ -451,7 +451,7 @@ public class Table implements ResultSet {
         return null;
     }
 
-    private Table getFirstIndexByIdColumn() throws ClassNotFoundException, InternalException, MalformedURLException {
+    private Table getFirstIndexByIdColumn() throws InternalException {
         final Class c = this.getTableClass();
         final Annotation[] ca = c.getAnnotations();
         for (int i=0; i<ca.length; i++) {
@@ -477,7 +477,7 @@ public class Table implements ResultSet {
         return null;
     }
 
-    private java.lang.reflect.Field[] getTableFields() throws ClassNotFoundException, MalformedURLException {
+    private java.lang.reflect.Field[] getTableFields() {
         final Class c = this.getTableClass();
         final ArrayList<java.lang.reflect.Field> res = new ArrayList<java.lang.reflect.Field>();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
@@ -494,7 +494,7 @@ public class Table implements ResultSet {
         return res.toArray(new java.lang.reflect.Field[]{});
     }
 
-    private String[] getTableFieldTypes() throws ClassNotFoundException, MalformedURLException {
+    private String[] getTableFieldTypes() {
         final java.lang.reflect.Field[] fs = getFields();
         String[] res = new String[fs.length];
         for (int i = 0; i < fs.length; i++) {
@@ -507,7 +507,7 @@ public class Table implements ResultSet {
         return fields;
     }
 
-    private java.lang.reflect.Field getTableIdField() throws ClassNotFoundException, MalformedURLException {
+    private java.lang.reflect.Field getTableIdField() {
         final Class c = this.getTableClass();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
         for (int i=0; i<f.length; i++) {
@@ -544,7 +544,7 @@ public class Table implements ResultSet {
         return this.idfieldgetter;
     }
 
-    private java.lang.reflect.Field getGeneratedField() throws ClassNotFoundException, MalformedURLException {
+    private java.lang.reflect.Field getGeneratedField() {
         final Class c = this.getTableClass();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
         for (int i=0; i<f.length; i++) {
@@ -824,7 +824,7 @@ public class Table implements ResultSet {
 
     }
 
-    public void initIndexFields () throws ClassNotFoundException, MalformedURLException {
+    public void initIndexFields () {
         final Class c = this.getTableClass();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
         for (int i=0; i<f.length; i++) {
@@ -921,7 +921,7 @@ public class Table implements ResultSet {
         return null;
     }
 
-    public IndexField getIdIndexField() throws MalformedURLException, ClassNotFoundException {
+    public IndexField getIdIndexField() {
         java.lang.reflect.Field id = this.getIdField();
         if (id!=null) {
             for (IndexField ix : indexes) {
@@ -1043,11 +1043,8 @@ public class Table implements ResultSet {
     private WaitFrame getAvailableFrame(final Object o, final boolean fpart) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException {
         Metrics.get("getAvailableFrame").start();
         final long st = System.currentTimeMillis();
-
-        //todo move to config
-        final long timeout = 100;
-
         final int a = avframeStart.get()%this.lbs.length;
+
         while (true) {
             final long tp = System.currentTimeMillis() - st;
             for (int i = 0; i < this.lbs.length; i++) {
@@ -1060,12 +1057,12 @@ public class Table implements ResultSet {
                     return bd;
                 }
             }
-            if (tp > timeout) {
+            if (tp > Config.getConfig().CHECK_AVAIL_FRAME_TIMEOUT) {
                 for (int i = 0; i < this.lbs.length; i++) {
                     logger.warn("lbs: "+lbs[i].getBd().getFrameId()+":"+lbs[i].getBusy().get());
                 }
                 logger.warn("avframestart: "+avframeStart.get());
-                logger.warn("timeout occured during getavailableframe method: " + timeout);
+                logger.warn("timeout occured during getavailableframe method: " + Config.getConfig().CHECK_AVAIL_FRAME_TIMEOUT);
                 for (int i = 0; i < this.lbs.length; i++) {
                     final int i_ = (a + i) % this.lbs.length;
                     final WaitFrame wb = this.lbs[i_];
@@ -1388,7 +1385,6 @@ public class Table implements ResultSet {
         if (!external) {
             synchronized (this) {
                 boolean done = true;
-//System.out.println("Table.createNewFrame: old="+(frame==null?"null":frame.getFrameId())+" frame="+(frame.getFrame()==null?"null":(frame.getFrame().getFrameData()==null?":null":frame.getFrame().getFrameData().getFrameId())));
                 if (setlbs && !this.getName().equals(UndoChunk.class.getName())) {
                     done = false;
                     for (WaitFrame wb : this.lbs) {
@@ -1529,7 +1525,7 @@ public class Table implements ResultSet {
                         startframes.add(entry.getValue());
                     }
 
-                    //todo need to implement merge algorithm for multinode indexes
+                    Map<Long, IndexContainer> mmap = new HashMap<>();
                     for (long start : startframes) {
                         List<IndexFrame> levelNodes = new ArrayList<>();
                         boolean cnue = true;
@@ -1545,16 +1541,12 @@ public class Table implements ResultSet {
                         el.sort();
                         levelNodes.add(el);
                         while (cnue) {
-                            ArrayList<IndexFrame> inNodes = new ArrayList<IndexFrame>();
+                            ArrayList<IndexFrame> inNodes = new ArrayList<>();
                             for (int k = 0; k < levelNodes.size(); k++) {
                                 levelNodes.get(k).sort();
                                 if (levelNodes.get(k).getType() == 1) {
+                                    mmap.put(start, new IndexContainer(levelNodes));
                                     cnue = false;
-                                    for (Chunk ie : levelNodes.get(k).getFrameChunks(s)) {
-                                        if (levelNodes.get(k).getType() == 1) {
-                                            q.put(ie);
-                                        }
-                                    }
                                 } else {
                                     for (int i = 0; i < levelNodes.get(k).getFrameChunks(s).size(); i++) {
                                         inNodes.add(Instance.getInstance().getFrameById(levelNodes.get(k).getFrameChunks(s).get(i).getHeader().getFramePtr()).getIndexFrame());
@@ -1573,6 +1565,35 @@ public class Table implements ResultSet {
                                 cnue = false;
                             }
                         }
+                    }
+                    boolean done = false;
+                    IndexContainer ic = null;
+                    try {
+                        while (!done) {
+                            done = true;
+                            for (Map.Entry<Long, IndexContainer> entry : mmap.entrySet()) {
+                                if (entry.getValue().get() != null) {
+                                    done = false;
+                                    if (ic != null) {
+                                        if (entry.getValue().get().compareTo(ic.get()) <= 0) {
+                                            ic = entry.getValue();
+                                        }
+                                    } else {
+                                        ic = entry.getValue();
+                                    }
+                                }
+                            }
+                            for (Map.Entry<Long, IndexContainer> entry : mmap.entrySet()) {
+                                if (entry.getValue().get() != null) {
+                                    if (ic.get() == null || ic.get() == entry.getValue().get() || ic.get().compareTo(entry.getValue().get()) == 0) {
+                                        q.put(entry.getValue().get());
+                                        entry.getValue().next();
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        logger.error("index merge failed", e);
                     }
                 }
                 q.put(tc);
@@ -1811,7 +1832,7 @@ public class Table implements ResultSet {
             cnue = true;
 
             //store element to target leaf
-            FrameData prevtg = null;
+            FrameData prevtg;
             DataChunk dc__ = null;
             while (cnue) {
                 final DataChunk dc_ = dc__ == null ? dc : dc__;

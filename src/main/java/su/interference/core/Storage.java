@@ -332,7 +332,18 @@ public class Storage {
 
     public void openDataFiles () throws Exception {
         for (Map.Entry e : ifs.entrySet()) {
-            if (((DataFile)e.getValue()).checkFile()==1) {
+            final int state = ((DataFile)e.getValue()).checkFile();
+            if (state == DataFile.FILE_OK) {
+                ((DataFile)e.getValue()).openFile(Config.getConfig().DISKIO_MODE);
+            }
+            if (state == DataFile.FILE_VERSION_NOT_MATCH) {
+                final int filesv = ((DataFile)e.getValue()).checkSystemVersion();
+                logger.warn("\n----------------------------------------------------------------------\n" +
+                        "--- data files were created by a different version of the software ---\n" +
+                        "--- datafile version: "+filesv+" ---------------------------------------\n" +
+                        "--- software version: "+Instance.SYSTEM_VERSION+" ---------------------------------------\n" +
+                        "--- SERVICE MAY BE UNSTABLE ------------------------------------------\n" +
+                        "----------------------------------------------------------------------");
                 ((DataFile)e.getValue()).openFile(Config.getConfig().DISKIO_MODE);
             }
         }

@@ -171,7 +171,7 @@ public class SyncFrameEvent extends TransportEventImpl {
                         final long uframeId = Instance.getInstance().getFrameByAllocId(uallocId).getFrameId();
                         uframes.put(uframeId, uallocId);
                         ulist.add(uframeId);
-                        tran.storeRFrame(uframeId);
+                        tran.storeRFrame(uframeId, b.getBd().getFrameId(), b.getBd().getObjectId(), s);
                     }
                     b.getBd().updateTCounter(entry.getKey(), ulist);
                 }

@@ -43,7 +43,6 @@ import java.util.stream.Collectors;
 public class TransportSyncTask implements Runnable {
 
     private final static Logger logger = LoggerFactory.getLogger(TransportSyncTask.class);
-    private final static int REMOTE_SYNC_TIMEOUT = 120000;
     private final static int REMOTE_SYNC_DEFERRED_AMOUNT = 10000;
     private final ArrayList<SyncFrame> frames;
     private final Session s;
@@ -76,7 +75,7 @@ public class TransportSyncTask implements Runnable {
                         if (bs.getAllocId() == CommandEvent.INITTRAN || bs.getAllocId() == CommandEvent.COMMIT || bs.getAllocId() == CommandEvent.ROLLBACK) { //command
                             final CommandEvent command = new CommandEvent((int)bs.getAllocId(), bs.getFrameId(), channel.getChannelId());
                             TransportContext.getInstance().send(command);
-                            final boolean sent = command.getLatch().await(REMOTE_SYNC_TIMEOUT, TimeUnit.MILLISECONDS);
+                            final boolean sent = command.getLatch().await(Config.getConfig().REMOTE_SYNC_TIMEOUT, TimeUnit.MILLISECONDS);
                             if (!command.isFail() && sent) {
                                 logger.debug("sent persisted command sync: " + bs);
                                 s.delete(bs);
@@ -94,7 +93,7 @@ public class TransportSyncTask implements Runnable {
                             Collection<SyncFrame> psb_ = retrieveAdditionalFrames(psb, s);
                             final SyncFrameEvent event = new SyncFrameEvent(channel.getChannelId(), psb_.toArray(new SyncFrame[]{}));
                             TransportContext.getInstance().send(event);
-                            final boolean sent = event.getLatch().await(REMOTE_SYNC_TIMEOUT, TimeUnit.MILLISECONDS);
+                            final boolean sent = event.getLatch().await(Config.getConfig().REMOTE_SYNC_TIMEOUT, TimeUnit.MILLISECONDS);
                             if (!event.isFail() && sent) {
                                 logger.info(psb.size() + "(" + psb_.size() + ") persisted sync frame(s) were sent and synced (node id = " + channel.getChannelId() + ")");
                             }
@@ -118,7 +117,7 @@ public class TransportSyncTask implements Runnable {
                         if (sb.length > 0) {
                             final SyncFrameEvent event = new SyncFrameEvent(channel.getChannelId(), sb);
                             TransportContext.getInstance().send(event);
-                            final boolean sent = event.getLatch().await(REMOTE_SYNC_TIMEOUT, TimeUnit.MILLISECONDS);
+                            final boolean sent = event.getLatch().await(Config.getConfig().REMOTE_SYNC_TIMEOUT, TimeUnit.MILLISECONDS);
                             if (event.isFail() || !sent) {
                                 if (event.getProcessException() != null) {
                                     event.getProcessException().printStackTrace();

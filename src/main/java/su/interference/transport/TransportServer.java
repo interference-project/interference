@@ -46,7 +46,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class TransportServer {
 
     private final static Logger logger = LoggerFactory.getLogger(TransportServer.class);
-    private final static int READ_BUFFER_SIZE = 33554432;
     private static TransportServer transportServer;
     private final AtomicBoolean started = new AtomicBoolean(true);
     private static final TransportContext transportContext = TransportContext.getInstance();
@@ -67,7 +66,7 @@ public class TransportServer {
                             try {
                                 serverSocket.setSoTimeout(10000);
                                 final Socket socket = serverSocket.accept();
-                                final ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(socket.getInputStream(), READ_BUFFER_SIZE)) {
+                                final ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(socket.getInputStream(), Config.getConfig().READ_BUFFER_SIZE)) {
                                     @Override
                                     protected Class<?> resolveClass(ObjectStreamClass objectStreamClass)
                                             throws IOException, ClassNotFoundException {
@@ -92,9 +91,9 @@ public class TransportServer {
                                                 final TransportMessage transportMessage = (TransportMessage) ois.readObject();
                                                 transportContext.onMessage(transportMessage, inetAddress);
                                             } catch (EOFException eof) {
-                                                logger.error(eof.getMessage());
+                                                running = false;
+                                                logger.warn("event server will be restarted due to " + eof.getMessage());
                                             } catch (Exception e) {
-                                                e.printStackTrace();
                                                 running = false;
                                                 logger.warn("event server will be restarted due to " + e.getMessage());
                                             }
