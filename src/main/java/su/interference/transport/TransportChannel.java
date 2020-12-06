@@ -26,6 +26,7 @@ package su.interference.transport;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import su.interference.core.Config;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -46,7 +47,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class TransportChannel {
 
     private final static Logger logger = LoggerFactory.getLogger(TransportChannel.class);
-    private final static int WRITE_BUFFER_SIZE = 33554432;
     private final int channelId;
     private final String channelUUID;
     private final ConcurrentLinkedQueue<TransportMessage> mq = new ConcurrentLinkedQueue<>();
@@ -58,7 +58,6 @@ public class TransportChannel {
     private final String host;
     private final int port;
     private final InetSocketAddress socketAddress;
-    private final static int CONNECT_ATTEMPTS = 1;
 
     protected TransportChannel(String hostport) {
         this.channelId = Integer.valueOf(hostport.substring(0, hostport.indexOf(":",1)));
@@ -88,7 +87,7 @@ public class TransportChannel {
                     }
                     if (sock.isConnected()) {
                         try {
-                            final ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(sock.getOutputStream(), WRITE_BUFFER_SIZE));
+                            final ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(sock.getOutputStream(), Config.getConfig().WRITE_BUFFER_SIZE));
                             boolean running = true;
                             started.set(true);
                             Thread.currentThread().setName("transport channel thread 2");

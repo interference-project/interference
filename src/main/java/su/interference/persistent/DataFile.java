@@ -85,6 +85,14 @@ public class DataFile implements Serializable {
     protected RandomAccessFile file;
     @Transient
     protected SystemFrame sframe;
+    @Transient
+    public static final int FILE_NOT_FOUND = 0;
+    @Transient
+    public static final int FILE_OK = 1;
+    @Transient
+    public static final int FILE_VERSION_NOT_MATCH = 2;
+    @Transient
+    public static final int FILE_SYSTEM_FRAME_CORRUPT = 3;
 
     public static int getCLASS_ID() {
         return CLASS_ID;
@@ -257,23 +265,45 @@ public class DataFile implements Serializable {
                 try {
                     this.file.close();
                 } catch (IOException e) {
-                    return 3;
+                    return FILE_SYSTEM_FRAME_CORRUPT;
                 }
                 if (this.sframe.getSysVersion()==Instance.SYSTEM_VERSION) {
-                    return 1;
+                    return FILE_OK;
                 } else {
-                    return 2;
+                    return FILE_VERSION_NOT_MATCH;
                 }
             } catch (FileNotFoundException e) {
-                return 0;
+                return FILE_NOT_FOUND;
             } catch (IOException e) {
-                return 3;
+                return FILE_SYSTEM_FRAME_CORRUPT;
             } catch (EmptyFrameHeaderFound e) {
-                return 3;
+                return FILE_SYSTEM_FRAME_CORRUPT;
             } catch (InvalidFrameHeader e) {
-                return 3;
+                return FILE_SYSTEM_FRAME_CORRUPT;
             } catch (InvalidFrame e) {
-                return 3;
+                return FILE_SYSTEM_FRAME_CORRUPT;
+            }
+        } catch (FileNotFoundException e) {
+            return FILE_NOT_FOUND;
+        }
+    }
+
+    public synchronized int checkSystemVersion() throws Exception {
+        try {
+            this.file = new RandomAccessFile(this.fileName,"r");
+            byte[] b = new byte[SYSTEM_FRAME_SIZE];
+            try {
+                this.file.seek(0);
+                this.file.read(b,0,SYSTEM_FRAME_SIZE);
+                this.sframe = new SystemFrame(b,this.getFileId(),0);
+                try {
+                    this.file.close();
+                } catch (IOException e) {
+                    return 0;
+                }
+                return this.sframe.getSysVersion();
+            } catch (Exception e) {
+                return 0;
             }
         } catch (FileNotFoundException e) {
             return 0;
@@ -329,7 +359,7 @@ public class DataFile implements Serializable {
     }
 
     public synchronized void createFile(Session s, LLT llt) throws IOException, InvocationTargetException, NoSuchMethodException, FileNotFoundException, InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
-        boolean check = false;
+        boolean check;
         try {
             this.file = new RandomAccessFile(this.fileName,"r");
             check = true;

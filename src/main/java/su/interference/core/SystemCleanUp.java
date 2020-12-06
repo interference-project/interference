@@ -41,11 +41,8 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
     private volatile boolean f = true;
     CountDownLatch latch;
     private final static Logger logger = LoggerFactory.getLogger(SystemCleanUp.class);
-    private static final int CLEANUP_TIMEOUT = 3000;
     public static final int DATA_RETRIEVED_PRIORITY = 6;
     public static final int INDEX_RETRIEVED_PRIORITY = 9;
-    private static final int CLEANUP_PROTECTION_THR = 1000;
-    private static final int IX_CLEANUP_PROTECTION_THR = 5000;
 
     public void run () {
         Thread.currentThread().setName("interference-cleanup-thread");
@@ -58,7 +55,7 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
             }
 
             try {
-                Thread.sleep(CLEANUP_TIMEOUT);
+                Thread.sleep(Config.getConfig().CLEANUP_TIMEOUT);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -74,7 +71,6 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
     }
 
     private void cleanUpFrames() {
-
         Metrics.get("systemCleanUp").start();
         int i = 0;
         int d = 0;
@@ -87,9 +83,9 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
         for (Object entry : Instance.getInstance().getFramesMap().entrySet()) {
             final FrameData f = (FrameData) ((DataChunk) ((Map.Entry) entry).getValue()).getEntity();
             final long frameAmount = f.getDataObject().getFrameAmount();
-            if (f.getDataFile().isData()) {
+            if (f.getDataFile().isData() && cleanupDataEnabled()) {
                 f.decreasePriority();
-                if (f.isSynced() && f.getObjectId() > 999 && f.getPriority() == 0 && frameAmount > CLEANUP_PROTECTION_THR) {
+                if (f.isSynced() && f.getObjectId() > 999 && f.getPriority() == 0 && frameAmount > Config.getConfig().CLEANUP_PROTECTION_THR) {
                     if (f.clearFrame()) {
                         d++;
                     }
@@ -98,9 +94,9 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
                     d_++;
                 }
             }
-            if (f.getDataFile().isIndex()) {
+            if (f.getDataFile().isIndex() && cleanupIndxEnabled()) {
                 f.decreasePriority();
-                if (f.isSynced() && f.getObjectId() > 999 && f.getPriority() == 0 && frameAmount > IX_CLEANUP_PROTECTION_THR) {
+                if (f.getPriority() == 0 && frameAmount > Config.getConfig().IX_CLEANUP_PROTECTION_THR) {
                     if (f.clearFrame()) {
                         x++;
                     }
@@ -109,8 +105,8 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
                     x_++;
                 }
             }
-            if (f.getDataFile().isTemp()) {
-                if (f.isSynced() && f.getObjectId() > 999 && frameAmount > CLEANUP_PROTECTION_THR) {
+            if (f.getDataFile().isTemp() && cleanupTempEnabled()) {
+                if (frameAmount > Config.getConfig().CLEANUP_PROTECTION_THR) {
                     if (f.clearFrame()) {
                         i++;
                     }
@@ -119,8 +115,8 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
                     i_++;
                 }
             }
-            if (f.getDataFile().isUndo()) {
-                if (f.isSynced() && frameAmount > CLEANUP_PROTECTION_THR) {
+            if (f.getDataFile().isUndo() && cleanupUndoEnabled()) {
+                if (f.isSynced() && frameAmount > Config.getConfig().CLEANUP_PROTECTION_THR) {
                     if (f.clearFrame()) {
                         u++;
                     }
@@ -147,5 +143,33 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
                 f.clearFrame();
             }
         }
+    }
+
+    private boolean cleanupDataEnabled() {
+        final long maxmem = Runtime.getRuntime().maxMemory();
+        final long alloc = Runtime.getRuntime().totalMemory();
+        final long allocpc = alloc * 100 / maxmem;
+        return allocpc > Config.getConfig().HEAP_USE_THR_DATA;
+    }
+
+    private boolean cleanupIndxEnabled() {
+        final long maxmem = Runtime.getRuntime().maxMemory();
+        final long alloc = Runtime.getRuntime().totalMemory();
+        final long allocpc = alloc * 100 / maxmem;
+        return allocpc > Config.getConfig().HEAP_USE_THR_INDX;
+    }
+
+    private boolean cleanupUndoEnabled() {
+        final long maxmem = Runtime.getRuntime().maxMemory();
+        final long alloc = Runtime.getRuntime().totalMemory();
+        final long allocpc = alloc * 100 / maxmem;
+        return allocpc > Config.getConfig().HEAP_USE_THR_UNDO;
+    }
+
+    private boolean cleanupTempEnabled() {
+        final long maxmem = Runtime.getRuntime().maxMemory();
+        final long alloc = Runtime.getRuntime().totalMemory();
+        final long allocpc = alloc * 100 / maxmem;
+        return allocpc > Config.getConfig().HEAP_USE_THR_TEMP;
     }
 }

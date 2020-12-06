@@ -28,6 +28,8 @@ import su.interference.metrics.Metrics;
 import su.interference.persistent.*;
 import su.interference.persistent.Process;
 import su.interference.exception.*;
+
+import java.beans.Transient;
 import java.io.IOException;
 import java.io.File;
 import java.net.URL;
@@ -46,6 +48,9 @@ import su.interference.transport.TransportContext;
 
 public class Instance implements Interference {
     
+    public static final String RELEASE = "2020.2";
+    public static final int SYSTEM_VERSION = 20201205;
+
     public static final String DATA_FILE = "datafile";
     public static final String INDX_FILE = "indxfile";
     public static final String JRNL_FILE = "jrnlfile";
@@ -57,8 +62,6 @@ public class Instance implements Interference {
     private static final String LOCALHOST_DEFAULT = "localhost";
     private static final int MAX_NODE_ID = 32;
     public static final int SESSION_EXPIRE = 7200000; //in ms
-
-    public static final int SYSTEM_VERSION = 20201122;
 
     public static final int SYSTEM_STATE_ONLINE = 1;
     public static final int SYSTEM_STATE_UP = 2;
@@ -377,12 +380,13 @@ public class Instance implements Interference {
             }
             TransportContext.getInstance().start();
             startProcesses(s);
+            checkOpenTransactions(s);
             systemState = Instance.SYSTEM_STATE_UP;
             //checkInMemoryIndexes();
             logger.info("\n----------------------------------------------------------------------\n" +
                           "------------------------ interference started ------------------------\n" +
                           "------------------ (c) head systems, ltd 2010-2020 -------------------\n" +
-                          "--------------------------- release 2020.2 ---------------------------\n" +
+                          "--------------------------- release "+RELEASE+" ---------------------------\n" +
                           "----------------------------------------------------------------------");
         } else {
 
@@ -424,6 +428,18 @@ public class Instance implements Interference {
         for (Map.Entry x : xx) {
             final Table t = (Table)((DataChunk)x.getValue()).getEntity();
             t.printIndexInfo();
+        }
+    }
+
+    private void checkOpenTransactions(Session s) {
+        for (Transaction t : getTransactions()) {
+            if (t.getCid() == 0 && t.getTransType() != Transaction.TRAN_THR) {
+                logger.info("Rollback incomplete transaction id="+t.getTransId());
+                t.retrieveTframes();
+                if (t.isLocal()) {
+                    t.rollback(s, false);
+                }
+            }
         }
     }
 
@@ -614,8 +630,7 @@ public class Instance implements Interference {
     }
 
     public synchronized Transaction getTransactionById (long transId) {
-        if (systemState!=SYSTEM_STATE_UP) { return null; }
-        if (transId==0) { return null; }
+        if (transId == 0) { return null; }
         Table t = getTableByName("su.interference.persistent.Transaction");
         DataChunk dc = ((DataChunk)t.getIndexFieldByColumn("transId").getIndex().getObjectByKey(transId));
         if (dc==null) {
@@ -696,6 +711,18 @@ public class Instance implements Interference {
             return (TransFrame) dc.getEntity();
         }
         return null;
+    }
+
+    public List<TransFrame> getTransFramesByTransId(long transId) {
+        List<TransFrame> res = new ArrayList<>();
+        final Table t = getTableByName("su.interference.persistent.TransFrame");
+        for (Map.Entry entry : ((Map<Object, Object>)t.getMapFieldByColumn("frameId").getMap()).entrySet()) {
+            final TransFrame tf = (TransFrame) ((DataChunk) entry.getValue()).getEntity();
+            if (tf.getTransId() == transId) {
+                res.add(tf);
+            }
+        }
+        return res;
     }
 
     //used in unlock table mechanism
