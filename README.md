@@ -1,9 +1,8 @@
 # interference
 
-##### Interference is a java library enable you to run a full featured ORM database 
-##### and implement persistent layer in your distributed application
+##### java-based distributed database platform
 ###### (c) 2010 - 2020 head systems, ltd
-###### current revision: release 2020.2
+###### current revision: release 2020.3
 ###### for detailed information see:
 ###### http://interference.su and doc/InterferenceManual.pdf
 ###### contacts: info@inteference.su
@@ -39,9 +38,11 @@ Consider a basic example when the interference service used as a
 local persistent layer of the application and runs in the same JVM 
 with the application.
 
-To get started with interference, you need to include the interference.jar 
-library in your project configuration. For maven pom.xml, this might look 
-like this:
+To get started with interference, you need to download sources of 
+the current interference release (2020.3), build it and install it 
+into your local maven repository (mvn install).
+include the interference.jar library in your project configuration. 
+For maven pom.xml, this might look like this:
 
 ```
 <dependencies>
@@ -72,39 +73,3 @@ Next, specify the necessary set of keys in the project
 -XX:ConcGCThreads=4
 ```
 
-To run a single local interference node, you can use the standard 
-supplied interference.properties configuration. Note that file 
-interference.properies should be within /config subdirectory. 
-Next, see the configuration section.
-
-Then, add following code into initializing section of your java application:
-
-```
-Instance instance = Instance.getInstance();
-Session session = Session.getSession();
-instance.startupInstance(session);
-```
-
-where Instance is su.inteference.core.Instance and Session is su.interference.persistent.Session.
-
-
-## Service as standalone
-
-This option can be used when the cluster node is used solely for the purpose of further horizontal scaling of the data retrieving mechanism:
-
-```
-java -cp interference.jar 
--Dsu.interference.config=interference.properties
--Dcom.sun.management.jmxremote 
--Dcom.sun.management.jmxremote.port=8888 
--Dcom.sun.management.jmxremote.local.only=false 
--Dcom.sun.management.jmxremote.authenticate=false 
--Dcom.sun.management.jmxremote.ssl=false 
--Xms256m
--Xmn512m
--Xmx4g
--XX:MaxMetaspaceSize=256m
--XX:ParallelGCThreads=8
--XX:ConcGCThreads=4
-su.interference.standalone.Start
-```

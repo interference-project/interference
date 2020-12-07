@@ -7,11 +7,11 @@
 
     <groupId>su.interference</groupId>
     <artifactId>interference</artifactId>
-    <version>2020.2</version>
+    <version>2020.3</version>
     <packaging>jar</packaging>
 
     <name>interference</name>
-    <description>distributed persistent layer with JPA/SQL/CEP support</description>
+    <description>distributed database platform</description>
     <url>https://github.com/interference-project/interference</url>
 
     <licenses>
