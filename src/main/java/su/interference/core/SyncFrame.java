@@ -89,7 +89,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
         className = bd == null ? null : t.getName();
 
         rtran = frame.getLiveTransactions();
-        uframes = allowR ? bd.getLiveUFrameAllocIds() : null;
+        uframes = allowR ? bd == null ? null : bd.getLiveUFrameAllocIds() : null;
 
         if (frame.getClass().getName().equals("su.interference.core.DataFrame")) {
             if (frame.getType()!=0) {

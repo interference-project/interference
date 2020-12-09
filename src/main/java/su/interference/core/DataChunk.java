@@ -176,10 +176,6 @@ public class DataChunk implements Chunk {
         return t;
     }
 
-    protected void setT(Table t) {
-        this.t = t;
-    }
-
     public Comparable getId (Field idfield, Session s) throws InvocationTargetException, NoSuchMethodException, IllegalAccessException {
         if (serializedId==null) {
             if (entity==null) {
@@ -325,12 +321,18 @@ public class DataChunk implements Chunk {
 
     //serializer INSERT ONLY!!! (with generate Id value)
     public DataChunk (Object o, Session s) {
-        this(o, s, null);
+        this(o, s, null, null);
+    }
+
+    //serializer INSERT ONLY!!! (with generate Id value)
+    public DataChunk (Object o, Session s, Table t) {
+        this(o, s, null, t);
     }
 
     //serializer INSERT ONLY!!! (with generate Id value) - rowid for index chunk
-    public DataChunk (Object o, Session s, RowId r) {
+    public DataChunk (Object o, Session s, RowId r, Table t) {
         this.entity = o;
+        this.t = t;
         this.state = NORMAL_STATE;
         this.header = new RowHeader(r, null, getChunk().length, false);
     }

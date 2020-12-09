@@ -1151,7 +1151,7 @@ public class Table implements ResultSet {
                     this.ident(o, s, llt); //ident system entities during persist
                 }
 
-                final DataChunk nc = new DataChunk(o, s);
+                final DataChunk nc = new DataChunk(o, s, this);
                 final int len = nc.getBytesAmount();
                 final WaitFrame bdw = getAvailableFrame(o, fpart);
                 final FrameData bd = bdw.getBd();
@@ -1797,7 +1797,7 @@ public class Table implements ResultSet {
     //rowid used in DataChunk constructor for build standalone indexes
     private synchronized void add (RowId rowid, Object o, Session s, LLT extllt) throws Exception {
 
-        final DataChunk dc = new DataChunk(o, s, rowid);
+        final DataChunk dc = new DataChunk(o, s, rowid, this);
         final int len = dc.getBytesAmount();
         dc.getHeader().setTran(s.getTransaction());
 
