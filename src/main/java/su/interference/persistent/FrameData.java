@@ -212,7 +212,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     public Frame getFrame() throws Exception {
         if (frame == null) {
-            if (getDataObject().isIndex()) {
+            if (isIndex()) {
                 frame = getIndexFrame();
             } else {
                 frame = getDataFrame();
@@ -220,6 +220,10 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
             frame.setFrameData(this);
         }
         return frame;
+    }
+
+    public boolean isIndex() {
+        return getDataObject().isIndex();
     }
 
     public boolean isFrame() {
