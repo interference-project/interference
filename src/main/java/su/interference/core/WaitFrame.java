@@ -47,13 +47,9 @@ public class WaitFrame {
         this.busy = new AtomicLong(0);
     }
 
-    public synchronized WaitFrame acquire(boolean force) {
+    public synchronized WaitFrame acquire() {
         if (this.bd == null) {
             return null;
-        }
-        if (force) {
-            this.busy.set(Thread.currentThread().getId());
-            return this;
         }
         if (this.busy.compareAndSet(0, Thread.currentThread().getId())) {
             return this;
@@ -61,20 +57,20 @@ public class WaitFrame {
         return null;
     }
 
-    public synchronized WaitFrame acquire(final int fileId, boolean force) {
+    public synchronized WaitFrame acquire(final int fileId) {
         if (this.bd == null) {
             return null;
         }
         if (this.bd.getFile() == fileId) {
-            if (force) {
-                this.busy.set(Thread.currentThread().getId());
-                return this;
-            }
             if (this.busy.compareAndSet(0, Thread.currentThread().getId()) || this.busy.compareAndSet(Thread.currentThread().getId(), Thread.currentThread().getId())) {
                 return this;
             }
         }
         return null;
+    }
+
+    public synchronized void set(FrameData bd) {
+        this.bd = bd;
     }
 
     public synchronized boolean trySetBd(FrameData oldbd, FrameData newbd, int frameType) {
@@ -90,20 +86,7 @@ public class WaitFrame {
         return false;
     }
 
-    public synchronized boolean trySetBdAndAcquire(FrameData bd) {
-        if (this.busy.compareAndSet(0, Thread.currentThread().getId())) {
-            if (this.bd == null) {
-                this.bd = bd;
-                return true;
-            } else {
-                this.busy.compareAndSet(Thread.currentThread().getId(), 0);
-                return false;
-            }
-         }
-        return false;
-    }
-
-    public FrameData getBd() {
+    public synchronized FrameData getBd() {
         return bd;
     }
 

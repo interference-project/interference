@@ -29,7 +29,6 @@ import su.interference.persistent.*;
 import su.interference.persistent.Process;
 import su.interference.exception.*;
 
-import java.beans.Transient;
 import java.io.IOException;
 import java.io.File;
 import java.net.URL;
@@ -48,8 +47,8 @@ import su.interference.transport.TransportContext;
 
 public class Instance implements Interference {
     
-    public static final String RELEASE = "2020.2";
-    public static final int SYSTEM_VERSION = 20201205;
+    public static final String RELEASE = "2020.3";
+    public static final int SYSTEM_VERSION = 20201220;
 
     public static final String DATA_FILE = "datafile";
     public static final String INDX_FILE = "indxfile";
@@ -364,7 +363,7 @@ public class Instance implements Interference {
         if (ok) {
 
             logger.info("interference is starting...");
-            Thread.currentThread().setName("interference-main-thread");
+            Thread.currentThread().setName("interference-main-thread-"+Thread.currentThread().getId());
             Storage.getStorage().restoreJournal();
             Storage.getStorage().openDataFiles();
             initSystemTable();
@@ -433,7 +432,7 @@ public class Instance implements Interference {
 
     private void checkOpenTransactions(Session s) {
         for (Transaction t : getTransactions()) {
-            if (t.getCid() == 0 && t.getTransType() != Transaction.TRAN_THR) {
+            if (t.getCid() == 0 && t.getTransType() < Transaction.TRAN_THR) {
                 logger.info("Rollback incomplete transaction id="+t.getTransId());
                 t.retrieveTframes();
                 if (t.isLocal()) {

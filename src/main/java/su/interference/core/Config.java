@@ -107,18 +107,19 @@ public class Config {
     public final String CODEPAGE;
     public final String DATEFORMAT;
     public final int TEST_DISTRIBUTE_MODE = 1;
-    public final int CHECK_AVAIL_FRAME_TIMEOUT = 200;
+    public final int CHECK_AVAIL_FRAME_TIMEOUT = 3000;
     // transport
     public final int REMOTE_SYNC_TIMEOUT = 60000;
     public final int READ_BUFFER_SIZE = 33554432;
     public final int WRITE_BUFFER_SIZE = 33554432;
     // cleanup
     public final int TRANS_CLEANUP_TIMEOUT = 5000;
+    public final int CLEANUP_ENABLE = 0;
     public final int CLEANUP_TIMEOUT = 3000;
     public final int CLEANUP_PROTECTION_THR = 1000;
-    public final int IX_CLEANUP_PROTECTION_THR = 5000;
+    public final int IX_CLEANUP_PROTECTION_THR = 2000;
     public final int HEAP_USE_THR_DATA = 60;
-    public final int HEAP_USE_THR_INDX = 80;
+    public final int HEAP_USE_THR_INDX = 70;
     public final int HEAP_USE_THR_TEMP = 40;
     public final int HEAP_USE_THR_UNDO = 50;
 

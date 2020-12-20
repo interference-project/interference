@@ -64,7 +64,7 @@ public class LLT {
         return sync.get();
     }
 
-    public static LLT getLLT() throws InterruptedException {
+    public static LLT getLLT() {
         final long id_ = Thread.currentThread().getId();
         if (pool.get(id_) != null) {
             if (debug) {
@@ -82,7 +82,7 @@ public class LLT {
         return llt;
     }
 
-    public static LLT getLLTAndLock() throws InterruptedException {
+    public static LLT getLLTAndLock() {
         final long id_ = Thread.currentThread().getId();
         if (pool.get(id_) != null) {
             logger.error("an unexpected attempt to get llt with id = "+id_+" which already exists");

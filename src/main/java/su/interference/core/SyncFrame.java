@@ -72,18 +72,16 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
         final Table t = Instance.getInstance().getTableById(frame.getObjectId());
         final FrameData bd = Instance.getInstance().getFrameById(frame.getPtr());
         allowR = frame.isLocal() ? !t.isNoTran() || t.getName().equals("su.interference.persistent.UndoChunk") : false;
-        this.proc = proc;
+        this.proc = bd == null ? false : proc;
 
         if (bd == null && allowR) {
             final FreeFrame fframe = Instance.getInstance().getFreeFrameById(frame.getPtr());
             if (fframe == null) {
-                logger.error(frame.getClass().getSimpleName()+" does not match any system objects");
-                throw new InternalException();
+                logger.warn(frame.getClass().getSimpleName()+" does not match any system objects");
             } else {
                 fframe.setPassed(1);
                 fb = fframe;
             }
-            //throw new MissingSyncFrameException();
         }
 
         className = bd == null ? null : t.getName();
@@ -130,7 +128,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
             prevId = 0;
             nextId = 0;
             final long parentId_ = ib.getParentF()+ib.getParentB();
-            final long lcId_ = ib.getLcF()+ib.getLcB();
+            final long lcId_ = ib.getLcId();
             parentId = parentId_==0?0:Instance.getInstance().getFrameById(parentId_).getAllocId();
             lcId = lcId_==0?0:Instance.getInstance().getFrameById(lcId_).getAllocId();
             this.frameType = frame.getType();

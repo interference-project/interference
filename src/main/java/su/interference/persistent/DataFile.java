@@ -161,72 +161,83 @@ public class DataFile implements Serializable {
     //but, in case of allocate undo space this may looks as:
     //lock datafile<undo> - lock table<framedata> - try lock datafile
     //todo deprecated started param
-    public synchronized FrameData createNewFrame(FrameData frame, int frameType, long allocId, boolean started, boolean external, Table t, Session s, LLT llt) throws Exception {
+    public FrameData createNewFrame(FrameData frame, WaitFrame wb, int frameType, long allocId, boolean started, boolean external, Table t, Session s, LLT llt) throws Exception {
         //deadlock bug fix
         //instead this.allocateFrame we lock Table<FrameData> first
         final FrameData bd = t.allocateFrame(this, t, s, llt);
-        final boolean setcurrenable = external?false:t.getName().equals("su.interference.persistent.UndoChunk")?false:true;
-        //allocated for rframe
-        if (allocId>0) { bd.setAllocId(allocId); }
+        bd.setFrameType(frameType);
+        synchronized (this) {
+            final boolean setcurrenable = external ? false : t.getName().equals("su.interference.persistent.UndoChunk") ? false : true;
+            //allocated for rframe
+            if (allocId > 0) {
+                bd.setAllocId(allocId);
+            }
 
-        //todo deprecated
-        if (started) { bd.setStarted(1); }
+            //todo deprecated
+            if (started) {
+                bd.setStarted(1);
+            }
 
-        final Frame db = frameType == 0 ? new DataFrame(bd, t) : new IndexFrame(bd, frameType, t);
-        db.setObjectId(t.getObjectId());
-        bd.setFrame(db);
-        if (setcurrenable) bd.markAsCurrent();
-        int prevFile = 0;
-        long prevPtr = 0;
+            final Frame db = frameType == 0 ? new DataFrame(bd, t) : new IndexFrame(bd, frameType, t);
+            db.setObjectId(t.getObjectId());
+            bd.setFrame(db);
+            if (setcurrenable) bd.markAsCurrent();
+            int prevFile = 0;
+            long prevPtr = 0;
 
-        if (frame != null && frameType == 0) {
-            frame.clearCurrent();
-            prevFile = frame.getFile();
-            prevPtr = frame.getPtr();
-            frame.setNextFile(bd.getFile());
-            frame.setNextFrame(bd.getPtr());
-            frame.getDataFrame().setNextFile(bd.getFile());
-            frame.getDataFrame().setNextFrame(bd.getPtr());
-            s.persist(frame, llt); //update
-        }
+            if (frame != null && frameType == 0) {
+                frame.clearCurrent();
+                prevFile = frame.getFile();
+                prevPtr = frame.getPtr();
+                frame.setNextFile(bd.getFile());
+                frame.setNextFrame(bd.getPtr());
+                frame.getDataFrame().setNextFile(bd.getFile());
+                frame.getDataFrame().setNextFrame(bd.getPtr());
+                s.persist(frame, llt); //update
+            }
 
-        bd.setPrevFile(prevFile);
-        bd.setPrevFrame(prevPtr);
+            bd.setPrevFile(prevFile);
+            bd.setPrevFrame(prevPtr);
 
-        if (frameType==0) {
-            ((DataFrame)db).setPrevFile(prevFile);
-            ((DataFrame)db).setPrevFrame(prevPtr);
-        }
+            if (frameType == 0) {
+                ((DataFrame) db).setPrevFile(prevFile);
+                ((DataFrame) db).setPrevFrame(prevPtr);
+            }
 
-        if (t.getFileStart()==0&&t.getFrameStart()==0) {
-            t.setFileStart(bd.getFile());
-            t.setFrameStart(bd.getPtr());
-        }
+            if (t.getFileStart() == 0 && t.getFrameStart() == 0) {
+                t.setFileStart(bd.getFile());
+                t.setFrameStart(bd.getPtr());
+            }
 
-        t.setFileLast(bd.getFile());
-        t.setFrameLast(bd.getPtr());
-        t.incFrameAmount();
+            t.setFileLast(bd.getFile());
+            t.setFrameLast(bd.getPtr());
+            t.incFrameAmount();
 
-        if (!external) {
-            if (llt != null) {
-                llt.add(db);
-                if (frame != null) {
-                    llt.add(frame.getFrame());
+            if (!external) {
+                if (llt != null) {
+                    llt.add(db);
+                    if (frame != null) {
+                        llt.add(frame.getFrame());
+                    }
                 }
             }
+
+            s.persist(t, llt); //update
+
+            if (t.getName().equals("su.interference.persistent.FrameData")) {
+                DataChunk dc = new DataChunk(bd, s);
+                int len = dc.getBytesAmount();
+                t.usedSpace(bd, len, false, s, llt);
+                //replace chunk after usedSpace
+                dc = new DataChunk(bd, s);
+                db.insertChunk(dc, s, true, llt);
+                t.addIndexValue(dc);
+            }
+            if (wb != null) {
+                wb.set(bd);
+            }
         }
-
-        s.persist(t, llt); //update
-
-        if (t.getName().equals("su.interference.persistent.FrameData")) {
-            DataChunk dc = new DataChunk(bd, s);
-            int len = dc.getBytesAmount();
-            t.usedSpace(bd, len, false, s, llt);
-            //replace chunk after usedSpace
-            dc = new DataChunk(bd, s);
-            db.insertChunk(dc, s, true, llt);
-            t.addIndexValue(dc);
-        } else {
+        if (!t.getName().equals("su.interference.persistent.FrameData")) {
             //syncframe event should not persist new frame
             if (!external) {
                 //fix deadlock by reorder access
@@ -239,7 +250,6 @@ public class DataFile implements Serializable {
                 }
             }
         }
-
         return bd;
     }
 
@@ -415,7 +425,6 @@ public class DataFile implements Serializable {
         final FrameData bd = new FrameData(this.getFileId(), ptr, size, t);
         // t should be updated mandatory during createFrame
         bd.setFrameOrder(t.getFrameOrder(s, llt));
-        bd.setDistribution(t.isDistributed() ? 0 : Config.getConfig().LOCAL_NODE_ID);
         Metrics.get("allocateFrame").stop();
         return bd;
     }

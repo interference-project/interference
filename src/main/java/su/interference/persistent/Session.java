@@ -226,7 +226,7 @@ public class Session {
         final LLT llt = LLT.getLLT();
 
         for (DataFile df : datafs) {
-            FrameData nb = w.createNewFrame(null, df.getFileId(), pt==null&&!ixflag?0:1, 0, false, setlbs, false, s, llt);
+            FrameData nb = w.createNewFrame(null, null, df.getFileId(), pt==null&&!ixflag?0:1, 0, false, setlbs, false, s, llt);
         }
 
         llt.commit();

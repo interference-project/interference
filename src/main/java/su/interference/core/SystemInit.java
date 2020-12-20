@@ -238,6 +238,7 @@ public class SystemInit {
                         ret[framesCntr].insertChunk(new DataChunk(new Process(1, "hbeat","su.interference.transport.HeartBeatProcess"), s), s, true, null);
                         ret[framesCntr].insertChunk(new DataChunk(new Process(2, "lsync","su.interference.core.SyncQueue"), s), s, true, null);
                         ret[framesCntr].insertChunk(new DataChunk(new Process(3, "clean","su.interference.core.SystemCleanUp"), s), s, true, null);
+                        ret[framesCntr].insertChunk(new DataChunk(new Process(4, "trcln","su.interference.core.TransCleanUp"), s), s, true, null);
                         //ret[framesCntr].insertChunk(new DataChunk(new Process(2, "rsync","su.interference.remote.RemoteSync"), s), s, true, null);
                     }
                     if (tables[i].equals("su.interference.persistent.Node")) {

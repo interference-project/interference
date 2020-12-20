@@ -130,6 +130,8 @@ public class Table implements ResultSet {
     @Transient
     private final java.lang.reflect.Method idmethod;
     @Transient
+    private final java.lang.reflect.Method idmethod_;
+    @Transient
     private final String idfieldtype;
     @Transient
     private final String idfieldgetter;
@@ -274,7 +276,7 @@ public class Table implements ResultSet {
         Runnable r = new Runnable() {
             @Override
             public void run() {
-                Thread.currentThread().setName("interference-retrieve-frames-thread");
+                Thread.currentThread().setName("interference-retrieve-frames-thread-"+Thread.currentThread().getId());
                 try {
                     for (Object o : ixl.getObjectsByKey(id)) {
                         q.put((FrameData) ((DataChunk) o).getEntity());
@@ -297,7 +299,7 @@ public class Table implements ResultSet {
         Runnable r = new Runnable() {
             @Override
             public void run() {
-                Thread.currentThread().setName("interference-retrieve-frames-thread");
+                Thread.currentThread().setName("interference-retrieve-frames-thread-"+Thread.currentThread().getId());
                 try {
                     for (Object o : ixl.getObjectsByKey(id)) {
                         q.put((FrameData) ((DataChunk) o).getEntity());
@@ -536,6 +538,10 @@ public class Table implements ResultSet {
         return idmethod;
     }
 
+    public Method getIdmethod_() {
+        return idmethod_;
+    }
+
     public String getIdFieldType() {
         return this.idfieldtype;
     }
@@ -607,6 +613,7 @@ public class Table implements ResultSet {
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
         this.idmethod = getTableIdField() == null ? null : ca == null ? null : getTableClass().getMethod(idfieldgetter, null);
+        this.idmethod_ = getTableIdField() == null ? null : ca != null ? null : getTableClass().getMethod(idfieldgetter, new Class<?>[]{Session.class});
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
@@ -634,6 +641,7 @@ public class Table implements ResultSet {
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
         this.idmethod = getTableIdField() == null ? null : ca == null ? null : getTableClass().getMethod(idfieldgetter, null);
+        this.idmethod_ = getTableIdField() == null ? null : ca != null ? null : getTableClass().getMethod(idfieldgetter, new Class<?>[]{Session.class});
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
@@ -662,6 +670,7 @@ public class Table implements ResultSet {
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
         this.idmethod = getTableIdField() == null ? null : ca == null ? null : getTableClass().getMethod(idfieldgetter, null);
+        this.idmethod_ = getTableIdField() == null ? null : ca != null ? null : getTableClass().getMethod(idfieldgetter, new Class<?>[]{Session.class});
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
@@ -688,6 +697,7 @@ public class Table implements ResultSet {
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
         this.idmethod = getTableIdField() == null ? null : ca == null ? null : getTableClass().getMethod(idfieldgetter, null);
+        this.idmethod_ = getTableIdField() == null ? null : ca != null ? null : getTableClass().getMethod(idfieldgetter, new Class<?>[]{Session.class});
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
@@ -710,6 +720,7 @@ public class Table implements ResultSet {
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
         this.idmethod = getTableIdField() == null ? null : ca == null ? null : getTableClass().getMethod(idfieldgetter, null);
+        this.idmethod_ = getTableIdField() == null ? null : ca != null ? null : getTableClass().getMethod(idfieldgetter, new Class<?>[]{Session.class});
         this.generatedfield = getGeneratedField();
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
@@ -745,6 +756,7 @@ public class Table implements ResultSet {
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
         this.idmethod = getTableIdField() == null ? null : sa == null ? null : getTableClass().getMethod(idfieldgetter, null);
+        this.idmethod_ = getTableIdField() == null ? null : sa != null ? null : getTableClass().getMethod(idfieldgetter, new Class<?>[]{Session.class});
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
@@ -947,54 +959,45 @@ public class Table implements ResultSet {
     }
 
     private void ident(final Object o, final Session s, final LLT extllt) throws Exception {
-        final Class c_ = o.getClass();
-        final TransEntity ta = (TransEntity)c_.getAnnotation(TransEntity.class);
-        //for Transactional Wrapper Entity we must get superclass (original Entity class)
-        final Class c = ta != null ? o.getClass().getSuperclass() : o.getClass();
-        final Entity ea = (Entity)c.getAnnotation(Entity.class);
-        if (ea == null) {
-            throw new InternalException();
+        final java.lang.reflect.Field idf = this.getIdField();
+        if (idf == null) {
+            return;
         }
-        final java.lang.reflect.Field[] f = c.getDeclaredFields();
-        for (int i=0; i<f.length; i++) {
-            final Column ca = f[i].getAnnotation(Column.class);
-            final Transient tr = f[i].getAnnotation(Transient.class);
-            final GeneratedValue ga = f[i].getAnnotation(GeneratedValue.class);
-            final DistributedId ds = f[i].getAnnotation(DistributedId.class);
-            if (tr==null) {
-                if (ga!=null) {
-                    int m = f[i].getModifiers();
-                    if (Modifier.isPrivate(m)) {
-                        f[i].setAccessible(true);
-                    }
-                    final LLT llt = extllt == null ? LLT.getLLT() : extllt;
-                    try {
-                        if (ds == null) {
-                            if (f[i].getType().getName().equals("int")) {
-                                f[i].setInt(o, (int) this.getIdValue(s, llt));
-                            }
-                            if (f[i].getType().getName().equals("long")) {
-                                f[i].setLong(o, this.getIdValue(s, llt));
-                            }
-                        } else {
-                            //for distributed ids, id value don't replace exists > 0
-                            if (f[i].getType().getName().equals("int")) {
-                                final int exists = (int) f[i].get(o);
-                                if (exists == 0) {
-                                    f[i].setInt(o, (int) (this.getIdValue(s, llt) * Storage.MAX_NODES) + Config.getConfig().LOCAL_NODE_ID);
-                                }
-                            }
-                            if (f[i].getType().getName().equals("long")) {
-                                final long exists = (long) f[i].get(o);
-                                if (exists == 0) {
-                                    f[i].setLong(o, (this.getIdValue(s, llt) * Storage.MAX_NODES) + Config.getConfig().LOCAL_NODE_ID);
-                                }
+        final Transient tr = idf.getAnnotation(Transient.class);
+        final GeneratedValue ga = idf.getAnnotation(GeneratedValue.class);
+        final DistributedId ds = idf.getAnnotation(DistributedId.class);
+        if (tr == null) {
+            if (ga != null) {
+                int m = idf.getModifiers();
+                if (Modifier.isPrivate(m)) {
+                    idf.setAccessible(true);
+                }
+                final LLT llt = extllt == null ? LLT.getLLT() : extllt;
+                try {
+                    if (ds == null) {
+                        if (idf.getType().getName().equals("int")) {
+                            idf.setInt(o, (int) this.getIdValue(s, llt));
+                        }
+                        if (idf.getType().getName().equals("long")) {
+                            idf.setLong(o, this.getIdValue(s, llt));
+                        }
+                    } else {
+                        //for distributed ids, id value don't replace exists > 0
+                        if (idf.getType().getName().equals("int")) {
+                            final int exists = (int) idf.get(o);
+                            if (exists == 0) {
+                                idf.setInt(o, (int) (this.getIdValue(s, llt) * Storage.MAX_NODES) + Config.getConfig().LOCAL_NODE_ID);
                             }
                         }
-                    } finally {
-                        if (extllt == null) { llt.commit(); }
+                        if (idf.getType().getName().equals("long")) {
+                            final long exists = (long) idf.get(o);
+                            if (exists == 0) {
+                                idf.setLong(o, (this.getIdValue(s, llt) * Storage.MAX_NODES) + Config.getConfig().LOCAL_NODE_ID);
+                            }
+                        }
                     }
-                    break;
+                } finally {
+                    if (extllt == null) { llt.commit(); }
                 }
             }
         }
@@ -1050,7 +1053,7 @@ public class Table implements ResultSet {
             for (int i = 0; i < this.lbs.length; i++) {
                 final int i_ = (a + i) % this.lbs.length;
                 final WaitFrame wb = this.lbs[i_];
-                final WaitFrame bd = fpart ? wb.acquire(getTargetFileId(((FilePartitioned) o).getFile()), false) : wb.acquire(false);
+                final WaitFrame bd = fpart ? wb.acquire(getTargetFileId(((FilePartitioned) o).getFile())) : wb.acquire();
                 if (bd != null) {
                     avframeStart.getAndIncrement();
                     Metrics.get("getAvailableFrame").stop();
@@ -1063,17 +1066,6 @@ public class Table implements ResultSet {
                 }
                 logger.warn("avframestart: "+avframeStart.get());
                 logger.warn("timeout occured during getavailableframe method: " + Config.getConfig().CHECK_AVAIL_FRAME_TIMEOUT);
-                for (int i = 0; i < this.lbs.length; i++) {
-                    final int i_ = (a + i) % this.lbs.length;
-                    final WaitFrame wb = this.lbs[i_];
-                    final WaitFrame bd = fpart ? wb.acquire(getTargetFileId(((FilePartitioned) o).getFile()), true) : wb.acquire(true);
-                    if (bd != null) {
-                        logger.warn("forced acquire: "+bd.getBd().getFrameId());
-                        avframeStart.getAndIncrement();
-                        Metrics.get("getAvailableFrame").stop();
-                        return bd;
-                    }
-                }
                 break;
             }
         }
@@ -1118,26 +1110,9 @@ public class Table implements ResultSet {
                     fpart = true;
                 }
             }
-        } else {
-            if (s.getTransaction() == null || !s.getTransaction().started || s.getTransaction().getMTran() == 0) {
-                s.startStatement();
-            }
-            if (s.getTransaction() == null || !s.getTransaction().started || s.getTransaction().getMTran() == 0) {
-                throw new InternalException();
-            }
-            final EntityContainer to = (EntityContainer)o;
-            if (to.getTran() != null && to.getTran().getCid() == 0) {
-                if (to.getTran().getTransId() != s.getTransaction().getTransId()) {
-                    logger.error("unable to persist an object that has not been changed by current transaction");
-                    return null;
-                }
-            }
-        }
 
-        final LLT llt = extllt==null?LLT.getLLT():extllt;
-        try {
             if (this.isIndex()) {
-                this.add(new RowId(0, 0, 0), o, s, llt);
+                this.add(new RowId(0, 0, 0), o, s, extllt);
                 return null;
             }
 
@@ -1147,140 +1122,192 @@ public class Table implements ResultSet {
 
             if (dc == null) {
                 Metrics.get("persistInsertChunk").start();
-                if (this.isNoTran()) {
-                    this.ident(o, s, llt); //ident system entities during persist
-                }
 
                 final DataChunk nc = new DataChunk(o, s, this);
                 final int len = nc.getBytesAmount();
                 final WaitFrame bdw = getAvailableFrame(o, fpart);
                 final FrameData bd = bdw.getBd();
-                final int diff = len - bd.getFrameFree();
 
-                if (isNoTran()) {
+                final LLT llt = extllt==null?LLT.getLLT():extllt;
+                try {
+                    this.ident(o, s, llt); //ident system entities during persist
                     final int p = bd.insertChunk(nc, s, true, llt);
                     if (p == 0) {
-                        final FrameData nb = this.createNewFrame(bd, bd.getFile(), 0, 0, false, true, false, s, llt);
+                        final FrameData nb = this.createNewFrame(bd, bdw, bd.getFile(), 0, 0, false, false, false, s, llt);
                         nb.getDataFrame().insertChunk(nc, s, true, llt);
                         usedSpace(nb, nb.getUsed() + len, true, s, llt);
                     } else {
                         usedSpace(bd, bd.getUsed() + len, true, s, llt);
                     }
-                } else {
-                    if (diff > 0) {
-                        final FrameData nb = this.createNewFrame(bd, bd.getFile(), 0, 0, false, true, false, s, llt);
-                        nb.getDataFrame().insertChunk(nc, s, true, llt);
-                        s.getTransaction().storeFrame(nb, len, s, llt);
-                    } else {
-                        final int p = bd.insertChunk(nc, s, true, llt);
-                        if (p == 0) {
-                            throw new InternalException();
-                        }
-                        s.getTransaction().storeFrame(bd, len, s, llt);
-                    }
-                    ((EntityContainer) o).setTran(nc.getHeader().getTran());
-                    ((EntityContainer) o).setRowId(nc.getHeader().getRowID());
-                    ((EntityContainer) o).setDataChunk(nc);
-                }
-
-                //system-only table in-memory indexes
-                this.addIndexValue(nc);
-                bdw.release();
-                Metrics.get("persistInsertChunk").stop();
-
-                Metrics.get("persistInsertIndex").start();
-                //remove external llt for deadlock prevent
-                persistIndexes(nc, s, llt);
-                Metrics.get("persistInsertIndex").stop();
-
-                return nc;
-
-            } else {
-
-                DataChunk udc = null;
-
-                if (!isNoTran()) { //save undo information
-                    udc = dc.lock(s, llt);
-                }
-
-                final int len = dc.getBytesAmount();
-                final FrameData bd = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId() + dc.getHeader().getRowID().getFramePointer());
-                final int newlen = bd.updateChunk(dc, o, s, llt);
-                final int diff = newlen - len - bd.getFrameFree();
-
-                if (diff > 0) {
-                    lockIndexes(dc, s, llt);
-                    bd.removeChunk(dc.getHeader().getRowID().getRowPointer(), s, llt);
-                    final WaitFrame ibw = getAvailableFrame(o, fpart);
-                    final FrameData ib = ibw.getBd();
-
-                    final int p = ib.getDataFrame().insertChunk(dc, s, true, llt);
-                    if (p == 0) {
-                        final FrameData nb = this.createNewFrame(ib, ib.getFile(), 0, 0, false, true, false, s, llt);
-                        nb.getDataFrame().insertChunk(dc, s, true, llt);
-                        if (isNoTran()) {
-                            usedSpace(bd, bd.getUsed() - len, true, s, llt);
-                            usedSpace(nb, newlen, true, s, llt);
-                        } else {
-                            s.getTransaction().storeFrame(bd, udc == null ? null : udc.getUframe(),0 - len, s, llt);
-                            s.getTransaction().storeFrame(nb, udc == null ? null : udc.getUframe(), newlen, s, llt);
-                            s.getTransaction().storeFrame(nb, newlen, s, llt);
-                        }
-                    } else {
-                        if (isNoTran()) {
-                            usedSpace(bd, bd.getUsed() - len, true, s, llt);
-                            usedSpace(ib, ib.getUsed() + newlen, true, s, llt);
-                        } else {
-                            s.getTransaction().storeFrame(bd, udc == null ? null : udc.getUframe(),0 - len, s, llt);
-                            s.getTransaction().storeFrame(ib, udc == null ? null : udc.getUframe(), newlen, s, llt);
-                            s.getTransaction().storeFrame(ib, newlen, s, llt);
-                        }
-                    }
-                    updateIndexesPtr(dc, s, llt);
-                    //update rowid
-                    if (!isNoTran()) {
-//                        logger.debug("updated: " + dc.getHeader().getRowID() + ", old: "+dc.getUndoChunk().getFile()+" "+dc.getUndoChunk().getFrame()+" "+dc.getUndoChunk().getPtr());
-                        ((EntityContainer) o).setRowId(dc.getHeader().getRowID());
-                        dc.getUndoChunk().setFile(dc.getHeader().getRowID().getFileId());
-                        dc.getUndoChunk().setFrame(dc.getHeader().getRowID().getFramePointer());
-                        dc.getUndoChunk().setPtr(dc.getHeader().getPtr());
-                        if (udc != null) {
-                            udc.setEntity(dc.getUndoChunk());
-                            udc.getUframe().updateChunk(udc, dc.getUndoChunk(), s, llt);
-                        }
-                    }
-
-                    ibw.release();
+                } finally {
                     if (extllt == null) {
                         llt.commit();
                     }
+                }
+
+                //system-only table in-memory indexes
+                bdw.release();
+                this.addIndexValue(nc);
+                Metrics.get("persistInsertChunk").stop();
+
+                return nc;
+            } else {
+                final int len = dc.getBytesAmount();
+                final FrameData bd = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId() + dc.getHeader().getRowID().getFramePointer());
+                final LLT llt = extllt==null?LLT.getLLT():extllt;
+                try {
+
+                    final int newlen = bd.updateChunk(dc, o, s, llt);
+                    final int diff = newlen - len - bd.getFrameFreeNoTran();
+
+                    if (diff > 0) {
+                        bd.removeChunk(dc.getHeader().getRowID().getRowPointer(), s, llt);
+                        final WaitFrame ibw = getAvailableFrame(o, fpart);
+                        final FrameData ib = ibw.getBd();
+
+                        final int p = ib.getDataFrame().insertChunk(dc, s, true, llt);
+                        if (p == 0) {
+                            final FrameData nb = this.createNewFrame(ib, ibw, ib.getFile(), 0, 0, false, false, false, s, llt);
+                            nb.getDataFrame().insertChunk(dc, s, true, llt);
+                            usedSpace(bd, bd.getUsed() - len, true, s, llt);
+                            usedSpace(nb, newlen, true, s, llt);
+                        } else {
+                            usedSpace(bd, bd.getUsed() - len, true, s, llt);
+                            usedSpace(ib, ib.getUsed() + newlen, true, s, llt);
+                        }
+
+                        ibw.release();
+                        return dc;
+
+                    } else {
+                        usedSpace(bd, bd.getUsed() + newlen - len, true, s, llt);
+                    }
 
                     return dc;
-
-                } else {
-                    if (isNoTran()) {
-                        usedSpace(bd, bd.getUsed() + newlen - len, true, s, llt);
-                    } else {
-                        s.getTransaction().storeFrame(bd, udc == null ? null : udc.getUframe(), newlen - len, s, llt);
+                } finally {
+                    if (extllt == null) {
+                        llt.commit();
+                    }
+                }
+            }
+        } else {
+            synchronized (this) {
+                if (s.getTransaction() == null || !s.getTransaction().started || s.getTransaction().getMTran() == 0) {
+                    s.startStatement();
+                }
+                if (s.getTransaction() == null || !s.getTransaction().started || s.getTransaction().getMTran() == 0) {
+                    throw new InternalException();
+                }
+                final EntityContainer to = (EntityContainer) o;
+                if (to.getTran() != null && to.getTran().getCid() == 0) {
+                    if (to.getTran().getTransId() != s.getTransaction().getTransId()) {
+                        logger.error("unable to persist an object that has not been changed by current transaction");
+                        return null;
                     }
                 }
 
-                return dc;
-            }
-        } finally {
-            if (extllt == null) {
-                llt.commit();
-            }
-        }
-    }
+                final LLT llt = extllt == null ? LLT.getLLT() : extllt;
+                try {
+                    if (this.isIndex()) {
+                        this.add(new RowId(0, 0, 0), o, s, llt);
+                        return null;
+                    }
 
-    private void persistIndexes(DataChunk c, Session s, LLT llt) throws Exception {
-        for (IndexDescript ids : this.getIndexNames()) {
-            final Table ixt = Instance.getInstance().getTableByName(SYSTEM_PKG_PREFIX + ids.getName());
-            //create IndexChunk implementation
-            final Object io = ixt.getTableClass().getConstructor(new Class<?>[]{c.getClass(),s.getClass()}).newInstance(new Object[]{c, s});
-            ixt.add(c.getHeader().getRowID(), io, s, llt);
+                    Metrics.get("persistGetChunk").start();
+                    final DataChunk dc = isIdFieldNoCheck() ? null : this.getChunkByEntity(o, s);
+                    Metrics.get("persistGetChunk").stop();
+
+                    if (dc == null) {
+                        Metrics.get("persistInsertChunk").start();
+                        final DataChunk nc = new DataChunk(o, s, this);
+                        final int len = nc.getBytesAmount();
+                        final WaitFrame bdw = getAvailableFrame(o, fpart);
+                        final FrameData bd = bdw.getBd();
+                        final int diff = len - bd.getFrameFree();
+
+                        if (diff > 0) {
+                            final FrameData nb = this.createNewFrame(bd, bdw, bd.getFile(), 0, 0, false, false, false, s, llt);
+                            nb.getDataFrame().insertChunk(nc, s, true, llt);
+                            s.getTransaction().storeFrame(nb, len, s, llt);
+                        } else {
+                            final int p = bd.insertChunk(nc, s, true, llt);
+                            if (p == 0) {
+                                throw new InternalException();
+                            }
+                            s.getTransaction().storeFrame(bd, len, s, llt);
+                        }
+                        ((EntityContainer) o).setTran(nc.getHeader().getTran());
+                        ((EntityContainer) o).setRowId(nc.getHeader().getRowID());
+                        ((EntityContainer) o).setDataChunk(nc);
+
+                        bdw.release();
+                        Metrics.get("persistInsertChunk").stop();
+
+                        Metrics.get("persistInsertIndex").start();
+                        //remove external llt for deadlock prevent
+                        persistIndexes(nc, s, llt);
+                        Metrics.get("persistInsertIndex").stop();
+
+                        return nc;
+
+                    } else {
+
+                        final DataChunk udc = dc.lock(s, llt);
+                        final int len = dc.getBytesAmount();
+                        final FrameData bd = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId() + dc.getHeader().getRowID().getFramePointer());
+                        final int newlen = bd.updateChunk(dc, o, s, llt);
+                        final int diff = newlen - len - bd.getFrameFree();
+
+                        if (diff > 0) {
+                            lockIndexes(dc, s, llt);
+                            bd.removeChunk(dc.getHeader().getRowID().getRowPointer(), s, llt);
+                            final WaitFrame ibw = getAvailableFrame(o, fpart);
+                            final FrameData ib = ibw.getBd();
+
+                            final int p = ib.getDataFrame().insertChunk(dc, s, true, llt);
+                            if (p == 0) {
+                                final FrameData nb = this.createNewFrame(ib, ibw, ib.getFile(), 0, 0, false, false, false, s, llt);
+                                nb.getDataFrame().insertChunk(dc, s, true, llt);
+                                s.getTransaction().storeFrame(bd, udc == null ? null : udc.getUframe(), 0 - len, s, llt);
+                                s.getTransaction().storeFrame(nb, udc == null ? null : udc.getUframe(), newlen, s, llt);
+                                s.getTransaction().storeFrame(nb, newlen, s, llt);
+                            } else {
+                                s.getTransaction().storeFrame(bd, udc == null ? null : udc.getUframe(), 0 - len, s, llt);
+                                s.getTransaction().storeFrame(ib, udc == null ? null : udc.getUframe(), newlen, s, llt);
+                                s.getTransaction().storeFrame(ib, newlen, s, llt);
+                            }
+                            updateIndexesPtr(dc, s, llt);
+                            //update rowid
+                            ((EntityContainer) o).setRowId(dc.getHeader().getRowID());
+                            dc.getUndoChunk().setFile(dc.getHeader().getRowID().getFileId());
+                            dc.getUndoChunk().setFrame(dc.getHeader().getRowID().getFramePointer());
+                            dc.getUndoChunk().setPtr(dc.getHeader().getPtr());
+                            if (udc != null) {
+                                udc.setEntity(dc.getUndoChunk());
+                                udc.getUframe().updateChunk(udc, dc.getUndoChunk(), s, llt);
+                            }
+
+                            ibw.release();
+                            if (extllt == null) {
+                                llt.commit();
+                            }
+
+                            return dc;
+
+                        } else {
+                            s.getTransaction().storeFrame(bd, udc == null ? null : udc.getUframe(), newlen - len, s, llt);
+                        }
+
+                        return dc;
+                    }
+                } finally {
+                    if (extllt == null) {
+                        llt.commit();
+                    }
+                }
+            }
         }
+
     }
 
     protected void delete (final Object o, final Session s, LLT extllt, boolean ignoreTransaction) throws Exception {
@@ -1334,6 +1361,15 @@ public class Table implements ResultSet {
         }
     }
 
+    private void persistIndexes(DataChunk c, Session s, LLT llt) throws Exception {
+        for (IndexDescript ids : this.getIndexNames()) {
+            final Table ixt = Instance.getInstance().getTableByName(SYSTEM_PKG_PREFIX + ids.getName());
+            //create IndexChunk implementation
+            final Object io = ixt.getTableClass().getConstructor(new Class<?>[]{c.getClass(),s.getClass()}).newInstance(new Object[]{c, s});
+            ixt.add(c.getHeader().getRowID(), io, s, llt);
+        }
+    }
+
     private void deleteIndexes(DataChunk dc, boolean noTran, boolean remove, Session s, LLT llt) throws Exception {
         for (IndexDescript ids : this.getIndexNames()) {
             final DataChunk ic = dc.getIc(ids, s);
@@ -1379,42 +1415,28 @@ public class Table implements ResultSet {
     }
 
     //todo deprecated started param
-    public FrameData createNewFrame(final FrameData frame, final int fileId, final int frameType, final long allocId, final boolean started, final boolean setlbs, final boolean external, final Session s, final LLT llt) throws Exception {
+    public FrameData createNewFrame(final FrameData frame, final WaitFrame wb, final int fileId, final int frameType, final long allocId, final boolean started, final boolean setlbs, final boolean external, final Session s, final LLT llt) throws Exception {
         final DataFile df = Storage.getStorage().getDataFileById(fileId);
-        final FrameData bd = df.createNewFrame(frame, frameType, allocId, started, external, this, s, llt);
+        final FrameData bd = df.createNewFrame(frame, wb, frameType, allocId, started, external, this, s, llt);
+
         if (!external) {
             synchronized (this) {
                 boolean done = true;
                 if (setlbs && !this.getName().equals(UndoChunk.class.getName())) {
                     done = false;
-                    for (WaitFrame wb : this.lbs) {
-                        if (wb.trySetBd(frame, bd, frameType)) {
+                    for (WaitFrame w : this.lbs) {
+                        if (w.trySetBd(frame, bd, frameType)) {
                             done = true;
                             break;
                         }
                     }
                 }
                 if (!done) {
-                    // todo evicted frame -> metric
-                    for (WaitFrame wb : this.lbs) {
-                        if (wb.getBd().getFile() == bd.getFile()) {
-                            // remove evicted ptr from prevframe
-                            frame.setNextFrame(wb.getBd().getPtr());
-                            s.persist(frame, llt);
-                        }
-                    }
-                    bd.clearCurrent();
-                    s.persist(bd, llt);
-                    logger.info("evict frame " + bd.getObjectId() + ":" + bd.getFile() + ":" + bd.getPtr() + " " + Thread.currentThread().getName());
-                    for (WaitFrame wb : this.lbs) {
-                        final WaitFrame bd_ = wb.acquire(fileId, false);
-                        if (bd_ != null) {
-                            return bd_.getBd();
-                        }
-                    }
+                    throw new RuntimeException("cannot set LBS frame");
                 }
             }
         }
+
         return bd;
     }
 
@@ -1422,6 +1444,7 @@ public class Table implements ResultSet {
         return df.allocateFrame(t, s, llt);
     }
 
+    @Deprecated
     public void lockTable(Session s) {
         try {
             s.persist(new RetrieveLock(this.objectId, s.getTransaction().getTransId())); //insert
@@ -1477,7 +1500,7 @@ public class Table implements ResultSet {
         final ManagedCallable<Boolean> r = new ManagedCallable<Boolean>() {
             @Override
             public Boolean call() throws Exception {
-                Thread.currentThread().setName("interference-retrieve-queue-thread");
+                Thread.currentThread().setName("interference-retrieve-queue-thread-"+Thread.currentThread().getId());
                 synchronized (t) {
                     final LinkedBlockingQueue<FrameData> bds = Instance.getInstance().getTableById(getObjectId()).getFrames();
                     boolean cnue = true;
@@ -1517,7 +1540,7 @@ public class Table implements ResultSet {
         final ManagedCallable<Boolean> r = new ManagedCallable<Boolean>() {
             @Override
             public Boolean call() throws Exception {
-                Thread.currentThread().setName("interference-retrieve-index-queue-thread");
+                Thread.currentThread().setName("interference-retrieve-index-queue-thread-"+Thread.currentThread().getId());
                 synchronized (t) {
                     List<Long> startframes = new ArrayList<>();
                     startframes.add(t.fileStart + t.frameStart);
@@ -1552,10 +1575,9 @@ public class Table implements ResultSet {
                                         inNodes.add(Instance.getInstance().getFrameById(levelNodes.get(k).getFrameChunks(s).get(i).getHeader().getFramePtr()).getIndexFrame());
                                     }
                                     if (k == levelNodes.size() - 1) {
-                                        int lcf = levelNodes.get(k).getLcF();
-                                        long lcb = levelNodes.get(k).getLcB();
-                                        if (lcf > 0) {
-                                            inNodes.add(Instance.getInstance().getFrameById(lcf + lcb).getIndexFrame());
+                                        final long lcId = levelNodes.get(k).getLcId();
+                                        if (lcId > 0) {
+                                            inNodes.add(Instance.getInstance().getFrameById(lcId).getIndexFrame());
                                         }
                                     }
                                 }
@@ -1668,7 +1690,7 @@ public class Table implements ResultSet {
             } else if (ix != null) {
                 return (DataChunk) ix.getIndex().getObjectByKey(new IndexElementKey(new Object[]{idMethod.invoke(o, null)}));
             } else {
-                final byte[] id = new DataChunkId(o, s).getIdBytes();
+                final byte[] id = new DataChunkId(o, this, s).getIdBytes();
                 if (id!=null) {
                     final LinkedBlockingQueue<FrameData> bds = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
                     boolean cnue = true;
@@ -1691,7 +1713,7 @@ public class Table implements ResultSet {
             final Table idt = getFirstIndexByIdColumn();
             if (to.getDataChunk() == null) {
                 //todo need further optimize
-                final DataChunkId dcid = new DataChunkId(o, s);
+                final DataChunkId dcid = new DataChunkId(o, this, s);
                 if (idt != null) {
                     final DataChunk idc = idt.getObjectByKey(new ValueSet(dcid.getId()), s);
                     if (idc == null) {
@@ -1818,12 +1840,12 @@ public class Table implements ResultSet {
                         target = Instance.getInstance().getFrameById(cc.getHeader().getFramePtr());
                         target.setMv(cc.getDcs()); //set non-persitent maxvalue
                     } else {
-                        final long lcId = target.getIndexFrame().getLcF() + target.getIndexFrame().getLcB();
-                        target = Instance.getInstance().getFrameById(lcId); //get by last child
+                        target = Instance.getInstance().getFrameById(target.getIndexFrame().getLcId()); //get by last child
                         if (target == null) {
-                            logger.info("null target returned for frame id " + lcId);
+                            logger.error("null target returned for frame id " + target.getIndexFrame().getLcId());
                         }
                     }
+                    llt.add(target.getIndexFrame());
                     target.getIndexFrame().setParentF(parentF);
                     target.getIndexFrame().setParentB(parentB);
                 }
@@ -1854,7 +1876,7 @@ public class Table implements ResultSet {
                     if (prevtg.getIndexFrame().getParentF() == 0) { //add parent ElementList - always type 2 (node)
                         final int nfileId = getIndexFileId(prevtg);
 //                    target = createNewFrame(prevtg, prevtg.getFile(), IndexFrame.INDEX_FRAME_NODE, s);
-                        target = createNewFrame(prevtg, nfileId, IndexFrame.INDEX_FRAME_NODE, 0, false, false, false, s, llt);
+                        target = createNewFrame(prevtg, null, nfileId, IndexFrame.INDEX_FRAME_NODE, 0, false, false, false, s, llt);
                         this.setFileStart(target.getIndexFrame().getFile());
                         this.setFrameStart(target.getIndexFrame().getPointer());
                         s.persist(this, llt);
@@ -1862,8 +1884,9 @@ public class Table implements ResultSet {
                         target = Instance.getInstance().getFrameById(prevtg.getIndexFrame().getParentF() + prevtg.getIndexFrame().getParentB()); //get by last child
                     }
                     if (newlist.getDivided() == 0) {
-                        target.getIndexFrame().setLcF(newlist.getFile()); //lc must be > 0 (0 is first leaf ElementList)
-                        target.getIndexFrame().setLcB(newlist.getPointer()); //lc must be > 0 (0 is first leaf ElementList)
+                        //paranoid fix
+                        llt.add(target.getIndexFrame());
+                        target.getIndexFrame().setLcId(newlist.getPtr()); //lc must be > 0 (0 is first leaf ElementList)
                     }
                 }
             }
@@ -1955,10 +1978,9 @@ public class Table implements ResultSet {
                         inNodes.add(Instance.getInstance().getFrameById(levelNodes.get(k).getFrameChunks(s).get(i).getHeader().getFramePtr()).getIndexFrame());
                     }
                     if (k==levelNodes.size()-1) {
-                        int lcf = levelNodes.get(k).getLcF();
-                        long lcb = levelNodes.get(k).getLcB();
-                        if (lcf>0) {
-                            inNodes.add(Instance.getInstance().getFrameById(lcf+lcb).getIndexFrame());
+                        final long lcId = levelNodes.get(k).getLcId();
+                        if (lcId>0) {
+                            inNodes.add(Instance.getInstance().getFrameById(lcId).getIndexFrame());
                         }
                     }
                 }
@@ -1978,7 +2000,7 @@ public class Table implements ResultSet {
         Runnable r = new Runnable() {
             @Override
             public void run() {
-                Thread.currentThread().setName("interference-retrieve-index-frames-thread");
+                Thread.currentThread().setName("interference-retrieve-index-frames-thread-"+Thread.currentThread().getId());
                 try {
                     for (Long start : startfs) {
                         getLocalLeafFrames(q, start, s);
@@ -2017,10 +2039,9 @@ public class Table implements ResultSet {
                         inNodes.add(Instance.getInstance().getFrameById(levelNodes.get(k).getFrameChunks(s).get(i).getHeader().getFramePtr()).getIndexFrame());
                     }
                     if (k==levelNodes.size()-1) {
-                        int lcf = levelNodes.get(k).getLcF();
-                        long lcb = levelNodes.get(k).getLcB();
-                        if (lcf>0) {
-                            inNodes.add(Instance.getInstance().getFrameById(lcf+lcb).getIndexFrame());
+                        final long lcId = levelNodes.get(k).getLcId();
+                        if (lcId>0) {
+                            inNodes.add(Instance.getInstance().getFrameById(lcId).getIndexFrame());
                         }
                     }
                 }
@@ -2059,10 +2080,9 @@ public class Table implements ResultSet {
                         inNodes.add(Instance.getInstance().getFrameById(levelNodes.get(k).getFrameChunks(s).get(i).getHeader().getFramePtr()).getIndexFrame());
                     }
                     if (k==levelNodes.size()-1) {
-                        int lcf = levelNodes.get(k).getLcF();
-                        long lcb = levelNodes.get(k).getLcB();
-                        if (lcf>0) {
-                            inNodes.add(Instance.getInstance().getFrameById(lcf+lcb).getIndexFrame());
+                        final long lcId = levelNodes.get(k).getLcId();
+                        if (lcId>0) {
+                            inNodes.add(Instance.getInstance().getFrameById(lcId).getIndexFrame());
                         }
                     }
                 }
@@ -2110,10 +2130,9 @@ public class Table implements ResultSet {
                 if (cc!=null) {
                     target = Instance.getInstance().getFrameById(cc.getHeader().getFramePtr()).getIndexFrame();
                 } else {
-                    final long lcId = target.getLcF()+target.getLcB();
-                    target = Instance.getInstance().getFrameById(lcId).getIndexFrame(); //get by last child
+                    target = Instance.getInstance().getFrameById(target.getLcId()).getIndexFrame(); //get by last child
                     if (target == null) {
-                        logger.info("null target returned for frame id "+lcId);
+                        logger.error("null target returned for frame id "+target.getLcId());
                     }
                 }
             }
@@ -2140,8 +2159,8 @@ public class Table implements ResultSet {
                             ntargets.add(Instance.getInstance().getFrameById(i).getIndexFrame());
                         }
                     }
-                    if (target.getLcF()>0) {
-                        ntargets.add(Instance.getInstance().getFrameById(target.getLcF()+target.getLcB()).getIndexFrame()); //get by last child
+                    if (target.getLcId()>0) {
+                        ntargets.add(Instance.getInstance().getFrameById(target.getLcId()).getIndexFrame()); //get by last child
                     }
                 }
             }
@@ -2170,8 +2189,8 @@ public class Table implements ResultSet {
                             ntargets.add(Instance.getInstance().getFrameById(i));
                         }
                     }
-                    if (target.getIndexFrame().getLcF()>0) {
-                        ntargets.add(Instance.getInstance().getFrameById(target.getIndexFrame().getLcF()+target.getIndexFrame().getLcB())); //get by last child
+                    if (target.getIndexFrame().getLcId()>0) {
+                        ntargets.add(Instance.getInstance().getFrameById(target.getIndexFrame().getLcId())); //get by last child
                     }
                 }
             }

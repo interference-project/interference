@@ -61,7 +61,7 @@ public class TransportServer {
                     @Override
                     public void run() {
                         logger.info("event server started on port " + serverPort);
-                        Thread.currentThread().setName("interference-event-server-thread-"+serverPort);
+                        Thread.currentThread().setName("interference-event-server-thread-"+serverPort+"-"+Thread.currentThread().getId());
                         while (started.get()) {
                             try {
                                 serverSocket.setSoTimeout(10000);
@@ -83,7 +83,7 @@ public class TransportServer {
                                     @Override
                                     public void run() {
                                         boolean running = true;
-                                        Thread.currentThread().setName("interference-transport-processor-thread-"+serverPort);
+                                        Thread.currentThread().setName("interference-transport-processor-thread-"+serverPort+"-"+Thread.currentThread().getId());
                                         logger.info("transport message processor started on port "+serverPort);
                                         while (running) {
                                             try {

@@ -93,7 +93,7 @@ public class SyncFrameEvent extends TransportEventImpl {
                             final int order = (f.getFileId() % Storage.MAX_NODES) % Config.getConfig().FILES_AMOUNT;
                             if (order == allocOrder) {
                                 final LLT llt_ = LLT.getLLT(); //df access reordering prevent deadlock
-                                bd = t.createNewFrame(null, f.getFileId(), b.getFrameType(), b.getAllocId(), false, false, true, s, llt_);
+                                bd = t.createNewFrame(null, null, f.getFileId(), b.getFrameType(), b.getAllocId(), false, false, true, s, llt_);
                                 llt_.commit();
                                 bd.setFrame(null);
                                 b.setDf(f);

@@ -72,7 +72,7 @@ public class TransportChannel {
             @Override
             public void run() {
                 Socket sock = null;
-                Thread.currentThread().setName("interference-transport-channel-"+channelId+"-thread");
+                Thread.currentThread().setName("interference-transport-channel-"+channelId+"-thread-"+Thread.currentThread().getId());
                 try {
                     try {
                         sock = new Socket();
@@ -90,7 +90,7 @@ public class TransportChannel {
                             final ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(sock.getOutputStream(), Config.getConfig().WRITE_BUFFER_SIZE));
                             boolean running = true;
                             started.set(true);
-                            Thread.currentThread().setName("transport channel thread 2");
+                            Thread.currentThread().setName("transport-channel-thread-"+Thread.currentThread().getId());
                             while (running) {
                                 final TransportMessage transportMessage = mq.peek() == null ? cbq.poll() : mq.poll();
                                 try {

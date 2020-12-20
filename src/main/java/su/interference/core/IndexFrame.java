@@ -136,11 +136,14 @@ public class IndexFrame extends Frame {
         }
     }
 
-    public IndexFrame add (DataChunk e, Table t, Session s, LLT llt) throws Exception {
+    public synchronized IndexFrame add (DataChunk e, Table t, Session s, LLT llt) throws Exception {
         if (this.isFill(e)) {
 
             final int nfileId = t.getIndexFileId(this.getFrameData());
-            final IndexFrame res = t.createNewFrame(this.getFrameData(), nfileId, this.getType(), 0, false, false, false, s, llt).getIndexFrame();
+            final IndexFrame res = t.createNewFrame(this.getFrameData(), null, nfileId, this.getType(), 0, false, false, false, s, llt).getIndexFrame();
+            //paranoid fix
+            llt.add(res);
+            llt.add(this);
             res.setParentF(this.getParentF());
             res.setParentB(this.getParentB());
             final ValueSet max = this.sort();
@@ -159,19 +162,18 @@ public class IndexFrame extends Frame {
                     }
                     this.setHasMV(1);
                 }
-                res.setLcF(this.getLcF());
-                res.setLcB(this.getLcB());
-                this.setLcF(0);
-                this.setLcB(0);
+                res.setLcId(this.getLcId());
+                this.setLcId(0);
             } else {
-                final int cmv = e.getDcs().compareTo(this.getFrameData().getMv());
+                //final int cmv = e.getDcs().compareTo(this.getFrameData().getMv());
+                final int cmv = e.getDcs().compareTo(max);
                 if (cmv > 0) {
                     throw new InternalException();
                 } else {
                     res.setDivided(1);
                     this.insertChunk(e, s, false, llt);
                     final ValueSet max2 = this.sort();
-                    final ArrayList<DataChunk> nlist = new ArrayList<DataChunk>();
+                    final ArrayList<DataChunk> nlist = new ArrayList<>();
                     ValueSet pkey = null;
                     boolean keyrpt = false;
                     boolean norpt  = false;
@@ -222,7 +224,7 @@ public class IndexFrame extends Frame {
         return ie.getBytesAmount() > this.getFrameFree();
     }
 
-    public ValueSet sort() throws InternalException {
+    public synchronized ValueSet sort() throws InternalException {
         if (!this.data.isSorted()) {
             this.data.sort();
         }
@@ -236,7 +238,7 @@ public class IndexFrame extends Frame {
 
     //accepted only to node element lists
     //for unique indexes
-    public DataChunk getChildElementPtr(ValueSet value) throws InternalException {
+    public synchronized DataChunk getChildElementPtr(ValueSet value) throws InternalException {
         //todo if (!this.sorted) {
             this.sort();
         //}
@@ -348,7 +350,7 @@ public class IndexFrame extends Frame {
         return len;
     }
 
-    public ValueSet getMaxValue() throws InternalException {
+    public synchronized ValueSet getMaxValue() throws InternalException {
         this.sort();
         return ((DataChunk)this.data.get(this.data.size()-1)).getDcs();
     }
@@ -364,59 +366,52 @@ public class IndexFrame extends Frame {
         return imap;
     }
 
-    public int getType() {
+    public synchronized int getType() {
         return this.getRes01();
     }
 
-    public void setType(int type) {
+    public synchronized void setType(int type) {
         this.setRes01(type);
     }
 
-    public int getHasMV() {
+    public synchronized int getHasMV() {
         return this.getRes02();
     }
 
-    public void setHasMV(int hasMV) {
+    public synchronized void setHasMV(int hasMV) {
         this.setRes02(hasMV);
     }
 
-    public int getDivided() {
+    public synchronized int getDivided() {
         return this.getRes03();
     }
 
-    public void setDivided(int divided) {
+    public synchronized void setDivided(int divided) {
         this.setRes03(divided);
     }
 
-    public int getParentF() {
+    public synchronized int getParentF() {
         return this.getRes04();
     }
 
-    public void setParentF(int parentF) {
+    public synchronized void setParentF(int parentF) {
         this.setRes04(parentF);
     }
 
-    public long getParentB() {
+    public synchronized long getParentB() {
         return this.getRes06();
     }
 
-    public void setParentB(long parentB) {
+    public synchronized void setParentB(long parentB) {
         this.setRes06(parentB);
     }
 
-    public int getLcF() {
-        return this.getRes05();
+    public synchronized long getLcId() {
+        return this.getRes05() + this.getRes07();
     }
 
-    public void setLcF(int lcF) {
-        this.setRes05(lcF);
-    }
-
-    public long getLcB() {
-        return this.getRes07();
-    }
-
-    public void setLcB(long lcB) {
-        this.setRes07(lcB);
+    public synchronized void setLcId(long lcId) {
+        this.setRes05((int)lcId%4096);
+        this.setRes07(lcId - lcId%4096);
     }
 }
