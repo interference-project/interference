@@ -106,9 +106,6 @@ public class SyncQueue implements Runnable, ManagedProcess {
             }
         }
 
-        //todo async process must depends from stop() method
-        pool2.submit(new TransportSyncTask(frames));
-
         long t1 = System.currentTimeMillis();
         pool.invokeAll(Arrays.asList(tasklist));
         long t2 = System.currentTimeMillis();
@@ -118,6 +115,8 @@ public class SyncQueue implements Runnable, ManagedProcess {
         for (FreeFrame fb : fframes) {
             s.persist(fb);
         }
+        //todo async process must depends from stop() method
+        pool2.submit(new TransportSyncTask(frames));
 
         running = false;
         return true;
@@ -134,7 +133,7 @@ public class SyncQueue implements Runnable, ManagedProcess {
     }
 
     public void run () {
-        Thread.currentThread().setName("interference-sync-thread");
+        Thread.currentThread().setName("interference-sync-thread-"+Thread.currentThread().getId());
         while (f) {
             latch = new CountDownLatch(1);
             try {

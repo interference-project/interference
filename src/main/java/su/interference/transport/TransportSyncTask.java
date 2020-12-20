@@ -55,7 +55,7 @@ public class TransportSyncTask implements Runnable {
     //todo need refactor for MT, now pesisted frame algorithm restrict this, should running in ONE thread
     @SuppressWarnings("unchecked")
     public void run () {
-        Thread.currentThread().setName("interference-transport-sync-thread");
+        Thread.currentThread().setName("interference-transport-sync-thread-"+Thread.currentThread().getId());
 
         final SyncFrame[] sb = frames.stream().filter(b -> b.isAllowR()).collect(Collectors.toList()).toArray(new SyncFrame[]{});
         try {

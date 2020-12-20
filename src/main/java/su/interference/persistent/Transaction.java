@@ -55,6 +55,8 @@ public class Transaction implements Serializable {
     public static final int TRAN_SERIALIZABLE = 1;
     @Transient
     public static final int TRAN_THR = 9;
+    @Transient
+    public static final int TRAN_LEGACY = 10;
 
     @Id
     @Column
@@ -149,9 +151,9 @@ public class Transaction implements Serializable {
     public void createUndoFrames(Session s, LLT llt) throws Exception {
         final Table t = Instance.getInstance().getTableByName("su.interference.persistent.UndoChunk");
         for (DataFile f : Storage.getStorage().getUndoFiles()) {
-            final FrameData ub = t.createNewFrame(null, f.getFileId(), 0, 0, false, true, false, s, llt);
+            final FrameData ub = t.createNewFrame(null, null, f.getFileId(), 0, 0, false, true, false, s, llt);
             ub.setSynced(false);
-            setNewLB(null, ub, false);
+            setNewLB(null, ub);
         }
     }
 
@@ -164,7 +166,7 @@ public class Transaction implements Serializable {
         while (true) {
 //            for (int i=0; i<this.lbs.length; i++) {
             final WaitFrame wb = this.lbs[i.get()];
-            final WaitFrame bd = fpart?wb.acquire(getTargetFileId(o.getFile()), false):wb.acquire(false);
+            final WaitFrame bd = fpart?wb.acquire(getTargetFileId(o.getFile())):wb.acquire();
             if (bd != null) {
                 if (avframeStart.get()==this.lbs.length-1) { avframeStart.set(0); }
                 else { avframeStart.getAndIncrement(); }
@@ -191,21 +193,12 @@ public class Transaction implements Serializable {
         return 0;
     }
 
-    public void setNewLB(FrameData frame, FrameData bd, boolean acquire) throws InternalException {
+    public void setNewLB(FrameData frame, FrameData bd) throws InternalException {
         boolean done = false;
-        if (acquire) {
-            for (WaitFrame wb : this.lbs) {
-                if (wb.trySetBdAndAcquire(bd)) {
-                    done = true;
-                    break;
-                }
-            }
-        } else {
-            for (WaitFrame wb : this.lbs) {
-                if (wb.trySetBd(frame, bd, 0)) {
-                    done = true;
-                    break;
-                }
+        for (WaitFrame wb : this.lbs) {
+            if (wb.trySetBd(frame, bd, 0)) {
+                done = true;
+                break;
             }
         }
         if (!done) {
@@ -214,7 +207,6 @@ public class Transaction implements Serializable {
     }
 
     public synchronized void commit (Session s, boolean remote) {
-        ArrayList<Long> fptr = new ArrayList<Long>();
         final Process lsync = Instance.getInstance().getProcessByName("lsync");
         final SyncQueue syncq = (SyncQueue) lsync.getRunnable();
         if (remote) {
@@ -222,9 +214,6 @@ public class Transaction implements Serializable {
                 try {
                     for (Long frameId : rframes) {
                         Instance.getInstance().getFrameById(frameId).decreaseTcounter(this.transId);
-                    }
-                    for (TransFrame tb : Instance.getInstance().getTransFramesByTransId(this.transId)) {
-                        s.delete(tb);
                     }
                     this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
                     this.transType = TRAN_THR;
@@ -240,34 +229,12 @@ public class Transaction implements Serializable {
             if (isLocal()) {
                 sendBroadcastEvents(CommandEvent.COMMIT, s);
                 try {
-                    this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
-                    this.transType = TRAN_THR;
-                    s.persist(this);
-                    syncq.commit();
-
                     for (TransFrame tb : tframes) {
-                        boolean hasfb = false;
                         if (tb.getUframeId() > 0) { // undo transframe record
-                            for (Long f : fptr) {
-                                if (f == tb.getUframeId()) {
-                                    hasfb = true;
-                                    break;
-                                }
-                            }
                             final List<RetrieveLock> rls = Instance.getInstance().getRetrieveLocksByObjectId(tb.getObjectId());
                             if (rls.size() == 0) {
                                 final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
-                                //deallocate undo frame
-                                final FrameData ub = Instance.getInstance().getFrameById(tb.getUframeId());
-                                //store frame params as free
-                                if (!hasfb) {
-                                    final FreeFrame fb = new FreeFrame(0, tb.getUframeId(), ub.getSize());
-                                    s.persist(fb); //insert
-                                    s.delete(ub);
-                                    fptr.add(tb.getUframeId());
-                                }
                                 cb.decreaseTcounter(this.transId);
-                                s.delete(tb);
                             }
                         } else { //change transframe record
                             final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
@@ -278,9 +245,13 @@ public class Transaction implements Serializable {
                             } else {
                                 s.persist(cb); //update new size value to dataframe
                             }
-                            s.delete(tb);
                         }
                     }
+
+                    this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
+                    this.transType = TRAN_THR;
+                    s.persist(this);
+                    syncq.commit();
 
                     if (this.join != null) {
                         join.deallocate(s);
@@ -301,15 +272,11 @@ public class Transaction implements Serializable {
     public synchronized void rollback (Session s, boolean remote) {
         final ArrayList<FrameData> ubd1 = new ArrayList<>();
         final ArrayList<FrameData> ubd2 = new ArrayList<>();
-        final ArrayList<Long> fptr = new ArrayList<>();
         if (remote) {
             if (!isLocal()) {
                 try {
                     for (Long frameId : rframes) {
                         Instance.getInstance().getFrameById(frameId).decreaseTcounter(this.transId);
-                    }
-                    for (TransFrame tb : Instance.getInstance().getTransFramesByTransId(this.transId)) {
-                        s.delete(tb);
                     }
                     this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
                     this.transType = TRAN_THR;
@@ -333,14 +300,13 @@ public class Transaction implements Serializable {
 
                     for (TransFrame tb : tframes) {
                         final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
-                        if (cb.getFrame() instanceof DataFrame) {
-                            if (!ubd1.contains(cb)) {
-                                ubd1.add(cb);
-                            }
-                        }
-                        if (cb.getFrame() instanceof IndexFrame) {
+                        if (cb.isIndex()) {
                             if (!ubd2.contains(cb)) {
                                 ubd2.add(cb);
+                            }
+                        } else {
+                            if (!ubd1.contains(cb)) {
+                                ubd1.add(cb);
                             }
                         }
                     }
@@ -384,30 +350,13 @@ public class Transaction implements Serializable {
                     }
 
                     for (TransFrame tb : tframes) {
-                        boolean hasfb = false;
                         if (tb.getUframeId() > 0) { // undo transframe record
-                            for (Long f : fptr) {
-                                if (f == tb.getUframeId()) {
-                                    hasfb = true;
-                                    break;
-                                }
-                            }
                             final List<RetrieveLock> rls = Instance.getInstance().getRetrieveLocksByObjectId(tb.getObjectId());
                             if (rls.size() == 0) {
                                 final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
-                                //deallocate undo frame
-                                final FrameData ub = Instance.getInstance().getFrameById(tb.getUframeId());
-                                //store frame params as free
-                                if (!hasfb) {
-                                    final FreeFrame fb = new FreeFrame(0, tb.getUframeId(), ub.getSize());
-                                    s.persist(fb); //insert
-                                    s.delete(ub);
-                                    fptr.add(tb.getUframeId());
-                                }
                                 if (cb != null) {
                                     cb.decreaseTcounter(this.transId);
                                 }
-                                s.delete(tb);
                             }
                         } else { //change transframe record
                             final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
@@ -416,7 +365,6 @@ public class Transaction implements Serializable {
                                 logger.info("rollback freeing frame " + cb.getFile() + " " + cb.getPtr());
                                 freeFrames(cb, s);
                             }
-                            s.delete(tb);
                         }
                     }
                     this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);

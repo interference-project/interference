@@ -45,11 +45,15 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
     public static final int INDEX_RETRIEVED_PRIORITY = 9;
 
     public void run () {
-        Thread.currentThread().setName("interference-cleanup-thread");
+        Thread.currentThread().setName("interference-cleanup-thread-"+Thread.currentThread().getId());
         while (f) {
             latch = new CountDownLatch(1);
             try {
-                cleanUpFrames();
+                if (Config.getConfig().CLEANUP_ENABLE == 1) {
+                    cleanUpFrames();
+                } else {
+                    logger.warn("system cleanup currently disabled");
+                }
             } catch(Exception e) {
                 e.printStackTrace();
             }
@@ -70,7 +74,7 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
         }
     }
 
-    private void cleanUpFrames() {
+    private void cleanUpFrames() throws Exception {
         Metrics.get("systemCleanUp").start();
         int i = 0;
         int d = 0;
@@ -96,7 +100,7 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
             }
             if (f.getDataFile().isIndex() && cleanupIndxEnabled()) {
                 f.decreasePriority();
-                if (f.getPriority() == 0 && frameAmount > Config.getConfig().IX_CLEANUP_PROTECTION_THR) {
+                if (f.getFrameType() == IndexFrame.INDEX_FRAME_LEAF && f.getPriority() == 0 && frameAmount > Config.getConfig().IX_CLEANUP_PROTECTION_THR) {
                     if (f.clearFrame()) {
                         x++;
                     }

@@ -28,7 +28,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.core.*;
 import su.interference.mgmt.MgmtColumn;
-import su.interference.exception.InternalException;
 import su.interference.sql.FrameApi;
 
 import javax.persistence.Entity;
@@ -90,7 +89,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @MgmtColumn(width=10, show=true, form=false, edit=false)
     private volatile long allocId; //virtual Id field
     @Column
-    private int distribution;
+    private int frameType;
     @Column
     private AtomicInteger current;
     @Column
@@ -101,16 +100,6 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @MapColumn
     @Transient
     private long frameId; //virtual Id field
-    @Transient
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
-    private int frameUsed;
-    @Transient
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
-    private int cUsed;
-    @Transient
-    private int undoId;  //for UndoChunk: objectId
-    @Transient
-    private long transId; //for UndoChunk: transId
     @Transient
     private final Map<Long, Map<Long, TransFrame>> tcounter = new ConcurrentHashMap<>();
     @Transient
@@ -174,7 +163,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return (DataFrame) frame;
     }
 
-    public IndexFrame getIndexFrame() throws Exception {
+    public synchronized IndexFrame getIndexFrame() throws Exception {
         if (frame == null) {
             this.priority.set(SystemCleanUp.INDEX_RETRIEVED_PRIORITY);
             List<FrameData> uframes = new ArrayList<>();
@@ -220,6 +209,14 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
             frame.setFrameData(this);
         }
         return frame;
+    }
+
+    public int getFrameType() {
+        return frameType;
+    }
+
+    public void setFrameType(int frameType) {
+        this.frameType = frameType;
     }
 
     public boolean isIndex() {
@@ -269,14 +266,18 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     //real current non-tran amount of chunk bytes
     public int getCUsed() {
-        if (frame ==null) {
+        if (frame == null) {
             return -1;
         }
         return frame.getBytesAmount();
     }
 
-    public int getFrameFree() throws InternalException {
+    public int getFrameFree() {
         return size - Frame.FRAME_HEADER_SIZE - getFrameUsed();
+    }
+
+    public int getFrameFreeNoTran() {
+        return size - Frame.FRAME_HEADER_SIZE - getUsed();
     }
 
     public FrameData() {
@@ -439,7 +440,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         }
     }
 
-    public boolean clearFrame() {
+    public synchronized boolean clearFrame() {
         if (this.frame != null) {
             this.frame.cleanUpIcs();
             this.frame = null;
@@ -527,20 +528,8 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         this.synced = synced;
     }
 
-    public int getDistribution() {
-        return distribution;
-    }
-
-    public void setDistribution(int distribution) {
-        this.distribution = distribution;
-    }
-
     public AtomicInteger getCurrent() {
         return current;
-    }
-
-    public void setCurrent(AtomicInteger current) {
-        this.current = current;
     }
 
     public int getStarted() {
@@ -559,11 +548,11 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         this.frameOrder = frameOrder;
     }
 
-    public ValueSet getMv() {
+    public synchronized ValueSet getMv() {
         return mv;
     }
 
-    public void setMv(ValueSet mv) {
+    public synchronized void setMv(ValueSet mv) {
         this.mv = mv;
     }
 }

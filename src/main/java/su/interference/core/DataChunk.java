@@ -64,6 +64,7 @@ public class DataChunk implements Chunk {
     private Comparable id;
     private byte[] serializedId;
     private volatile Object entity;
+    private volatile ValueSet dcs;
     private Object undoentity;
     private Map<Integer, DataChunk> ics = new HashMap<>();
     private UndoChunk uc;
@@ -73,10 +74,21 @@ public class DataChunk implements Chunk {
 
     //returns datacolumn set
     public ValueSet getDcs() {
+        if (t.isIndex() && dcs != null) {
+            return dcs;
+        }
         if (state == INIT_STATE) {
+            if (t.isIndex()) {
+                dcs = getDcsFromBytes();
+                return dcs;
+            }
             return getDcsFromBytes();
         }
         if (state == NORMAL_STATE) {
+            if (t.isIndex()) {
+                dcs = getDcsFromEntity();
+                return dcs;
+            }
             return getDcsFromEntity();
         }
         return null;
@@ -176,6 +188,7 @@ public class DataChunk implements Chunk {
         return t;
     }
 
+    @Deprecated
     public Comparable getId (Field idfield, Session s) throws InvocationTargetException, NoSuchMethodException, IllegalAccessException {
         if (serializedId==null) {
             if (entity==null) {
@@ -220,30 +233,19 @@ public class DataChunk implements Chunk {
             if (entity==null) {
                 getEntity();
             }
-            Class c = entity.getClass();
-            final TransEntity ta = (TransEntity)c.getAnnotation(TransEntity.class);
-            final SystemEntity sa = (SystemEntity)c.getAnnotation(SystemEntity.class);
-            if (ta!=null) {
-                //for Transactional Wrapper Entity we must get superclass (original Entity class)
-                c = c.getSuperclass();
-            }
-            Field[] f = c.getDeclaredFields();
-            for (int i=0; i<f.length; i++) {
-                final Id a = f[i].getAnnotation(Id.class);
-                if (a!=null) {
-                    if (sa!=null) {
-                        Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), null);
-                        Object v = z.invoke(entity, null);
-                        id = (Comparable) v;
-                        serializedId = sr.serialize(f[i].getType().getName(), v);
-                    } else {
-                        Method z = c.getMethod("get"+f[i].getName().substring(0,1).toUpperCase()+f[i].getName().substring(1,f[i].getName().length()), new Class<?>[]{Session.class});
-                        Object v = z.invoke(entity, new Object[]{s});
-                        id = (Comparable) v;
-                        serializedId = sr.serialize(f[i].getType().getName(), v);
-                    }
+            final Field idf = t.getIdField();
+            if (idf != null) {
+                if (t.isNoTran()) {
+                    final Method z = t.getIdmethod();
+                    id = (Comparable) z.invoke(entity, null);
+                    serializedId = sr.serialize(idf.getType().getName(), id);
+                } else {
+                    final Method z = t.getIdmethod_();
+                    id = (Comparable) z.invoke(entity, new Object[]{s});
+                    serializedId = sr.serialize(idf.getType().getName(), id);
                 }
             }
+
         }
         return serializedId;
     }
@@ -693,8 +695,8 @@ public class DataChunk implements Chunk {
         final int p = ub.getDataFrame().insertChunk(dc, s, true, llt);
         if (p == 0) {
             final Table t = Instance.getInstance().getTableByName(UndoChunk.class.getName());
-            final FrameData nb = t.createNewFrame(ub, ub.getFile(), 0, 0, false, false, false, s, llt);
-            s.getTransaction().setNewLB(ub, nb, false);
+            final FrameData nb = t.createNewFrame(ub, ubw, ub.getFile(), 0, 0, false, false, false, s, llt);
+            s.getTransaction().setNewLB(ub, nb);
             nb.getDataFrame().insertChunk(dc, s, true, llt);
             dc.uframe = nb;
         } else {

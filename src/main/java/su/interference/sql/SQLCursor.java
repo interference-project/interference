@@ -506,7 +506,7 @@ public class SQLCursor implements FrameIterator {
             Runnable r = new Runnable() {
                 @Override
                 public void run() {
-                    Thread.currentThread().setName("interference-sql-cursor-flush-thread");
+                    Thread.currentThread().setName("interference-sql-cursor-flush-thread-"+Thread.currentThread().getId());
                     try {
                         while (hasNextFrame()) {
                             nextFrame();

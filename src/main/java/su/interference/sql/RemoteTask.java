@@ -56,7 +56,7 @@ public class RemoteTask implements Callable<Boolean> {
     }
 
     public Boolean call() throws Exception {
-        Thread.currentThread().setName("interference-remote-task-thread");
+        Thread.currentThread().setName("interference-remote-task-thread-"+Thread.currentThread().getId());
         final TransportEvent transportEvent = new SQLEvent(nodeId, cur.getCursorId(), joins, rightType, 0, null, null, 0, true);
         TransportContext.getInstance().send(transportEvent);
         transportEvent.getLatch().await();

@@ -54,7 +54,7 @@ public class SyncTask implements Callable<Integer> {
     }
 
     public Integer call() {
-        Thread.currentThread().setName("interference-sync-task-thread");
+        Thread.currentThread().setName("interference-sync-task-thread-"+Thread.currentThread().getId());
         Metrics.get("syncFrames").start();
         try {
 
