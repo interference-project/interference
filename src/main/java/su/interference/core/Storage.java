@@ -527,7 +527,7 @@ public class Storage {
         final ArrayList<FrameData> res = new ArrayList<FrameData>();
         for (Object b : bds) {
             final FrameData bd = (FrameData)((DataChunk)b).getEntity(FrameData.class, null);
-            if (bd.getCurrent().get()>0) {
+            if (bd.getCurrent() > 0) {
                 res.add(bd);
             }
         }

@@ -91,7 +91,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @Column
     private int frameType;
     @Column
-    private AtomicInteger current;
+    private int current;
     @Column
     private volatile int started;
     @Column
@@ -106,6 +106,8 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     private AtomicInteger priority = new AtomicInteger(2);
     @Transient
     private volatile boolean synced = true;
+    @Transient
+    private volatile boolean rbck = true;
     @Transient
     private volatile Frame frame;
     @Transient
@@ -123,17 +125,12 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return FrameApi.IMPL_DATA;
     }
 
-    public void markAsCurrent() {
-        if (this.current==null) {
-            this.current = new AtomicInteger(0);
-        }
-        this.current.compareAndSet(0, 1);
+    public synchronized void markAsCurrent() {
+        this.current = 1;
     }
 
-    public void clearCurrent() {
-        if (this.current!=null) {
-            this.current.compareAndSet(1, 0);
-        }
+    public synchronized void clearCurrent() {
+        this.current = 0;
     }
 
     public Table getDataObject() {
@@ -303,7 +300,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         this.size = bd.getSize();
         this.allocId = bd.getAllocId();
         this.started = bd.getStarted();
-        this.current = new AtomicInteger(bd.getCurrent().get());
+        this.current = bd.getCurrent();
         this.used = bd.getUsed();
         this.prevFrame = bd.getPrevFrame();
         this.prevFile = bd.getPrevFile();
@@ -510,10 +507,6 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return priority.get();
     }
 
-    public void setPriority(int priority) {
-        this.priority.set(priority);
-    }
-
     public void decreasePriority() {
         if (this.priority.get() > 0) {
             this.priority.decrementAndGet();
@@ -528,7 +521,15 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         this.synced = synced;
     }
 
-    public AtomicInteger getCurrent() {
+    public boolean isRbck() {
+        return rbck;
+    }
+
+    public void setRbck(boolean rbck) {
+        this.rbck = rbck;
+    }
+
+    public synchronized int getCurrent() {
         return current;
     }
 

@@ -114,7 +114,7 @@ public class Config {
     public final int WRITE_BUFFER_SIZE = 33554432;
     // cleanup
     public final int TRANS_CLEANUP_TIMEOUT = 5000;
-    public final int CLEANUP_ENABLE = 0;
+    public final int CLEANUP_ENABLE = 1;
     public final int CLEANUP_TIMEOUT = 3000;
     public final int CLEANUP_PROTECTION_THR = 1000;
     public final int IX_CLEANUP_PROTECTION_THR = 2000;

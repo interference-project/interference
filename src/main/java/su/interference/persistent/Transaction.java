@@ -294,7 +294,6 @@ public class Transaction implements Serializable {
             }
         } else {
             if (isLocal()) {
-                sendBroadcastEvents(CommandEvent.ROLLBACK, s);
                 try {
                     Collections.sort(tframes);
 
@@ -323,6 +322,7 @@ public class Transaction implements Serializable {
 
                         final Frame frame_ = ub.getFrame();
                         if (frame_ instanceof IndexFrame) {
+                            ub.setRbck(true);
                             frame_.rollbackTransaction(this, ubs, s);
                         }
                     }
@@ -345,6 +345,7 @@ public class Transaction implements Serializable {
                     for (FrameData ub : ubd2) {
                         final Frame frame_ = ub.getFrame();
                         if (frame_ instanceof IndexFrame) {
+                            ub.setRbck(false);
                             ((IndexFrame) frame_).cleanICEntities();
                         }
                     }
@@ -376,6 +377,7 @@ public class Transaction implements Serializable {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
+                sendBroadcastEvents(CommandEvent.ROLLBACK, s);
             } else {
                 logger.warn("rollback cannot be applied to transaction on remote node");
             }
@@ -548,7 +550,9 @@ public class Transaction implements Serializable {
         ntb.setDiff(len);
         try {
             s.persist(ntb, llt); //insert
-            this.tframes.add(ntb);
+            synchronized (this) {
+                this.tframes.add(ntb);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }

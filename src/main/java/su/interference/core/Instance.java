@@ -561,7 +561,7 @@ public class Instance implements Interference {
         return (Table)((DataChunk)tt.getMapFieldByColumn("name").getMap().get("su.interference.persistent.FrameData")).getEntity();
     }
 
-    protected Map getFramesMap () {
+    public Map getFramesMap () {
         final Table t = getTableByName("su.interference.persistent.FrameData");
         final MapField ixf = t.getMapFieldByColumn("frameId");
         return ixf.getMap();
