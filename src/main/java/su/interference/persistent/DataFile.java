@@ -495,7 +495,7 @@ public class DataFile implements Serializable {
         this.file.write(b);
     }
 
-    public synchronized void writeFrame(FrameData bd, final long ptr, final byte[] b, LLT llt, Session s) throws Exception {
+    public void writeFrame(FrameData bd, final long ptr, final byte[] b, LLT llt, Session s) throws Exception {
         final ByteString bs = new ByteString(b);
         final int file_ = bs.getIntFromBytes(0);
         final long ptr_ = bs.getLongFromBytes(4);
@@ -508,9 +508,10 @@ public class DataFile implements Serializable {
         if (ptr != ptr_) {
             logger.error("Wrong write frame operation with file = " + this.file + " ptr = " + ptr + ", internal file = " + file_ + " ptr = " + ptr_);
         }
-
-        this.file.seek(ptr);
-        this.file.write(b);
+        synchronized (this) {
+            this.file.seek(ptr);
+            this.file.write(b);
+        }
         s.persist(bd, llt);
     }
 

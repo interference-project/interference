@@ -350,7 +350,7 @@ public class Frame implements Comparable {
         res.append(res2.getBytes());
         
         if (used > getFrameSize()) {
-            logger.error("Build snapshot for "+this.getClass().getName()+":"+this.getObjectId()+":"+this.pointer+" with used length="+used+" failed, not enough size for expected framesize="+getFrameSize()+"");
+            logger.error("Build snapshot for "+this.getClass().getName()+":"+this.getObjectId()+":"+this.getPtr()+" with used length="+used+" failed, not enough size for expected framesize="+getFrameSize()+"");
             throw new InvalidFrame();
         }
         if (used < getFrameSize()) {
@@ -561,7 +561,7 @@ public class Frame implements Comparable {
         return res;
     }
 
-    public synchronized void rollbackTransaction(Transaction tran, ArrayList<FrameData> ubs, Session s) throws InterruptedException {
+    public synchronized void rollbackTransaction(Transaction tran, ArrayList<FrameData> ubs, Session s) throws Exception {
         data.check();
 
         //rollback inserted records
@@ -579,23 +579,19 @@ public class Frame implements Comparable {
 
         //rollback deleted & updated records
         if (ubs!=null) {
-            try {
-                for (FrameData ub : ubs) {
-                    for (Chunk c : ub.getDataFrame().getChunks()) {
-                        final UndoChunk uc = (UndoChunk)c.getEntity();
-                        final int ucfile = uc.getDataChunk().getHeader().getRowID().getFileId();
-                        final long frameptr = uc.getDataChunk().getHeader().getRowID().getFramePointer();
-                        if (uc.getTransId() == tran.getTransId() && ucfile == this.file && frameptr == this.pointer) {
-                            final DataChunk rc = uc.getDataChunk().restore(uc);
-                            if (this instanceof IndexFrame && rc.getExistingEntity() != null) {
-                                ((IndexChunk) rc.getExistingEntity()).setDataChunk(null);
-                            }
-                            data.add(rc);
+            for (FrameData ub : ubs) {
+                for (Chunk c : ub.getDataFrame().getChunks()) {
+                    final UndoChunk uc = (UndoChunk)c.getEntity();
+                    final int ucfile = uc.getDataChunk().getHeader().getRowID().getFileId();
+                    final long frameptr = uc.getDataChunk().getHeader().getRowID().getFramePointer();
+                    if (uc.getTransId() == tran.getTransId() && ucfile == this.file && frameptr == this.pointer) {
+                        final DataChunk rc = uc.getDataChunk().restore(uc);
+                        if (this instanceof IndexFrame && rc.getExistingEntity() != null) {
+                            ((IndexChunk) rc.getExistingEntity()).setDataChunk(null);
                         }
+                        data.add(rc);
                     }
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
             }
         }
         final LLT llt = LLT.getLLT();

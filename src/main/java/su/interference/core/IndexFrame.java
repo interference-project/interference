@@ -25,10 +25,7 @@
 package su.interference.core;
 
 import su.interference.exception.*;
-import su.interference.persistent.Table;
-import su.interference.persistent.FrameData;
-import su.interference.persistent.Session;
-import su.interference.persistent.UndoChunk;
+import su.interference.persistent.*;
 import su.interference.serialize.ByteString;
 
 import java.util.*;
@@ -127,6 +124,42 @@ public class IndexFrame extends Frame {
         this.b = null; //throw bytes to GC
     }
 
+    @Override
+    public synchronized void rollbackTransaction(Transaction tran, ArrayList<FrameData> ubs, Session s) throws Exception {
+        data.check();
+        final Map<Integer, DataChunk> ucmap = new HashMap();
+
+        if (ubs!=null) {
+            for (FrameData ub : ubs) {
+                for (Chunk c : ub.getDataFrame().getChunks()) {
+                    final UndoChunk uc = (UndoChunk) c.getEntity();
+                    final int ucfile = uc.getDataChunk().getHeader().getRowID().getFileId();
+                    final long frameptr = uc.getDataChunk().getHeader().getRowID().getFramePointer();
+                    if (uc.getTransId() == tran.getTransId() && ucfile == this.getFile() && frameptr == this.getPointer()) {
+                        ucmap.put(uc.getPtr(), uc.getDataChunk());
+                    }
+                }
+            }
+        }
+
+        //rollback modified index records
+        for (Chunk c : data.getChunks()) {
+            if (c.getHeader().getTran().getTransId() == tran.getTransId()) {
+                final DataChunk dc = ucmap.get(c.getHeader().getPtr());
+                final DataChunk dc_ = ((IndexChunk) c.getEntity()).getDataChunk().getUndoChunk().getDataChunk();
+                ((DataChunk) c).setUndoChunk(null);
+                ((DataChunk) c).cleanUpIcs();
+                ((IndexChunk)c.getEntity()).setDataChunk(dc_);
+                ((IndexChunk)c.getEntity()).setFramePtrRowId(dc_.getHeader().getRowID());
+                ((DataChunk)c).getHeader().setFramePtr(dc_.getHeader().getRowID());
+            }
+        }
+
+        final LLT llt = LLT.getLLT();
+        llt.add(this);
+        llt.commit();
+    }
+
     public void cleanICEntities() {
         for (Chunk c : this.data.getChunks()) {
             final Object e = ((DataChunk) c).getExistingEntity();
@@ -136,11 +169,12 @@ public class IndexFrame extends Frame {
         }
     }
 
-    public synchronized IndexFrame add (DataChunk e, Table t, Session s, LLT llt) throws Exception {
+    public synchronized FrameData add (DataChunk e, Table t, Session s, LLT llt) throws Exception {
         if (this.isFill(e)) {
 
             final int nfileId = t.getIndexFileId(this.getFrameData());
-            final IndexFrame res = t.createNewFrame(this.getFrameData(), null, nfileId, this.getType(), 0, false, false, false, s, llt).getIndexFrame();
+            final FrameData res_ = t.createNewFrame(this.getFrameData(), null, nfileId, this.getType(), 0, false, false, false, s, llt);
+            final IndexFrame res = res_.getIndexFrame();
             //paranoid fix
             llt.add(res);
             llt.add(this);
@@ -182,7 +216,7 @@ public class IndexFrame extends Frame {
                     for (int i=0; i<this.data.size(); i++) {
                         if (!norpt) {
                             if (pkey!=null) {
-                                if (((DataChunk)this.data.get(i)).getDcs().compareTo(pkey)==0) {
+                                if (this.data.get(i).getDcs().compareTo(pkey)==0) {
                                     keyrpt = true;
                                 }
                             } else {
@@ -192,7 +226,7 @@ public class IndexFrame extends Frame {
                         if (i==this.data.size()-1) {
                             keyrpt = false;
                         }
-                        if (this.getFrameSize()-resamt>this.data.get(i).getBytesAmount()&&(keyrpt||((DataChunk)this.data.get(i)).getDcs().compareTo(max2)<0)) {
+                        if (this.getFrameSize()-resamt>this.data.get(i).getBytesAmount()&&(keyrpt||this.data.get(i).getDcs().compareTo(max2)<0)) {
                             res.insertChunk(this.data.get(i), s, false, true, llt);
                             resamt = resamt + this.data.get(i).getBytesAmount();
                             res.setHasMV(1);
@@ -200,7 +234,7 @@ public class IndexFrame extends Frame {
                             norpt = true;
                             nlist.add((DataChunk)this.data.get(i));
                         }
-                        pkey = ((DataChunk)this.data.get(i)).getDcs();
+                        pkey = this.data.get(i).getDcs();
                         keyrpt = false;
                     }
                     this.data.clear();
@@ -209,7 +243,7 @@ public class IndexFrame extends Frame {
                     }
                 }
             }
-            return res;
+            return res_;
         } else {
             this.insertChunk(e, s, false, llt);
             return null;

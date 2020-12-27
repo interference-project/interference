@@ -812,24 +812,29 @@ public class Table implements ResultSet {
         //get LBS frames
         if (!this.isIndex()&&!this.name.equals(UndoChunk.class.getName())) {
             final List<Object> bds = ixl.getObjectsByKey(this.objectId);
-            final ArrayList<WaitFrame> lbs = new ArrayList<WaitFrame>();
+            final ArrayList<WaitFrame> lbs = new ArrayList<>();
             for (Object b : bds) {
                 FrameData bd = (FrameData) ((DataChunk) b).getEntity();
-                if (bd.getCurrent() != null && bd.getCurrent().get() > 0) {
+                if (bd.getCurrent() > 0) {
                     lbs.add(new WaitFrame(bd));
                 }
             }
+            Map<Integer, WaitFrame> lbs_ = null;
             if (!(lbs.size() == 1 || lbs.size() == Config.getConfig().FILES_AMOUNT)) { //paranoid check
                 if (lbs.size() == 0 && this.name.equals(UndoChunk.class.getName())) {
                     //DataChunk not used pre-allocated frames
                 } else {
+                    lbs_ = new HashMap<>();
                     for (WaitFrame wb : lbs) {
+                        lbs_.put(wb.getBd().getFile(), wb);
                         logger.error("set lb during init table: " + wb.getBd().getObjectId() + ":" + wb.getBd().getFile() + ":" + wb.getBd().getPtr());
                     }
-                    throw new InternalException();
+                    if (this.objectId != FreeFrame.CLASS_ID) {
+                        throw new InternalException();
+                    }
                 }
             }
-            this.lbs = lbs.toArray(new WaitFrame[]{});
+            this.lbs = lbs_ == null ? lbs.toArray(new WaitFrame[]{}) : lbs_.values().toArray(new WaitFrame[]{});
         } else {
             this.lbs = new WaitFrame[]{};
         }
@@ -1858,7 +1863,7 @@ public class Table implements ResultSet {
             DataChunk dc__ = null;
             while (cnue) {
                 final DataChunk dc_ = dc__ == null ? dc : dc__;
-                IndexFrame newlist = target.getIndexFrame().add(dc_, this, s, llt);
+                final FrameData newlist = target.getIndexFrame().add(dc_, this, s, llt);
                 if (isNoTran()) {
                     usedSpace(target, target.getUsed() + len, true, s, llt);
                 } else {
@@ -1868,8 +1873,8 @@ public class Table implements ResultSet {
                     cnue = false;
                 } else {
                     prevtg = target;
-                    if (newlist.getDivided() == 1) {
-                        dc__ = new DataChunk(newlist.getMaxValue(), s, new RowId(newlist.getFile(), newlist.getPointer(), 0), this);
+                    if (newlist.getIndexFrame().getDivided() == 1) {
+                        dc__ = new DataChunk(newlist.getIndexFrame().getMaxValue(), s, new RowId(newlist.getIndexFrame().getFile(), newlist.getIndexFrame().getPointer(), 0), this);
                     } else {
                         dc__ = new DataChunk(prevtg.getIndexFrame().getMaxValue(), s, new RowId(prevtg.getIndexFrame().getFile(), prevtg.getIndexFrame().getPointer(), 0), this);
                     }
@@ -1883,10 +1888,10 @@ public class Table implements ResultSet {
                     } else {
                         target = Instance.getInstance().getFrameById(prevtg.getIndexFrame().getParentF() + prevtg.getIndexFrame().getParentB()); //get by last child
                     }
-                    if (newlist.getDivided() == 0) {
+                    if (newlist.getIndexFrame().getDivided() == 0) {
                         //paranoid fix
                         llt.add(target.getIndexFrame());
-                        target.getIndexFrame().setLcId(newlist.getPtr()); //lc must be > 0 (0 is first leaf ElementList)
+                        target.getIndexFrame().setLcId(newlist.getIndexFrame().getPtr()); //lc must be > 0 (0 is first leaf ElementList)
                     }
                 }
             }
