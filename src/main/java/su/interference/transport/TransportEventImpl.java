@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -28,7 +28,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -46,7 +45,7 @@ public class TransportEventImpl implements TransportEvent {
     private TransportCallback callback;
     private transient CountDownLatch latch;
     private AtomicBoolean sent = new AtomicBoolean(false);
-    private List<Integer> failures = new ArrayList<>();
+    private ArrayList<Integer> failures = new ArrayList<>();
     private Exception processException;
 
     public TransportEventImpl(int channelId) {

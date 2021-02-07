@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -28,9 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.core.Config;
 
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
+import java.io.*;
 
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -80,7 +78,7 @@ public class TransportChannel {
                         sock.connect(socketAddress, 2000);
                         connected.set(true);
                         logger.info("sucessfully connected to host=" + host + ":" + port);
-                        latch.countDown();
+                        //latch.countDown();
                     } catch (Exception e) {
                         latch.countDown();
                         logger.info("connection refused by host=" + host + ":" + port);
@@ -90,6 +88,7 @@ public class TransportChannel {
                             final ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(sock.getOutputStream(), Config.getConfig().WRITE_BUFFER_SIZE));
                             boolean running = true;
                             started.set(true);
+                            latch.countDown();
                             Thread.currentThread().setName("transport-channel-thread-"+Thread.currentThread().getId());
                             while (running) {
                                 final TransportMessage transportMessage = mq.peek() == null ? cbq.poll() : mq.poll();
@@ -105,7 +104,9 @@ public class TransportChannel {
                                         } else {
                                             if (transportMessage.getType() == TransportMessage.TRANSPORT_MESSAGE || transportMessage.getType() == TransportMessage.HEARTBEAT_MESSAGE) {
                                                 transportMessage.getTransportEvent().failure(channelId, new RuntimeException("Channel failure"));
-                                                transportMessage.getTransportEvent().getLatch().countDown();
+                                                if (transportMessage.getTransportEvent().getLatch() != null) {
+                                                    transportMessage.getTransportEvent().getLatch().countDown();
+                                                }
                                             } else if (transportMessage.getType() == TransportMessage.CALLBACK_MESSAGE) {
                                                 cbq.add(transportMessage);
                                             }
@@ -132,7 +133,9 @@ public class TransportChannel {
                                     //e.printStackTrace();
                                     if (transportMessage != null && transportMessage.getTransportEvent() != null) {
                                         transportMessage.getTransportEvent().failure(channelId, e);
-                                        transportMessage.getTransportEvent().getLatch().countDown();
+                                        if (transportMessage.getTransportEvent().getLatch() != null) {
+                                            transportMessage.getTransportEvent().getLatch().countDown();
+                                        }
                                     }
                                     running = false;
                                     started.set(false);

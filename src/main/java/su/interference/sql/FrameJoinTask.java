@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 import su.interference.core.*;
 import su.interference.metrics.Metrics;
 import su.interference.persistent.*;
-import su.interference.proxy.GenericResult;
+import su.interference.api.GenericResult;
 
 import java.util.List;
 import java.util.concurrent.Callable;

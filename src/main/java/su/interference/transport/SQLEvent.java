@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -109,9 +109,9 @@ public class SQLEvent extends TransportEventImpl {
                 }
             } catch (Exception e) {
                 logger.error("SQLEvent process: ", e);
-                return new EventResult(TransportCallback.FAILURE, this.cursorId, res, null);
+                return new EventResult(TransportCallback.FAILURE, null, this.cursorId, res, null, null);
             }
-            return new EventResult(TransportCallback.SUCCESS, this.cursorId, res, null);
+            return new EventResult(TransportCallback.SUCCESS, null, this.cursorId, res, null, null);
         } else {
             final Session s = Session.getSession();
             final Cursor cur = this.cursorId == 0 ? null : new Cursor(this.sql, this.resultTargetNames, Cursor.SLAVE_TYPE);
@@ -135,16 +135,16 @@ public class SQLEvent extends TransportEventImpl {
             final SQLStatement sql = cur == null ? SQLStatementFactory.getInstance(this.sql, s) : SQLStatementFactory.getInstance(this.sql, cur, s);
             //todo temp solution
             if (sql.getSQLException() != null) {
-                return new EventResult(TransportCallback.FAILURE, cur.getCursorId(), null, sql.getSQLException());
+                return new EventResult(TransportCallback.FAILURE, null, cur.getCursorId(), null, sql.getSQLException(), null);
             } else {
                 try {
                     if (sql instanceof SQLSystem) {
                         sql.executeSQL(s);
                     }
                 } catch (SQLException e) {
-                    return new EventResult(TransportCallback.FAILURE, cur.getCursorId(), null, e);
+                    return new EventResult(TransportCallback.FAILURE, null, cur.getCursorId(), null, e, null);
                 }
-                return new EventResult(TransportCallback.SUCCESS, cur.getCursorId(), null, null);
+                return new EventResult(TransportCallback.SUCCESS, null, cur.getCursorId(), null, null, null);
             }
         }
     }

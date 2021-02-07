@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -145,7 +145,7 @@ public class SQLJoin {
                 boolean ixflag = ocs.size() > 0;
 
                 //todo getall
-                gtemp = new ResultSetImpl(s.registerTable("su.interference.persistent.G$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols, null, null, ixflag), null, false);
+                gtemp = new ResultSetImpl(s.registerTable("su.interference.persistent.G$" + UUID.randomUUID().toString().replace('-', '$'), null, s, rscols, null, null, ixflag), null, false);
                 final Table gtarget = ((ResultSetImpl)gtemp).getTarget();
                 //warning! use rscols set for both 1st table (ordered by group columns) and 2nd (group records)
                 //warning! use 2 tables with SAME value sets - use dc.getEntity(Table) method

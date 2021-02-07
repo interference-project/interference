@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -29,7 +29,6 @@ import org.slf4j.LoggerFactory;
 import su.interference.core.Config;
 import su.interference.core.Instance;
 import su.interference.exception.InternalException;
-import su.interference.persistent.Table;
 
 import javax.tools.*;
 import java.io.File;
@@ -37,7 +36,9 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URLClassLoader;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -196,6 +197,13 @@ public class IOTProxyFactory {
 
         final JavaCompiler jc = ToolProvider.getSystemJavaCompiler();
         final StandardJavaFileManager fm = jc.getStandardFileManager(null,null,null);
+        final Iterable cps = fm.getLocation(StandardLocation.CLASS_PATH);
+        final List<File> cps_ = new ArrayList<>();
+        for (Object o : cps) {
+            cps_.add((File) o);
+        }
+        cps_.add(new File(Config.getConfig().DB_PATH));
+        fm.setLocation(StandardLocation.CLASS_PATH, cps_);
         fm.setLocation(StandardLocation.CLASS_OUTPUT, Arrays.asList(new File(Config.getConfig().DB_PATH)));
 
         final SimpleJavaFileObject fo = new JavaSourceFromString(name, s.toString());

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -24,7 +24,6 @@
 
 package su.interference.persistent;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -75,37 +74,39 @@ public class Table implements ResultSet {
     @MapColumn
     @GeneratedValue
     @MgmtColumn(width=10, show=true, form=false, edit=false)
-    private int    objectId;
+    private int objectId;
     @Column
     @MapColumn
     @MgmtColumn(width=80, show=true, form=true, edit=false)
     @MgmtClassIdColumn
     private String name;
     @Column
-    private int    fileStart;
+    private int fileStart;
     @Column
-    private long   frameStart;
+    private long frameStart;
     @Column
     @MgmtColumn(width=10, show=true, form=false, edit=false)
-    private int    frameSize;
+    private int frameSize;
     @Column
-    private int    fileLast;
+    private int fileLast;
     @Column
-    private long   frameLast;
+    private long frameLast;
     @Column
     private AtomicLong frameAmount = new AtomicLong(0L);
     @Column
-    private long   ltran;
+    private long ltran;
     @Column
-    private int    parentId;
+    private int parentId;
     @Column
-    private int    idIncrement;
+    private int idIncrement;
     @Column
     private AtomicLong idValue;
     @Column
     private AtomicLong incValue;
     @Column
     private AtomicLong frameOrder;
+    @Column
+    private int proxy;
 
     @Transient
     private String simpleName;
@@ -599,7 +600,7 @@ public class Table implements ResultSet {
     }
 
     //constructor for SystemData - SystemFrame only
-    public Table(String name) throws ClassNotFoundException, NoSuchMethodException, SecurityException, MalformedURLException {
+    public Table(String name) throws ClassNotFoundException, NoSuchMethodException, SecurityException {
         this.setName(name);
         this.setFrameSize(DataFile.SYSTEM_FRAME_SIZE);
         this.lbs = new WaitFrame[Config.getConfig().FILES_AMOUNT];
@@ -619,18 +620,22 @@ public class Table implements ResultSet {
         this.generatedfield = getGeneratedField();
     }
 
-    public Table(String name, Class pclass) throws ClassNotFoundException, NoSuchMethodException, SecurityException, MalformedURLException {
+    public Table(String name, Class pclass) throws ClassNotFoundException, NoSuchMethodException, SecurityException {
         this.setName(name);
         this.lbs = new WaitFrame[Config.getConfig().FILES_AMOUNT];
         for (int i=0; i<Config.getConfig().FILES_AMOUNT; i++) {
             this.lbs[i] = new WaitFrame(null);
         }
-        this.indexes = new ArrayList<IndexField>();
-        this.maps = new ArrayList<MapField>();
+        this.indexes = new ArrayList<>();
+        this.maps = new ArrayList<>();
         try {
             this.genericClass = Class.forName(name);
         } catch (ClassNotFoundException e) {
-            this.genericClass = Instance.getUCL().loadClass(name);
+            try {
+                this.genericClass = Instance.getUCL().loadClass(name);
+            } catch (ClassNotFoundException e2) {
+                this.genericClass = pclass;
+            }
         }
         this.simpleName = genericClass.getSimpleName();
         SystemEntity ca = (SystemEntity)this.genericClass.getAnnotation(SystemEntity.class);
@@ -654,8 +659,8 @@ public class Table implements ResultSet {
         for (int i=0; i<Config.getConfig().FILES_AMOUNT; i++) {
             this.lbs[i] = new WaitFrame(null);
         }
-        this.indexes = new ArrayList<IndexField>();
-        this.maps = new ArrayList<MapField>();
+        this.indexes = new ArrayList<>();
+        this.maps = new ArrayList<>();
         try {
             this.genericClass = Class.forName(name);
         } catch (ClassNotFoundException e) {
@@ -685,8 +690,8 @@ public class Table implements ResultSet {
         for (int i=0; i<Config.getConfig().FILES_AMOUNT; i++) {
             this.lbs[i] = new WaitFrame(null);
         }
-        this.indexes = new ArrayList<IndexField>();
-        this.maps = new ArrayList<MapField>();
+        this.indexes = new ArrayList<>();
+        this.maps = new ArrayList<>();
         this.genericClass = Class.forName(name);
         this.simpleName = genericClass.getSimpleName();
         SystemEntity ca = (SystemEntity)this.genericClass.getAnnotation(SystemEntity.class);
@@ -704,11 +709,11 @@ public class Table implements ResultSet {
     }
 
     //constructor for inital system method
-    public Table(int id, String name) throws MalformedURLException, ClassNotFoundException, NoSuchMethodException, SecurityException {
+    public Table(int id, String name) throws ClassNotFoundException, NoSuchMethodException, SecurityException {
         this.objectId = id;
         this.name = name;
-        this.indexes  = new ArrayList<IndexField>();
-        this.maps = new ArrayList<MapField>();
+        this.indexes  = new ArrayList<>();
+        this.maps = new ArrayList<>();
         this.lbs = new WaitFrame[Config.getConfig().FILES_AMOUNT];
         this.genericClass = Class.forName(name);
         this.simpleName = genericClass.getSimpleName();
@@ -728,7 +733,7 @@ public class Table implements ResultSet {
     }
 
     //constructor for low-level storage function (initial first-time load table descriptions from datafile)
-    public Table (DataChunk chunk, IndexList ixl) throws IllegalAccessException, ClassNotFoundException, IOException, InternalException, NoSuchMethodException, SecurityException {
+    public Table (DataChunk chunk, IndexList ixl) throws IllegalAccessException, ClassNotFoundException, InternalException, NoSuchMethodException, SecurityException {
         final Object[] dcs = chunk.getDcs().getValueSet();
         final Class c = this.getClass();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
@@ -2293,5 +2298,13 @@ public class Table implements ResultSet {
 
     public void setIdIncrement(int idIncrement) {
         this.idIncrement = idIncrement;
+    }
+
+    public int getProxy() {
+        return proxy;
+    }
+
+    public void setProxy(int proxy) {
+        this.proxy = proxy;
     }
 }

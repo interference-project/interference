@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -109,6 +109,13 @@ public class Types {
     public static synchronized boolean isVarType (Field f) {
         String type = f.getType().getName();
         return isVarType(type);
+    }
+
+    public static synchronized boolean isObjType (Field f) {
+        return f.getType().getName().equals("java.lang.Object") || f.getType().getName().equals("su.interference.transport.TransportMessage") ||
+                f.getType().getName().equals("su.interference.transport.TransportEvent") || f.getType().getName().equals("su.interference.transport.TransportCallback") ||
+                f.getType().getName().equals("su.interference.transport.TransportCallback") || f.getType().getName().equals("su.interference.transport.EventResult") ||
+                f.getType().getName().equals("su.interference.sql.FrameApiJoin");
     }
 
     public static synchronized boolean isPrimitiveType (String type) {

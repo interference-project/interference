@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -48,8 +48,18 @@ public class TransportContext implements TransportApi {
     private final ConcurrentLinkedQueue<TransportEvent> mq = new ConcurrentLinkedQueue<>();
     private final ExecutorService pool = Executors.newFixedThreadPool(1);
     private final Map<String, TransportMessage> mmap = new ConcurrentHashMap<>();
+    private final int callbackPort;
+    private final TransportChannel clientChannel;
     private TransportServer transportServer;
+
     private TransportContext() {
+        this.clientChannel = null;
+        this.callbackPort = 0;
+    }
+
+    private TransportContext(TransportChannel clientChannel, int callbackPort) {
+        this.clientChannel = clientChannel;
+        this.callbackPort = callbackPort;
     }
 
     public void start() {
@@ -64,11 +74,15 @@ public class TransportContext implements TransportApi {
         }
     }
 
-    protected void startServer() {
-        transportServer = TransportServer.getInstance();
+    private void startServer() {
+        if (clientChannel != null && callbackPort > 0) {
+            transportServer = TransportServer.getInstance(callbackPort);
+        } else {
+            transportServer = TransportServer.getInstance();
+        }
     }
 
-    protected void startClient() {
+    private void startClient() {
         pool.submit(new Runnable() {
             @Override
             public void run() {
@@ -77,7 +91,8 @@ public class TransportContext implements TransportApi {
                 while (started_) {
                     final TransportEvent transportEvent = mq.peek();
                     if (transportEvent != null) {
-                        final TransportMessage transportMessage = new TransportMessage(TransportMessage.TRANSPORT_MESSAGE, Config.getConfig().LOCAL_NODE_ID, transportEvent, null);
+                        final TransportMessage transportMessage = new TransportMessage(TransportMessage.TRANSPORT_MESSAGE,
+                                transportEvent instanceof RemoteEvent ? 0 : Config.getConfig().LOCAL_NODE_ID, transportEvent, null);
                         mmap.put(transportMessage.getUuid(), transportMessage);
 
                         if (transportEvent.getChannelId() > 0) {
@@ -92,10 +107,13 @@ public class TransportContext implements TransportApi {
                                 }
                             }
                         } else {
-                            try {
-                                throw new InternalException();
-                            } catch(Exception e) {
-                                e.printStackTrace();
+                            if (clientChannel != null) {
+                                if (!clientChannel.isStarted()) {
+                                    logger.error("Client channel must be running");
+                                }
+                                clientChannel.send(transportMessage);
+                            } else {
+                                logger.error("No transport channel defined for message: "+transportMessage.getUuid());
                             }
                         }
 
@@ -119,7 +137,8 @@ public class TransportContext implements TransportApi {
     // process incoming events
     protected void onMessage(TransportMessage transportMessage, InetAddress inetAddress) throws InternalException {
         if (transportMessage.getType() == TransportMessage.HEARTBEAT_MESSAGE) {
-            TransportCallback transportCallback = new TransportCallback(Config.getConfig().LOCAL_NODE_ID, transportMessage.getUuid(), new EventResult(TransportCallback.SUCCESS, 0, null, null));
+            TransportCallback transportCallback = new TransportCallback(Config.getConfig().LOCAL_NODE_ID, transportMessage.getUuid(),
+                    new EventResult(TransportCallback.SUCCESS, null, 0, null, null, null));
             sendCallback(transportMessage.getSender(), new TransportMessage(TransportMessage.CALLBACK_MESSAGE, Config.getConfig().LOCAL_NODE_ID, null, transportCallback));
             logger.debug("heartbeat callback " + transportCallback.getMessageUUID() + " sent to node "+transportMessage.getSender());
         } else if (transportMessage.getType() == TransportMessage.CALLBACK_MESSAGE) {
@@ -130,7 +149,7 @@ public class TransportContext implements TransportApi {
             transportMessage.getTransportEvent().setCallbackNodeId(transportMessage.getSender());
             final EventResult result = transportMessage.getTransportEvent().process();
             TransportCallback transportCallback = new TransportCallback(Config.getConfig().LOCAL_NODE_ID, transportMessage.getUuid(), result);
-            sendCallback(transportMessage.getSender(), new TransportMessage(TransportMessage.CALLBACK_MESSAGE, Config.getConfig().LOCAL_NODE_ID, null, transportCallback));
+            sendCallback(transportMessage.getSender(), new TransportMessage(TransportMessage.CALLBACK_MESSAGE, Config.getConfig().LOCAL_NODE_ID, transportMessage.getTransportEvent(), transportCallback));
             logger.debug("callback sent with UUID: " + transportMessage.getUuid() + ", type = " + transportMessage.getTransportEvent().getClass()+", destination="+transportMessage.getSender());
         }
     }
@@ -138,6 +157,13 @@ public class TransportContext implements TransportApi {
     public static TransportContext getInstance() {
         if (transportContext == null) {
             transportContext = new TransportContext();
+        }
+        return transportContext;
+    }
+
+    protected static TransportContext getInstance(TransportChannel clientChannel, int callbackPort) {
+        if (transportContext == null) {
+            transportContext = new TransportContext(clientChannel, callbackPort);
         }
         return transportContext;
     }
@@ -152,7 +178,7 @@ public class TransportContext implements TransportApi {
     }
 
     private void sendCallback(int channelId, TransportMessage transportMessage) throws InternalException {
-        final TransportChannel channel = HeartBeatProcess.channels.get(channelId);
+        final TransportChannel channel = channelId == 0 ? transportMessage.getTransportCallback().getResult().getChannel() : HeartBeatProcess.channels.get(channelId);
         if (channel != null) {
             if (transportMessage.getType() == TransportMessage.CALLBACK_MESSAGE) {
                 channel.send(transportMessage);

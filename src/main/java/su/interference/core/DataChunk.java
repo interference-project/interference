@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -70,7 +70,9 @@ public class DataChunk implements Chunk {
     private UndoChunk uc;
     private FrameData uframe;
     private boolean terminate;
-    private final CustomSerializer sr = new CustomSerializer();
+    private boolean external;
+    private static final CustomSerializer sr = new CustomSerializer();
+    private static final CustomSerializer sr_ = new CustomSerializer(true);
 
     //returns datacolumn set
     public ValueSet getDcs() {
@@ -154,7 +156,7 @@ public class DataChunk implements Chunk {
                     if (Modifier.isPrivate(m)) {
                         cs[i].setAccessible(true);
                     }
-                    dcs.getValueSet()[i] = sr.deserialize(data, cs[i]);
+                    dcs.getValueSet()[i] = this.external ? sr_.deserialize(data, cs[i]) : sr.deserialize(data, cs[i]);
                     if (a != null) {
                         id = (Comparable) dcs.getValueSet()[i];
                     }
@@ -168,6 +170,16 @@ public class DataChunk implements Chunk {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public GenericObject getGenericObject() {
+        final ValueSet vs = getDcs();
+        final Field[] cs = t.getFields();
+        final Map<String, Object> vmap = new HashMap();
+        for (int i=0; i<cs.length; i++) {
+            vmap.put(cs[i].getName(), vs.getValueSet()[i]);
+        }
+        return new GenericObject(vmap);
     }
 
     public UndoChunk getUndoChunk() {
@@ -238,11 +250,11 @@ public class DataChunk implements Chunk {
                 if (t.isNoTran()) {
                     final Method z = t.getIdmethod();
                     id = (Comparable) z.invoke(entity, null);
-                    serializedId = sr.serialize(idf.getType().getName(), id);
+                    serializedId = this.external ? sr_.serialize(idf.getType().getName(), id) : sr.serialize(idf.getType().getName(), id);
                 } else {
                     final Method z = t.getIdmethod_();
                     id = (Comparable) z.invoke(entity, new Object[]{s});
-                    serializedId = sr.serialize(idf.getType().getName(), id);
+                    serializedId = this.external ? sr_.serialize(idf.getType().getName(), id) : sr.serialize(idf.getType().getName(), id);
                 }
             }
 
@@ -278,7 +290,7 @@ public class DataChunk implements Chunk {
         final ByteString res = new ByteString();
         final Field[] f = t.getFields();
         for (int i=0; i<f.length; i++) {
-            byte[] b = sr.serialize(f[i].getType().getName(), vs.getValueSet()[i]);
+            byte[] b = this.external ? sr_.serialize(f[i].getType().getName(), vs.getValueSet()[i]) : sr.serialize(f[i].getType().getName(), vs.getValueSet()[i]);
             if (b==null) { b = new byte[]{}; } //stub for reflection convert null fields to byte[] object in DataRecord
             if (Types.isVarType(f[i])) {
                 res.addBytesFromInt(b.length);
@@ -331,6 +343,15 @@ public class DataChunk implements Chunk {
         this(o, s, null, t);
     }
 
+    //serializer INSERT ONLY!!! (with generate Id value)
+    public DataChunk (Object o, Session s, Table t, boolean external) {
+        this.entity = o;
+        this.t = t;
+        this.state = NORMAL_STATE;
+        this.external = external;
+        this.header = new RowHeader(null, null, getChunk().length, false);
+    }
+
     //serializer INSERT ONLY!!! (with generate Id value) - rowid for index chunk
     public DataChunk (Object o, Session s, RowId r, Table t) {
         this.entity = o;
@@ -355,6 +376,15 @@ public class DataChunk implements Chunk {
         this.header = h;
         this.state = INIT_STATE;
         this.t = t;
+    }
+
+    //constructor ONLY for external client deserializer
+    public DataChunk (byte[] b, Table t, boolean external) {
+        this.chunk  = b;
+        this.t = t;
+        this.state = INIT_STATE;
+        this.external = external;
+        this.header = new RowHeader(null, null, getChunk().length, false);
     }
 
     public byte[] getChunk () {
@@ -543,6 +573,27 @@ public class DataChunk implements Chunk {
         return null;
     }
 
+    public Object getClientStandaloneEntity() {
+        try {
+            final ValueSet dcs = getDcs();
+            final Object o = t.getInstance(); //returns empty instance
+            final Field[] cs = t.getFields();
+            for (int i=0; i<cs.length; i++) {
+                final int m = cs[i].getModifiers();
+                if (Modifier.isPrivate(m)) {
+                    cs[i].setAccessible(true);
+                }
+                if (dcs.getValueSet()[i]!=null) {
+                    cs[i].set(o, dcs.getValueSet()[i]);
+                }
+            }
+            return o;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
     //for bootstrap system / not use table objects
     public Object getEntity (Class c, Object[] params) {
         SystemEntity ca = (SystemEntity)c.getAnnotation(SystemEntity.class);
@@ -665,7 +716,7 @@ public class DataChunk implements Chunk {
     private byte[] getBytes(Field f, Object o) throws IllegalAccessException, UnsupportedEncodingException, ClassNotFoundException, InternalException, InstantiationException {
         final String t = f.getType().getName();
         final Object fo = f.get(o);
-        return sr.serialize(t, fo);
+        return this.external ? sr_.serialize(t, fo) : sr.serialize(t, fo);
     }
 
     private int getLen(Field f, Object o) throws IllegalAccessException, UnsupportedEncodingException, ClassNotFoundException, InternalException, InstantiationException {

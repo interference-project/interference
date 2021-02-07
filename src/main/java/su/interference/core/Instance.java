@@ -47,8 +47,8 @@ import su.interference.transport.TransportContext;
 
 public class Instance implements Interference {
     
-    public static final String RELEASE = "2020.3";
-    public static final int SYSTEM_VERSION = 20201220;
+    public static final String RELEASE = "2021.1";
+    public static final int SYSTEM_VERSION = 20210201;
 
     public static final String DATA_FILE = "datafile";
     public static final String INDX_FILE = "indxfile";
@@ -384,7 +384,7 @@ public class Instance implements Interference {
             //checkInMemoryIndexes();
             logger.info("\n----------------------------------------------------------------------\n" +
                           "------------------------ interference started ------------------------\n" +
-                          "------------------ (c) head systems, ltd 2010-2020 -------------------\n" +
+                          "------------------ (c) head systems, ltd 2010-2021 -------------------\n" +
                           "--------------------------- release "+RELEASE+" ---------------------------\n" +
                           "----------------------------------------------------------------------");
         } else {

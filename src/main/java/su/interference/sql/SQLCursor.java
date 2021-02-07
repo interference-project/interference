@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -112,13 +112,13 @@ public class SQLCursor implements FrameIterator {
 
 //        if (cur.getType() == Cursor.SLAVE_TYPE && cur.getResultTargetNames() != null && this.id == 1) {
         if (cur.getType() == Cursor.SLAVE_TYPE && cur.getResultTargetNames() != null) {
-            target = new ResultSetImpl(cur.getSqlStmt().isEntityResult() ? cur.getSqlStmt().getEntityTable() : s.registerTable(cur.getResultTargetNames().get(id-1), s, rscols, null, null, ixflag && last), this, this.peristent);
+            target = new ResultSetImpl(cur.getSqlStmt().isEntityResult() ? cur.getSqlStmt().getEntityTable() : s.registerTable(cur.getResultTargetNames().get(id-1), null, s, rscols, null, null, ixflag && last), this, this.peristent);
         } else if (cur.getType() == Cursor.STREAM_TYPE) {
             final List<SQLColumn> rscols_ = getIOTCList();
-            final Table rstable = cur.getSqlStmt().isEntityResult() ? cur.getSqlStmt().getEntityTable() : s.registerTable("su.interference.persistent.R$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols_, null, null, ixflag && last);
+            final Table rstable = cur.getSqlStmt().isEntityResult() ? cur.getSqlStmt().getEntityTable() : s.registerTable("su.interference.persistent.R$" + UUID.randomUUID().toString().replace('-', '$'), null, s, rscols_, null, null, ixflag && last);
             target = new StreamQueue(rscols_, rstable, cur.getSqlStmt().getCols().getWindowColumn(), s);
         } else {
-            target = new ResultSetImpl(cur.getSqlStmt().isEntityResult() ? cur.getSqlStmt().getEntityTable() : s.registerTable("su.interference.persistent.R$" + UUID.randomUUID().toString().replace('-', '$'), s, rscols, null, null, ixflag && last), this, this.peristent);
+            target = new ResultSetImpl(cur.getSqlStmt().isEntityResult() ? cur.getSqlStmt().getEntityTable() : s.registerTable("su.interference.persistent.R$" + UUID.randomUUID().toString().replace('-', '$'), null, s, rscols, null, null, ixflag && last), this, this.peristent);
         }
         current = new FrameHolder(target);
 

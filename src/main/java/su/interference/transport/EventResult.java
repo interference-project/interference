@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -36,19 +36,36 @@ import java.util.List;
 
 public class EventResult implements Serializable {
     private final int result;
+    private final Object resultObject;
     private final long slaveCursorid;
     private final List<FrameApiJoin> resultSet;
+    private final transient TransportChannel channel;
     private final Exception exception;
 
-    public EventResult(int result, long slaveCursorid, List<FrameApiJoin> resultSet, Exception exception) {
+    public EventResult() {
+        this.result = 0;
+        this.resultObject = null;
+        this.slaveCursorid = 0;
+        this.resultSet = null;
+        this.exception = null;
+        this.channel = null;
+    }
+
+    public EventResult(int result, Object resultObject, long slaveCursorid, List<FrameApiJoin> resultSet, Exception exception, TransportChannel channel) {
         this.result = result;
+        this.resultObject = resultObject;
         this.slaveCursorid = slaveCursorid;
         this.resultSet = resultSet;
         this.exception = exception;
+        this.channel = channel;
     }
 
     public int getResult() {
         return result;
+    }
+
+    public Object getResultObject() {
+        return resultObject;
     }
 
     public long getSlaveCursorid() {
@@ -61,5 +78,9 @@ public class EventResult implements Serializable {
 
     public Exception getException() {
         return exception;
+    }
+
+    public TransportChannel getChannel() {
+        return channel;
     }
 }

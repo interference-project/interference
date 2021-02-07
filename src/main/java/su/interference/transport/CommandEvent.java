@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -63,17 +63,17 @@ public class CommandEvent extends TransportEventImpl implements PersistentEvent 
             if (t != null) {
                 t.commit(s, true);
             } else {
-                return new EventResult(TransportCallback.FAILURE, 0, null, new RuntimeException("transaction in null"));
+                return new EventResult(TransportCallback.FAILURE, null, 0, null, new RuntimeException("transaction in null"), null);
             }
         }
         if (command == ROLLBACK) {
             if (t != null) {
                 t.rollback(s, true);
             } else {
-                return new EventResult(TransportCallback.FAILURE, 0, null, new RuntimeException("transaction in null"));
+                return new EventResult(TransportCallback.FAILURE, null, 0, null, new RuntimeException("transaction in null"), null);
             }
         }
-        return new EventResult(TransportCallback.SUCCESS, 0, null, null);
+        return new EventResult(TransportCallback.SUCCESS, null, 0, null, null, null);
     }
 
     public long getId() {

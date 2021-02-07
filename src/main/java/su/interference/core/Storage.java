@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -26,7 +26,6 @@ package su.interference.core;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import su.interference.exception.EmptyFrameHeaderFound;
 import su.interference.exception.InternalException;
 import su.interference.exception.InvalidFrame;
 import su.interference.persistent.FrameData;
@@ -34,6 +33,7 @@ import su.interference.persistent.DataFile;
 import su.interference.persistent.Session;
 import su.interference.persistent.Table;
 import su.interference.proxy.POJOProxyFactory;
+import su.interference.proxy.SimplePOJOProxyFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -539,6 +539,7 @@ public class Storage {
         final IndexList ixl = bootstrapFrameLoad();
         final List<Object> bds = ixl.getObjectsByKey(Table.CLASS_ID);
         final POJOProxyFactory ppf = POJOProxyFactory.getInstance();
+        final SimplePOJOProxyFactory spf = SimplePOJOProxyFactory.getInstance();
 
         //Collections.sort(bds);
         final ConcurrentHashMap map1 = new ConcurrentHashMap();
@@ -562,7 +563,7 @@ public class Storage {
                     map1.put(td.getObjectId(), (DataChunk)c);
                     map2.put(td.getName(), (DataChunk)c);
                     final String tdname = td.getName();
-                    final Class pc = ppf.register(tdname);
+                    final Class pc = td.getProxy() == 1 ? spf.register(tdname) : ppf.register(tdname);
                     td.setSc(pc);
                     //if is not a SystemEntity (non-transactional)
                     if (pc!=null) {
