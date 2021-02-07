@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -30,19 +30,19 @@ import su.interference.core.MapField;
 import su.interference.core.*;
 import su.interference.exception.*;
 import su.interference.mgmt.MgmtColumn;
-import su.interference.proxy.IOTProxyFactory;
-import su.interference.proxy.POJOProxyFactory;
-import su.interference.proxy.RSProxyFactory;
+import su.interference.proxy.*;
 import su.interference.sql.ResultSet;
 import su.interference.sql.SQLColumn;
 import su.interference.sql.SQLCursor;
 import su.interference.sql.SQLSelect;
+import su.interference.transport.RemoteSession;
+import su.interference.transport.TransportChannel;
 
+import java.lang.reflect.Field;
 import java.util.*;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
-import java.net.MalformedURLException;
 import java.util.concurrent.*;
 import javax.persistence.*;
 
@@ -64,24 +64,24 @@ public class Session {
     @Column
     @IndexColumn
     @MgmtColumn(width=10, show=true, form=false, edit=false)
-    private long   sid;
+    private long sid;
     @Column
     @IndexColumn
     @MgmtColumn(width=10, show=true, form=true, edit=false)
     private String sessionId;
     @Column
     @MgmtColumn(width=10, show=true, form=false, edit=false)
-    private int    nodeId;
+    private int nodeId;
     @Column
     @MgmtColumn(width=10, show=true, form=false, edit=false)
-    private int    userId;
+    private int userId;
     @Column
     @MgmtColumn(width=10, show=true, form=false, edit=false)
-    private Date   dateStart;
+    private Date dateStart;
     @Column
-    private Date   dateEnd;
+    private Date dateEnd;
     @Column
-    private Date   dateLastAction;
+    private Date dateLastAction;
     @Column
     @MgmtColumn(width=10, show=true, form=false, edit=false)
     private String ipAddress;
@@ -107,6 +107,8 @@ public class Session {
 
     @Transient
     private static ThreadLocal<Session> contextSession = new ThreadLocal<Session>();
+    @Transient
+    private final TransportChannel sessionChannel;
 
     @Transient
     private static final ExecutorService rqpool = Executors.newCachedThreadPool();
@@ -116,6 +118,8 @@ public class Session {
     private static final ExecutorService streampool = Executors.newCachedThreadPool();
     @Transient
     private final Map<Long, Integer> streammap = new ConcurrentHashMap<>();
+    @Transient
+    private final Map<String, ResultSet> rss = new ConcurrentHashMap<>();
     @Transient
     private volatile boolean stream;
 
@@ -175,18 +179,30 @@ public class Session {
     }
 
     public Table registerTable (String n, Session s) throws Exception {
-        return registerTable (n, s, null, null, null, false);
+        return registerTable (n, null, s, null, null, null, false);
     }
 
     @SuppressWarnings("unchecked")
-    public Table registerTable (String n, Session s, List<SQLColumn> cols, java.lang.reflect.Field[] flds, Table pt, boolean ixflag) throws Exception {
+    public Table registerTable (String n, ClassContainer source, Session s, List<SQLColumn> cols, java.lang.reflect.Field[] flds, Table pt, boolean ixflag) throws Exception {
         final ClassLoader cl = this.getClass().getClassLoader();
         final POJOProxyFactory ppf = POJOProxyFactory.getInstance();
+        final SimplePOJOProxyFactory spf = SimplePOJOProxyFactory.getInstance();
         final RSProxyFactory rpf = RSProxyFactory.getInstance();
         final IOTProxyFactory ipf = IOTProxyFactory.getInstance();
 
-        if (cols==null&&flds==null) {
+        if (source == null && cols==null && flds==null) {
             Class c = cl.loadClass(n); //try load specific class
+        }
+
+        if (source != null) {
+            try {
+                Class c = cl.loadClass(n); //try load specific class
+                if (c != null) {
+                    throw new RuntimeException("external class already registered: "+c.getName());
+                }
+            } catch (ClassNotFoundException e) {
+                logger.debug("external class not found, ok");
+            }
         }
 
         final Table t = Instance.getInstance().getTableByName("su.interference.persistent.Table");
@@ -194,14 +210,18 @@ public class Session {
 
         if (w != null) {
             if (cols == null && flds == null) {
-                logger.info("register table rejected: table "+n+" already registered");
-                return w;
+                if (source != null) {
+                    throw new RuntimeException("external class already registered: "+ w.getName());
+                } else {
+                    logger.info("register table rejected: table " + n + " already registered");
+                    return w;
+                }
             } else {
                 throw new InternalException();
             }
         }
 
-        final Class proxy = cols==null&&flds==null?ppf.register(n):flds==null?rpf.register(cols,n,ixflag):ipf.register(flds,n,pt.getName());
+        final Class proxy = cols==null&&flds==null?source==null?ppf.register(n):spf.compile(source):flds==null?rpf.register(cols,n,ixflag):ipf.register(flds,n,pt.getSc().getName());
         final String sname = proxy==null?null:proxy.getName();
 
         boolean setlbs = true;
@@ -221,6 +241,7 @@ public class Session {
         w = (Table)t.newInstance(new Object[]{n, proxy==null?new String("x"):proxy});
         w.setFrameSize(framesize);
         w.setParentId(pt==null?0:pt.getObjectId());
+        w.setProxy(source == null ? 0 : 1);
         s.persist(w); //ident
 
         final LLT llt = LLT.getLLT();
@@ -245,7 +266,7 @@ public class Session {
         if (pt == null) {
             final IndexDescript[] idcs = w.getIndexNames();
             for (IndexDescript ids : idcs) {
-                registerTable(Table.SYSTEM_PKG_PREFIX + ids.getName(), s, null, ids.getFields(), w, false);
+                registerTable(Table.SYSTEM_PKG_PREFIX + ids.getName(), null, s, null, ids.getFields(), w, false);
             }
         }
 
@@ -259,6 +280,28 @@ public class Session {
         final Table t = Instance.getInstance().getTableByName(c.getName());
         try {
             return t.isNoTran() ? t.newInstance() : t.newInstance(this);
+        } catch (Exception e) {
+            logger.error("proxy instantiation fails", e);
+        }
+        return null;
+    }
+
+    public Object newEntity (Object o) {
+        final Table t = Instance.getInstance().getTableByName(o.getClass().getName());
+        try {
+            final Object entityContainer = t.isNoTran() ? t.newInstance() : t.newInstance(this);
+            final Field[] cs = t.getFields();
+            for (int i=0; i<cs.length; i++) {
+                Transient ta = cs[i].getAnnotation(Transient.class);
+                if (ta == null) {
+                    final int m = cs[i].getModifiers();
+                    if (Modifier.isPrivate(m)) {
+                        cs[i].setAccessible(true);
+                    }
+                    cs[i].set(entityContainer, cs[i].get(o));
+                }
+            }
+            return entityContainer;
         } catch (Exception e) {
             logger.error("proxy instantiation fails", e);
         }
@@ -281,7 +324,11 @@ public class Session {
     }
 
     public Object find (Class c, long id) throws Exception {
-        final Table t = Instance.getInstance().getTableByName(c.getName());
+        return find(c.getName(), id);
+    }
+
+    public Object find (String c, long id) throws Exception {
+        final Table t = Instance.getInstance().getTableByName(c);
         if (t != null) {
             this.startStatement();
             final DataChunk dc = t.getChunkById(id, this);
@@ -453,24 +500,34 @@ public class Session {
     }
 
     public Session () {
-        setSessionId(UUID.randomUUID().toString());
-        setUserId(0);
-        setDateStart(new Date());
+        this.sessionId = UUID.randomUUID().toString();
+        this.userId = 0;
+        this.dateStart = new Date();
+        this.sessionChannel = null;
+    }
+
+    public Session (TransportChannel channel) {
+        this.sessionId = UUID.randomUUID().toString();
+        this.userId = 0;
+        this.dateStart = new Date();
+        this.sessionChannel = channel;
     }
 
     public Session (String ipAddress) {
-        setSessionId(UUID.randomUUID().toString());
-        setUserId(0);
-        setDateStart(new Date());
-        setIpAddress(ipAddress);
+        this.sessionId = UUID.randomUUID().toString();
+        this.userId = 0;
+        this.dateStart = new Date();
+        this.ipAddress = ipAddress;
+        this.sessionChannel = null;
     }
 
     public Session (int user, int pass) {
-        setSessionId(UUID.randomUUID().toString());
-        setUserId(0);
-        setDateStart(new Date());
+        this.sessionId = UUID.randomUUID().toString();
+        this.userId = 0;
+        this.dateStart = new Date();
         this.user = user;
         this.pass = pass;
+        this.sessionChannel = null;
     }
 
     public static synchronized Session getSession () {
@@ -490,8 +547,19 @@ public class Session {
         return s;
     }
 
+    public static synchronized Session getSession (TransportChannel channel) throws Exception {
+        final Session s = new Session(channel);
+        s.persist(s);
+        return s;
+    }
+
+    public static synchronized RemoteSession getRemoteSession (String host, int port, String callbackHost, int callbackPort) throws InterruptedException {
+        return new RemoteSession(host, port, callbackHost, callbackPort);
+    }
+
     //constructor for low-level storage function (initial first-time load table descriptions from datafile)
-    public Session (DataChunk chunk) throws ClassNotFoundException, IllegalAccessException, InternalException, MalformedURLException {
+    public Session (DataChunk chunk) throws IllegalAccessException, InternalException {
+        this.sessionChannel = null;
         final Object[] dcs = chunk.getDcs().getValueSet();
         final Class c = this.getClass();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
@@ -608,11 +676,23 @@ public class Session {
         return streammap.get(f.getAllocFile()+f.getAllocPointer()) == null ? 0 : streammap.get(f.getAllocFile()+f.getAllocPointer());
     }
 
+    public void putResultSet(String uuid, ResultSet rs) {
+        rss.put(uuid, rs);
+    }
+
+    public ResultSet getResultSet(String uuid) {
+        return rss.get(uuid);
+    }
+
     public boolean isStream() {
         return stream;
     }
 
     public void setStream(boolean stream) {
         this.stream = stream;
+    }
+
+    public TransportChannel getSessionChannel() {
+        return sessionChannel;
     }
 }

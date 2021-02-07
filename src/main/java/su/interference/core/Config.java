@@ -119,7 +119,7 @@ public class Config {
     public final int CLEANUP_PROTECTION_THR = 1000;
     public final int IX_CLEANUP_PROTECTION_THR = 2000;
     public final int HEAP_USE_THR_DATA = 60;
-    public final int HEAP_USE_THR_INDX = 70;
+    public final int HEAP_USE_THR_INDX = 60;
     public final int HEAP_USE_THR_TEMP = 40;
     public final int HEAP_USE_THR_UNDO = 50;
 

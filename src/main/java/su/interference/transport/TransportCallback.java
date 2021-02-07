@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -38,6 +38,12 @@ public class TransportCallback implements Serializable {
     private final int nodeId;
     private final String messageUUID;
     private final EventResult result;
+
+    public TransportCallback() {
+        this.nodeId = 0;
+        this.messageUUID = null;
+        this.result = null;
+    }
 
     public TransportCallback(int nodeId, String messageUUID, EventResult result) {
         this.nodeId = nodeId;

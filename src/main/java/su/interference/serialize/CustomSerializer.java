@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -25,15 +25,14 @@
 package su.interference.serialize;
 
 import su.interference.api.SerializerApi;
-import su.interference.core.DataChunk;
-import su.interference.core.Instance;
-import su.interference.core.RowHeader;
-import su.interference.core.Types;
+import su.interference.core.*;
 import su.interference.exception.InternalException;
 import su.interference.persistent.Table;
 
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
 import java.nio.ByteBuffer;
 import java.text.ParseException;
@@ -51,17 +50,24 @@ import java.util.concurrent.atomic.AtomicLong;
 public class CustomSerializer implements SerializerApi {
 
     private byte[] b = new byte[]{};
+    private final boolean external;
 
     public CustomSerializer() {
+        this.external = false;
+    }
 
+    public CustomSerializer(boolean external) {
+        this.external = external;
     }
 
     public CustomSerializer(String t, Object o) throws IllegalAccessException, UnsupportedEncodingException, ClassNotFoundException, InternalException, InstantiationException {
         b = serialize(t, o);
+        this.external = false;
     }
 
     public CustomSerializer(byte[] b) {
         this.b = b;
+        this.external = false;
     }
 
     public byte[] getBytes() {
@@ -95,6 +101,22 @@ public class CustomSerializer implements SerializerApi {
                     return append(fo==null?new byte[]{0}:new byte[]{1}, append(getBytesFromInt(((DataChunk)fo).getT().getObjectId()),
                             append(getBytesFromInt(((DataChunk)fo).getHeader().getRowID().getFileId()), getBytesFromLong(((DataChunk)fo).getHeader().getRowID().getFramePointer())),
                             append(((DataChunk)fo).getHeader().getHeader(), ((DataChunk)fo).getChunk())));
+                case ("su.interference.transport.TransportMessage"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromObject(fo));
+                case ("su.interference.transport.TransportEvent"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromObject(fo));
+                case ("su.interference.transport.TransportCallback"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromObject(fo));
+                case ("su.interference.transport.EventResult"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromObject(fo));
+                case ("su.interference.sql.FrameApiJoin"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromObject(fo));
+                case ("java.lang.Class"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},fo==null?new byte[]{}:getBytesFromString(((Class) fo).getName()));
+                case ("java.lang.Exception"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},fo==null?new byte[]{}:getBytesFromString(((Exception) fo).getClass().getSimpleName()+": "+((Exception) fo).getMessage()));
+                case ("java.lang.Object"):
+                    return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromObject(fo));
             }
         } else {
             switch (t) {
@@ -117,6 +139,7 @@ public class CustomSerializer implements SerializerApi {
         return null;
     }
 
+    @Deprecated
     public int length (String t, Object fo) throws IllegalAccessException, UnsupportedEncodingException, ClassNotFoundException, InternalException, InstantiationException {
         if (!Types.isPrimitiveType(t)) {
             switch (t) {
@@ -157,13 +180,19 @@ public class CustomSerializer implements SerializerApi {
         return 0;
     }
 
-    public Object deserialize (byte[] b, Field f) throws UnsupportedEncodingException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
+    public Object deserialize (byte[] b, Field f) throws InvocationTargetException, NoSuchMethodException, UnsupportedEncodingException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
         final String t = f.getType().getName();
         final String g = f.getGenericType().toString();
-        return deserialize(b, t, g);
+        return deserialize(b, t, g, null);
     }
 
-    private Object deserialize (byte[] b, String t, String g) throws UnsupportedEncodingException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
+    public Object deserialize (byte[] b, Field f, String cn) throws InvocationTargetException, NoSuchMethodException, UnsupportedEncodingException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
+        final String t = f == null ? cn : f.getType().getName();
+        final String g = f == null ? cn : f.getGenericType().toString();
+        return deserialize(b, t, g, cn);
+    }
+
+    public Object deserialize (byte[] b, String t, String g, String cn) throws InvocationTargetException, NoSuchMethodException, UnsupportedEncodingException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
         if (!Types.isPrimitiveType(t)) {
             int isNull = getIntFromBytes(substring(b,0,1));
             if (isNull==0) {
@@ -199,6 +228,22 @@ public class CustomSerializer implements SerializerApi {
                     final int endpos = to.isIndex() ? 49 : 33;
                     final RowHeader h = new RowHeader(substring(b, 17, endpos), file, frame);
                     return new DataChunk(substring(b, endpos, b.length), to, h, null);
+                case ("su.interference.transport.TransportMessage"):
+                    return getObjectFromBytes(substring(b, 1, b.length), cn);
+                case ("su.interference.transport.TransportEvent"):
+                    return getObjectFromBytes(substring(b, 1, b.length), cn);
+                case ("su.interference.transport.TransportCallback"):
+                    return getObjectFromBytes(substring(b, 1, b.length), cn);
+                case ("su.interference.transport.EventResult"):
+                    return getObjectFromBytes(substring(b, 1, b.length), cn);
+                case ("su.interference.sql.FrameApiJoin"):
+                    return getObjectFromBytes(substring(b, 1, b.length), cn);
+                case ("java.lang.Class"):
+                    return Class.forName(getStringFromBytes(substring(b, 1, b.length)));
+                case ("java.lang.Exception"):
+                    return new RuntimeException(getStringFromBytes(substring(b, 1, b.length)));
+                case ("java.lang.Object"):
+                    return getObjectFromBytes(substring(b, 1, b.length), cn);
             }
         } else {
             switch (t) {
@@ -239,7 +284,7 @@ public class CustomSerializer implements SerializerApi {
                 case ("java.lang.Double"):
                     return Double.parseDouble(v);
                 case ("java.util.Date"):
-                    SimpleDateFormat df = new SimpleDateFormat(Instance.getInstance().getDateFormat());
+                    SimpleDateFormat df = new SimpleDateFormat(this.external ? Config.getConfig().DATEFORMAT : Instance.getInstance() == null ? Config.getConfig().DATEFORMAT : Instance.getInstance().getDateFormat());
                     return df.parse(v);
                 case ("java.lang.String"):
                     return v;
@@ -290,7 +335,7 @@ public class CustomSerializer implements SerializerApi {
     }
 
     private byte[] getBytesFromString (String p) throws UnsupportedEncodingException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException {
-        return p==null?new byte[]{}:p.getBytes(Instance.getInstance().getCodePage());
+        return p==null?new byte[]{}:p.getBytes(this.external ? Config.getConfig().CODEPAGE : Instance.getInstance() == null ? Config.getConfig().CODEPAGE : Instance.getInstance().getCodePage());
     }
 
     private byte[] getBytesFromArrayList (ArrayList p) throws UnsupportedEncodingException, IllegalAccessException, ClassNotFoundException, InternalException, InstantiationException {
@@ -352,11 +397,11 @@ public class CustomSerializer implements SerializerApi {
     }
 
     private String getStringFromBytes (byte[] b) throws UnsupportedEncodingException, ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException {
-        return new String(b,Instance.getInstance().getCodePage());
+        return new String(b, this.external ? Config.getConfig().CODEPAGE : Instance.getInstance() == null ? Config.getConfig().CODEPAGE : Instance.getInstance().getCodePage());
     }
 
     @SuppressWarnings("unchecked")
-    private ArrayList getArrayListFromBytes (byte[] b, String t) throws UnsupportedEncodingException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
+    private ArrayList getArrayListFromBytes (byte[] b, String t) throws InvocationTargetException, NoSuchMethodException, UnsupportedEncodingException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
         final ArrayList r = new ArrayList();
         if (b!=null) {
             if (b.length>0) {
@@ -371,7 +416,7 @@ public class CustomSerializer implements SerializerApi {
                     while (cnue) {
                         byte[] data = substring(b, s+v, s+v+(Types.isVarType(et)?getIntFromBytes(substring(b,s,s+v)):Types.getTypeLength(et,0)));
                         s = s + data.length + v;
-                        r.add(deserialize(data, et, et));
+                        r.add(deserialize(data, et, et, null));
                         if (s>=b.length) { cnue=false; }
                     }
                 }
@@ -384,6 +429,113 @@ public class CustomSerializer implements SerializerApi {
         final Date d = new Date();
         d.setTime(getLongFromBytes(b));
         return d;
+    }
+
+    private Object getObjectFromBytes(byte[] b, String t) throws InvocationTargetException, NoSuchMethodException, UnsupportedEncodingException, ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException, MalformedURLException {
+        final Class c = Class.forName(t);
+        final Field[] fields = c.getDeclaredFields();
+        if (t.equals("[B")) {
+            return b;
+        }
+        if (t.equals("java.lang.Integer")) {
+            return getIntFromBytes(b);
+        }
+        if (t.equals("java.lang.Long")) {
+            return getLongFromBytes(b);
+        }
+        if (t.equals("java.lang.String")) {
+            return new String(b,"UTF-8");
+        }
+        final Object o = c.getConstructor().newInstance();
+        final ByteString bs = new ByteString(b);
+        int s = 0;
+        for (int i = 0; i < fields.length; i++) {
+            final boolean obj = Types.isObjType(fields[i]);
+            final int v = Types.isVarType(fields[i]) ? 4 : 0;
+            final int m = fields[i].getModifiers();
+            if (!Modifier.isTransient(m) && !Modifier.isStatic(m)) {
+                if (obj) {
+                    String cn = null;
+                    final int l_ = bs.getIntFromBytes(bs.substring(s, s + 4));
+                    if (l_ == 0) {
+                        s = s + 4;
+                    } else {
+                        final byte[] data_ = bs.substring(s + 4, s + 4 + l_);
+                        cn = new String(data_, "UTF-8");
+                        s = s + data_.length + 4;
+                    }
+                    final byte[] data = bs.substring(s + 4, s + 4 + bs.getIntFromBytes(bs.substring(s, s + 4)));
+                    if (data.length > 0) {
+                        if (Modifier.isPrivate(m)) {
+                            fields[i].setAccessible(true);
+                        }
+                        fields[i].set(o, this.deserialize(data, fields[i], cn));
+                    }
+                    s = s + data.length + 4;
+                } else {
+                    final byte[] data = bs.substring(s + v, s + v + (Types.isVarType(fields[i]) ? bs.getIntFromBytes(bs.substring(s, s + v)) : Types.getLength(fields[i])));
+                    if (data.length > 0) {
+                        if (Modifier.isPrivate(m)) {
+                            fields[i].setAccessible(true);
+                        }
+                        fields[i].set(o, this.deserialize(data, fields[i]));
+                    }
+                    s = s + data.length + v;
+                }
+            }
+        }
+        return o;
+    }
+
+    private byte[] getBytesFromObject(Object o) throws ClassNotFoundException, InstantiationException, UnsupportedEncodingException, IllegalAccessException, InternalException {
+        if (o == null) {
+            return new byte[]{};
+        }
+        final String t = o.getClass().getName();
+        if (t.equals("[B")) {
+            return (byte[])o;
+        }
+        if (t.equals("java.lang.Integer")) {
+            return getBytesFromInt((int)o);
+        }
+        if (t.equals("java.lang.Long")) {
+            return getBytesFromLong((long)o);
+        }
+        if (t.equals("java.lang.String")) {
+            return ((String) o).getBytes("UTF-8");
+        }
+        final Field[] fields = o.getClass().getDeclaredFields();
+        final ByteString res = new ByteString();
+        for (int i = 0; i < fields.length; i++) {
+            final int m = fields[i].getModifiers();
+            if (!Modifier.isTransient(m) && !Modifier.isStatic(m)) {
+                byte[] b;
+                if (Modifier.isPrivate(m)) {
+                    fields[i].setAccessible(true);
+                }
+                final Object fo = fields[i].get(o);
+                b = this.serialize(fields[i].getType().getName(), fo);
+                if (b == null) {
+                    b = new byte[]{};
+                }
+                if (Types.isObjType(fields[i])) {
+                    if (fo == null) {
+                        res.addBytesFromInt(0);
+                    } else {
+                        final byte[] cn = fo.getClass().getName().getBytes("UTF-8");
+                        res.addBytesFromInt(cn.length);
+                        res.append(cn);
+                    }
+                }
+                if (Types.isVarType(fields[i])) {
+                    res.addBytesFromInt(b.length);
+                    res.append(b);
+                } else {
+                    res.append(b);
+                }
+            }
+        }
+        return res.getBytes();
     }
 
     private byte[] substring(byte[] b, int startPos, int endPos) {

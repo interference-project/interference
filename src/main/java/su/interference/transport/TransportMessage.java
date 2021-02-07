@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -24,7 +24,13 @@
 
 package su.interference.transport;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import su.interference.api.SerializerApi;
+import su.interference.serialize.CustomSerializer;
+
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.util.UUID;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
@@ -39,12 +45,15 @@ public class TransportMessage implements Serializable, Delayed {
     public static final int TRANSPORT_MESSAGE = 1;
     public static final int HEARTBEAT_MESSAGE = 2;
     public static final int CALLBACK_MESSAGE = 3;
+    private final static Logger logger = LoggerFactory.getLogger(TransportMessage.class);
+    private final static Field[] fields = TransportMessage.class.getDeclaredFields();
+    private final static SerializerApi sr = new CustomSerializer();
     private final int type;
     private final TransportEvent transportEvent;
     private final TransportCallback transportCallback;
     private final int sender;
     private final String uuid;
-    private TransportChannel sendChannel;
+    private transient TransportChannel sendChannel;
     private long delayTime;
 
     protected TransportMessage(int type, int sender, TransportEvent transportEvent, TransportCallback transportCallback) {
@@ -58,6 +67,14 @@ public class TransportMessage implements Serializable, Delayed {
         } else {
             this.uuid = transportCallback==null?null:transportCallback.getMessageUUID();
         }
+    }
+
+    public TransportMessage() {
+        this.type = 0;
+        this.sender = 0;
+        this.transportEvent = null;
+        this.transportCallback = null;
+        this.uuid = null;
     }
 
     @Override

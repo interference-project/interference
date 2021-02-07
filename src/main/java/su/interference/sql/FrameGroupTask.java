@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -30,7 +30,7 @@ import su.interference.core.DataChunk;
 import su.interference.persistent.Cursor;
 import su.interference.persistent.Session;
 import su.interference.persistent.Table;
-import su.interference.proxy.GenericResultImpl;
+import su.interference.core.GenericResultImpl;
 
 import java.util.Queue;
 
