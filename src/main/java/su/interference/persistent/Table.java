@@ -131,8 +131,6 @@ public class Table implements ResultSet {
     @Transient
     private final java.lang.reflect.Method idmethod;
     @Transient
-    private final java.lang.reflect.Method idmethod_;
-    @Transient
     private final String idfieldtype;
     @Transient
     private final String idfieldgetter;
@@ -280,7 +278,7 @@ public class Table implements ResultSet {
                 Thread.currentThread().setName("interference-retrieve-frames-thread-"+Thread.currentThread().getId());
                 try {
                     for (Object o : ixl.getObjectsByKey(id)) {
-                        q.put((FrameData) ((DataChunk) o).getEntity());
+                        q.put((FrameData) ((DataChunk) o).getEntity(s));
                     }
                     //terminate
                     q.put(new FrameData());
@@ -360,6 +358,11 @@ public class Table implements ResultSet {
         }
 
         return null;
+    }
+
+    public Object identEntity(Object o, Session s) throws Exception {
+        ident(o, s, null);
+        return o;
     }
 
     //used in DataChunk.getEntity
@@ -539,10 +542,6 @@ public class Table implements ResultSet {
         return idmethod;
     }
 
-    public Method getIdmethod_() {
-        return idmethod_;
-    }
-
     public String getIdFieldType() {
         return this.idfieldtype;
     }
@@ -613,8 +612,7 @@ public class Table implements ResultSet {
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
-        this.idmethod = getTableIdField() == null ? null : ca == null ? null : getTableClass().getMethod(idfieldgetter, null);
-        this.idmethod_ = getTableIdField() == null ? null : ca != null ? null : getTableClass().getMethod(idfieldgetter, new Class<?>[]{Session.class});
+        this.idmethod = getTableIdField() == null ? null : getTableClass().getMethod(idfieldgetter, null);
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
@@ -645,8 +643,7 @@ public class Table implements ResultSet {
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
-        this.idmethod = getTableIdField() == null ? null : ca == null ? null : getTableClass().getMethod(idfieldgetter, null);
-        this.idmethod_ = getTableIdField() == null ? null : ca != null ? null : getTableClass().getMethod(idfieldgetter, new Class<?>[]{Session.class});
+        this.idmethod = getTableIdField() == null ? null : getTableClass().getMethod(idfieldgetter, null);
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
@@ -674,8 +671,7 @@ public class Table implements ResultSet {
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
-        this.idmethod = getTableIdField() == null ? null : ca == null ? null : getTableClass().getMethod(idfieldgetter, null);
-        this.idmethod_ = getTableIdField() == null ? null : ca != null ? null : getTableClass().getMethod(idfieldgetter, new Class<?>[]{Session.class});
+        this.idmethod = getTableIdField() == null ? null : getTableClass().getMethod(idfieldgetter, null);
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
@@ -701,8 +697,7 @@ public class Table implements ResultSet {
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
-        this.idmethod = getTableIdField() == null ? null : ca == null ? null : getTableClass().getMethod(idfieldgetter, null);
-        this.idmethod_ = getTableIdField() == null ? null : ca != null ? null : getTableClass().getMethod(idfieldgetter, new Class<?>[]{Session.class});
+        this.idmethod = getTableIdField() == null ? null : getTableClass().getMethod(idfieldgetter, null);
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
@@ -724,8 +719,7 @@ public class Table implements ResultSet {
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
-        this.idmethod = getTableIdField() == null ? null : ca == null ? null : getTableClass().getMethod(idfieldgetter, null);
-        this.idmethod_ = getTableIdField() == null ? null : ca != null ? null : getTableClass().getMethod(idfieldgetter, new Class<?>[]{Session.class});
+        this.idmethod = getTableIdField() == null ? null : getTableClass().getMethod(idfieldgetter, null);
         this.generatedfield = getGeneratedField();
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
@@ -760,8 +754,7 @@ public class Table implements ResultSet {
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
-        this.idmethod = getTableIdField() == null ? null : sa == null ? null : getTableClass().getMethod(idfieldgetter, null);
-        this.idmethod_ = getTableIdField() == null ? null : sa != null ? null : getTableClass().getMethod(idfieldgetter, new Class<?>[]{Session.class});
+        this.idmethod = getTableIdField() == null ? null : getTableClass().getMethod(idfieldgetter, null);
         this.fields = getTableFields();
         this.fieldtypes = getTableFieldTypes();
         this.generatedfield = getGeneratedField();
@@ -1643,7 +1636,7 @@ public class Table implements ResultSet {
     public Object poll(Session s) {
         try {
             final RetrieveQueue rq = s.getContentQueue(this);
-            return rq.poll();
+            return rq.poll(s);
         } catch (Exception e) {
             e.printStackTrace();
         }

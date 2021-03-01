@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -103,10 +103,10 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
             if (f.getDataFile().isIndex() && cleanupIndxEnabled()) {
                 f.decreasePriority();
                 xall++;
-                if (f.getFrameType() == IndexFrame.INDEX_FRAME_NODE) {
+                if (f.isSynced() && f.getFrameType() == IndexFrame.INDEX_FRAME_NODE) {
                     xn++;
                 }
-                if (f.getFrameType() != IndexFrame.INDEX_FRAME_NODE && !f.isRbck() && frameAmount > Config.getConfig().IX_CLEANUP_PROTECTION_THR) {
+                if (f.isSynced() && f.getFrameType() != IndexFrame.INDEX_FRAME_NODE && !f.isRbck() && frameAmount > Config.getConfig().IX_CLEANUP_PROTECTION_THR) {
                     if (f.clearFrame()) {
                         x++;
                     }
@@ -116,7 +116,7 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
                 }
             }
             if (f.getDataFile().isTemp() && cleanupTempEnabled()) {
-                if (f.getFrameType() != IndexFrame.INDEX_FRAME_NODE && frameAmount > Config.getConfig().CLEANUP_PROTECTION_THR) {
+                if (f.isSynced() && f.getFrameType() != IndexFrame.INDEX_FRAME_NODE && frameAmount > Config.getConfig().CLEANUP_PROTECTION_THR) {
                     if (f.clearFrame()) {
                         i++;
                     }

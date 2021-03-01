@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -24,6 +24,7 @@
 
 package su.interference.core;
 
+import su.interference.persistent.Session;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
@@ -41,7 +42,7 @@ public class RetrieveQueue {
         this.r = r;
     }
 
-    public synchronized Object poll() {
+    public synchronized Object poll(Session s) {
         try {
             if (retrieve) {
                 Chunk c = q.take();
@@ -49,7 +50,7 @@ public class RetrieveQueue {
                     stop();
                     return null;
                 }
-                return c.getEntity();
+                return c.getEntity(s);
             }
         } catch (Exception e) {
             e.printStackTrace();

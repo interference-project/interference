@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -25,7 +25,6 @@
 package su.interference.sql;
 
 import su.interference.core.IndexDescript;
-import su.interference.persistent.Session;
 import su.interference.persistent.Table;
 import su.interference.exception.InternalException;
 
@@ -98,9 +97,9 @@ public class SQLColumn implements Comparable {
         this.cl = table.getTableClass();
         //todo MJ keys may be more than one
         this.keycl = table.getFirstIndexByColumnName(c.getName()) == null ? null : table.getFirstIndexByColumnName(c.getName()).getTableClass();
-        this.getter = this.cl.getMethod("get" + c.getName().substring(0, 1).toUpperCase() + c.getName().substring(1, c.getName().length()), cursor ? null : new Class<?>[]{Session.class});
-        this.aliasGetter = cursor ? this.cl.getMethod("get" + alias.substring(0, 1).toUpperCase() + alias.substring(1, alias.length()), cursor ? null : new Class<?>[]{Session.class}) : null;
-        this.keyGetter = this.keycl == null ? null : this.keycl.getMethod("get" + c.getName().substring(0, 1).toUpperCase() + c.getName().substring(1, c.getName().length()), cursor ? null : new Class<?>[]{Session.class});
+        this.getter = this.cl.getMethod("get" + c.getName().substring(0, 1).toUpperCase() + c.getName().substring(1, c.getName().length()), null);
+        this.aliasGetter = cursor ? this.cl.getMethod("get" + alias.substring(0, 1).toUpperCase() + alias.substring(1, alias.length()), null) : null;
+        this.keyGetter = this.keycl == null ? null : this.keycl.getMethod("get" + c.getName().substring(0, 1).toUpperCase() + c.getName().substring(1, c.getName().length()), null);
         this.objectId = table.getObjectId();
         this.id = columnid;
         this.column = c;

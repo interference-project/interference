@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -116,7 +116,7 @@ public class SQLIndexFrame implements FrameApi, Finder {
                 ArrayList<Object> res = new ArrayList<>();
                 for (Object o : vc.getValues()) {
                     for (Chunk c : t.getObjectsByKey(new ValueSet(o), s)) {
-                        res.add(c.getEntity());
+                        res.add(c.getEntity(s));
                     }
                 }
                 return res;
@@ -129,7 +129,7 @@ public class SQLIndexFrame implements FrameApi, Finder {
                         if (mcontent == null) {
                             mcontent = new ArrayList<>();
                             for (Chunk c : t.getContent(s)) {
-                                mcontent.add(c.getEntity());
+                                mcontent.add(c.getEntity(s));
                             }
                         }
                         return mcontent;
@@ -145,13 +145,13 @@ public class SQLIndexFrame implements FrameApi, Finder {
             if (rqueue == null) {
                 rqueue = s.getContentQueue(t);
             }
-            return rqueue.poll();
+            return rqueue.poll(s);
         } else {
             synchronized (this) {
                 if (mcontent == null) {
                     mcontent = new ArrayList<>();
                     for (Chunk c : t.getContent(s)) {
-                        mcontent.add(c.getEntity());
+                        mcontent.add(c.getEntity(s));
                     }
                 }
             }

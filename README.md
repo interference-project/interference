@@ -1,10 +1,10 @@
 # interference
 
 ##### java-based distributed database platform
-###### (c) 2010 - 2020 head systems, ltd
-###### current revision: release 2020.3
+###### (c) 2010 - 2021 head systems, ltd
+###### current revision: release 2021.1
 ###### for detailed information see:
-###### http://interference.su and doc/InterferenceManual.pdf
+###### http://io.digital and doc/InterferenceManual.pdf
 ###### contacts: info@inteference.su
 ##### https://github.com/interference-project/interference
 
@@ -39,7 +39,7 @@ local persistent layer of the application and runs in the same JVM
 with the application.
 
 To get started with interference, you need to download sources of 
-the current interference release (2020.3), build it and install it 
+the current interference release (2021.1), build it and install it 
 into your local maven repository (mvn install).
 include the interference.jar library in your project configuration. 
 For maven pom.xml, this might look like this:
@@ -49,7 +49,7 @@ For maven pom.xml, this might look like this:
     <dependency>
         <groupId>su.interference</groupId>
         <artifactId>interference</artifactId>
-        <version>2020.2</version>
+        <version>2021.1</version>
     </dependency>
     ...
 </dependencies>

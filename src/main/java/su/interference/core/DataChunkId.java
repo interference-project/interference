@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -65,15 +65,10 @@ public class DataChunkId {
     public DataChunkId (Object o, Table t, Session s) throws IOException, InvocationTargetException, InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         final Field idf = t.getIdField();
         if (idf != null) {
-            if (t.isNoTran()) {
-                final Method z = t.getIdmethod();
-                id = z.invoke(o, null);
-                idb = sr.serialize(idf.getType().getName(), id);
-            } else {
-                final Method z = t.getIdmethod_();
-                id = z.invoke(o, new Object[]{s});
-                idb = sr.serialize(idf.getType().getName(), id);
-            }
+            final Object o_ = t.isNoTran() ? o : ((EntityContainer) o).getEntity(s);
+            final Method z = t.getIdmethod();
+            id = z.invoke(o_, null);
+            idb = sr.serialize(idf.getType().getName(), id);
         }
     }
 

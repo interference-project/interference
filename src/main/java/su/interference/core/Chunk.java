@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -30,7 +30,6 @@ import su.interference.persistent.UndoChunk;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
-import java.net.MalformedURLException;
 
 /**
  * @author Yuriy Glotanov
@@ -48,6 +47,7 @@ public interface Chunk extends Comparable {
     boolean isTerminate();
     void setTerminate(boolean terminate);
     Object getEntity();
+    Object getEntity(Session s);
     Object getUndoEntity();
     void updateEntity(Object o) throws InternalException, IllegalAccessException;
     UndoChunk getUndoChunk();

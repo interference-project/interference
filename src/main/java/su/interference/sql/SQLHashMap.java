@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -66,8 +66,8 @@ public class SQLHashMap implements FrameIterator {
 
     @SuppressWarnings("unchecked")
     public Comparable getKeyValue(Class c, Object o, SQLColumn sqlc, Session s) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
-        Method y = c.getMethod("get"+sqlc.getColumn().getName().substring(0,1).toUpperCase()+sqlc.getColumn().getName().substring(1,sqlc.getColumn().getName().length()), new Class<?>[]{Session.class});
-        return (Comparable)y.invoke(o, new Object[]{s});
+        Method y = c.getMethod("get"+sqlc.getColumn().getName().substring(0,1).toUpperCase()+sqlc.getColumn().getName().substring(1,sqlc.getColumn().getName().length()), null);
+        return (Comparable)y.invoke(o, null);
     }
 
     public FrameApi nextFrame() throws Exception {
@@ -82,7 +82,7 @@ public class SQLHashMap implements FrameIterator {
                                 for (Object o : drs) {
                                     if (bd.getImpl() == FrameApi.IMPL_INDEX) {
                                         final IndexChunk ib1 = (IndexChunk) o;
-                                        o = ib1.getDataChunk().getEntity();
+                                        o = ib1.getDataChunk().getEntity(s);
                                     }
 
                                     hmap.put(getKeyValue(c, o, cmap, s), o);

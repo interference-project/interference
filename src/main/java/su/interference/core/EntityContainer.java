@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -24,6 +24,7 @@
 
 package su.interference.core;
 
+import su.interference.persistent.Session;
 import su.interference.persistent.Transaction;
 
 /**
@@ -34,6 +35,7 @@ import su.interference.persistent.Transaction;
 public interface EntityContainer {
 
     Transaction getTran();
+    Object getEntity(Session s);
     void setTran(Transaction tran);
     su.interference.core.RowId getRowId();
     void setRowId(su.interference.core.RowId r);

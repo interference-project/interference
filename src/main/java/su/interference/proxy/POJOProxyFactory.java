@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -122,6 +122,13 @@ public class POJOProxyFactory {
         sb.append("    public su.interference.core.DataChunk dc;\n");
         sb.append("    public boolean getReceived() { return received; }\n");
         sb.append("    public void setReceived(boolean received) { this.received = received; }\n");
+        sb.append("    public Object getEntity(su.interference.persistent.Session s) {\n");
+        sb.append("        if (s.isStream()||tran==null||(tran!=null&&tran.getTransType()>=su.interference.persistent.Transaction.TRAN_THR)||(tran!=null&&tran.getTransId() == s.getTransaction().getTransId())) {\n");
+        sb.append("            return this;\n");
+        sb.append("        } else {\n");
+        sb.append("            return dc.getUndoChunk().getDataChunk().getUndoEntity();\n");
+        sb.append("        }\n");
+        sb.append("    }\n");
         sb.append("    public Transaction getTran() { return tran; }\n");
         sb.append("    public void setTran(Transaction t) { tran = t; }\n");
         sb.append("    public su.interference.core.RowId getRowId() { return rowid; }\n");
@@ -209,19 +216,7 @@ public class POJOProxyFactory {
                     }
                 }
                 sb.append(" {\n");
-                if (sparam==null) {
-                    sb.append("    su.interference.persistent.Session session = su.interference.persistent.Session.getContextSession();\n");
-                } else {
-                    sb.append("    su.interference.persistent.Session session = null;\n");
-                    sb.append("    if (");
-                    sb.append(sparam);
-                    sb.append("==null) { session = su.interference.persistent.Session.getContextSession(); } else { session = ");
-                    sb.append(sparam);
-                    sb.append("; }\n");
-                }
-                sb.append("    if (session.isStream()||tran==null||(tran!=null&&tran.getTransType()>=su.interference.persistent.Transaction.TRAN_THR)||(tran!=null&&tran.getTransId() == ");
-                sb.append("session.getTransaction().getTransId())) {\n");
-                sb.append("        return super.get");
+                sb.append("    return super.get");
                 sb.append(f[i].getName().substring(0,1).toUpperCase());
                 sb.append(f[i].getName().substring(1,f[i].getName().length()));
                 sb.append("(");
@@ -233,25 +228,6 @@ public class POJOProxyFactory {
                     }
                 }
                 sb.append(");\n");
-                sb.append("    } else {\n");
-                sb.append("        ");
-                sb.append(name);
-                sb.append(" u = (");
-                sb.append(name);
-                sb.append(")dc.getUndoChunk().getDataChunk().getUndoEntity();\n ");
-                sb.append("        return u.get");
-                sb.append(f[i].getName().substring(0,1).toUpperCase());
-                sb.append(f[i].getName().substring(1,f[i].getName().length()));
-                sb.append("(");
-                if (pt!=null) {
-                    for (int k=0; k<pt.length; k++) {
-                        if (k>0) {sb.append(", "); }
-                        sb.append("p");
-                        sb.append(k);
-                    }
-                }
-                sb.append(");\n");
-                sb.append("    }\n");
                 sb.append("}\n");
 
                 //set method
@@ -291,16 +267,6 @@ public class POJOProxyFactory {
                     }
 
                     sb.append(" {\n");
-                    if (sparam==null) {
-                        sb.append("    su.interference.persistent.Session session = su.interference.persistent.Session.getContextSession();\n");
-                    } else {
-                        sb.append("    su.interference.persistent.Session session = null;\n");
-                        sb.append("    if (");
-                        sb.append(sparam);
-                        sb.append("==null) { session = su.interference.persistent.Session.getContextSession(); } else { session = ");
-                        sb.append(sparam);
-                        sb.append("; }\n");
-                    }
                     sb.append("    try {\n");
                     sb.append("        super.set");
                     sb.append(f[i].getName().substring(0,1).toUpperCase());

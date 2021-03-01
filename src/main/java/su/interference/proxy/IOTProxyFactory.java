@@ -112,6 +112,9 @@ public class IOTProxyFactory {
         sb.append("    }\n");
         sb.append("    public boolean getReceived() { return received; }\n");
         sb.append("    public void setReceived(boolean received) { this.received = received; }\n");
+        sb.append("    public Object getEntity(su.interference.persistent.Session s) {\n");
+        sb.append("        return this;\n");
+        sb.append("    }\n");
         sb.append("    public void setDataChunk(su.interference.core.DataChunk c) { dc = c; }\n");
         sb.append("    public Transaction getTran() { return tran; }\n");
         sb.append("    public void setTran(Transaction t) { tran = t; }\n");
@@ -142,7 +145,7 @@ public class IOTProxyFactory {
         sb.append(pname);
         sb.append(" o = (");
         sb.append(pname);
-        sb.append(")dc.getEntity();\n");
+        sb.append(")dc.getEntity(s);\n");
         for (int i=0; i<cs.length; i++) {
             Field f = cs[i];
             sb.append("        this.");
@@ -150,7 +153,7 @@ public class IOTProxyFactory {
             sb.append(" = o.get");
             sb.append(f.getName().substring(0,1).toUpperCase());
             sb.append(f.getName().substring(1,f.getName().length()));
-            sb.append("(s);\n");
+            sb.append("();\n");
         }
         sb.append("}\n");
         //simple constructor
@@ -167,7 +170,7 @@ public class IOTProxyFactory {
             sb.append(" get");
             sb.append(f.getName().substring(0,1).toUpperCase());
             sb.append(f.getName().substring(1,f.getName().length()));
-            sb.append("(su.interference.persistent.Session s) {\n");
+            sb.append("() {\n");
             sb.append("      return this.");
             sb.append(f.getName());
             sb.append(";\n");
@@ -180,7 +183,7 @@ public class IOTProxyFactory {
             sb.append(f.getType().getName());
             sb.append(" ");
             sb.append(f.getName());
-            sb.append(", su.interference.persistent.Session s) {\n");
+            sb.append(") {\n");
             sb.append("      this.");
             sb.append(f.getName());
             sb.append(" = ");
