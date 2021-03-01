@@ -72,7 +72,7 @@ public class FrameGroupTask implements Runnable {
                 if (o != null) {
                     final DataChunk gdc = sqlg.add(o.getDataChunk(s), gtable, s);
                     if (gdc != null) {
-                        Object oo = gdc.getEntity();
+                        Object oo = gdc.getEntity(s);
                         target.persist(oo, s);
                     }
 

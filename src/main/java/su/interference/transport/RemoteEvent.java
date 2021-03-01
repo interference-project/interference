@@ -32,6 +32,7 @@ import su.interference.core.Instance;
 import su.interference.exception.InternalException;
 import su.interference.persistent.Session;
 import su.interference.core.GenericResultImpl;
+import su.interference.persistent.Table;
 import su.interference.proxy.ClassContainer;
 import su.interference.sql.ResultSet;
 
@@ -98,9 +99,11 @@ public class RemoteEvent extends TransportEventImpl {
             Object resultObject = null;
             try {
                 if (this.type == REMOTE_PERSIST) {
-                    final DataChunk dc = new DataChunk((byte[]) this.source, Instance.getInstance().getTableByName(this.srcClass), false);
+                    final Table t = Instance.getInstance().getTableByName(this.srcClass);
+                    final DataChunk dc = new DataChunk((byte[]) this.source, t, false);
                     final Object o = dc.getEntity();
                     ((EntityContainer) o).setDataChunk(null);
+                    t.identEntity(o, s);
                     if (o != null) {
                         s.persist(o);
                     }

@@ -121,8 +121,8 @@ public class FrameJoinTask implements Callable<List<Object>> {
                                 if (ib2.getDataChunk() == null) {
                                     logger.error(bd2.getAllocId() + " " + bd2.getFrameId() + " found ib2chunk = null, drs2.size = " + drs2.size() + " p2 = " + p2);
                                 }
-                                final Object oo1 = ib1.getDataChunk() == null ? null : ib1.getDataChunk().getEntity();
-                                final Object oo2 = ib2.getDataChunk() == null ? null : ib2.getDataChunk().getEntity();
+                                final Object oo1 = ib1.getDataChunk() == null ? null : ib1.getDataChunk().getEntity(s);
+                                final Object oo2 = ib2.getDataChunk() == null ? null : ib2.getDataChunk().getEntity(s);
                                 j = joinDataRecords(r, c1, c2, t1, t2, oo1, oo2, cols, c1rs, s);
                                 if (hmap.skipCheckNC()) {
                                     res.add(j);
@@ -170,8 +170,8 @@ public class FrameJoinTask implements Callable<List<Object>> {
                                 if (ib2.getDataChunk() == null) {
                                     logger.error(bd2.getAllocId() + " " + bd2.getFrameId() + " right merge chunk is null");
                                 }
-                                final Object oo1 = ib1.getDataChunk() == null ? null : ib1.getDataChunk().getEntity();
-                                final Object oo2 = ib2.getDataChunk() == null ? null : ib2.getDataChunk().getEntity();
+                                final Object oo1 = ib1.getDataChunk() == null ? null : ib1.getDataChunk().getEntity(s);
+                                final Object oo2 = ib2.getDataChunk() == null ? null : ib2.getDataChunk().getEntity(s);
                                 Object j = joinDataRecords(r, c1, c2, t1, t2, oo1, oo2, cols, c1rs, s);
                                 if (hmap.skipCheckNC()) {
                                     res.add(j);
@@ -213,7 +213,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
             for (Object o1 : drs1) {
                 if (bd1.getImpl() == FrameApi.IMPL_INDEX) {
                     final IndexChunk ib1 = (IndexChunk) o1;
-                    o1 = ib1.getDataChunk().getEntity();
+                    o1 = ib1.getDataChunk().getEntity(s);
                 }
                 if (drs2 == null) {
                     //HashFrame returns null drs
@@ -238,8 +238,8 @@ public class FrameJoinTask implements Callable<List<Object>> {
                         //todo may cause wrong (cutted) resultsets in non-last cursors for (OR) conditions - see hashmap impl above
                         if (o2 != null) {
                             for (Object o2_ : o2) {
-                                final IndexChunk ib = (IndexChunk) ((DataChunk) o2_).getEntity();
-                                final Object oo2 = ib.getDataChunk().getEntity();
+                                final IndexChunk ib = (IndexChunk) ((DataChunk) o2_).getEntity(s);
+                                final Object oo2 = ib.getDataChunk().getEntity(s);
                                 final Object j = joinDataRecords(r, c1, c2, t1, t2, o1, oo2, cols, c1rs, s);
                                 if (hmap.skipCheckNC()) {
                                     res.add(j);
@@ -299,7 +299,7 @@ public class FrameJoinTask implements Callable<List<Object>> {
                     if (sqlc.getObjectId() == t2) {
                         final Method y = sqlc.getGetter();
                         final Method z = sqlc.getSetter(r);
-                        z.invoke(ret, new Object[]{y.invoke(o2, new Object[]{s})});
+                        z.invoke(ret, new Object[]{y.invoke(o2, null)});
                     }
                 }
             }
@@ -308,13 +308,13 @@ public class FrameJoinTask implements Callable<List<Object>> {
                 if (sqlc.getObjectId()==t1) {
                     final Method y = sqlc.getGetter();
                     final Method z = sqlc.getSetter(r);
-                    z.invoke(ret, new Object[]{y.invoke(o1, new Object[]{s})});
+                    z.invoke(ret, new Object[]{y.invoke(o1, null)});
                 }
                 if (c2 != null && o2 != null) {
                     if (sqlc.getObjectId() == t2) {
                         final Method y = sqlc.getGetter();
                         final Method z = sqlc.getSetter(r);
-                        z.invoke(ret, new Object[]{y.invoke(o2, new Object[]{s})});
+                        z.invoke(ret, new Object[]{y.invoke(o2, null)});
                     }
                 }
             }
@@ -325,12 +325,12 @@ public class FrameJoinTask implements Callable<List<Object>> {
 
     private Comparable getKeyValue(Object o, SQLColumn sqlc, Session s) throws InvocationTargetException, IllegalAccessException {
         final Method y = sqlc.getKeyGetter();
-        return sqlc.isCursor() ? (Comparable) y.invoke(o, null) : (Comparable) y.invoke(o, new Object[]{s});
+        return sqlc.isCursor() ? (Comparable) y.invoke(o, null) : (Comparable) y.invoke(o, null);
     }
 
     private Comparable getHashKeyValue(Class c, Object o, SQLColumn sqlc, Session s) throws InvocationTargetException, IllegalAccessException {
         final Method y = sqlc.getGetter();
-        return sqlc.isCursor() ? (Comparable) y.invoke(o, null) : (Comparable) y.invoke(o, new Object[]{s});
+        return sqlc.isCursor() ? (Comparable) y.invoke(o, null) : (Comparable) y.invoke(o, null);
     }
 
 }

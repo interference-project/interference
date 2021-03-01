@@ -332,7 +332,7 @@ public class Session {
         if (t != null) {
             this.startStatement();
             final DataChunk dc = t.getChunkById(id, this);
-            return dc == null ? null : dc.getStandaloneEntity();
+            return dc == null ? null : ((EntityContainer) dc.getStandaloneEntity()).getEntity(this);
         }
         return null;
     }
@@ -398,7 +398,7 @@ public class Session {
                         List<FrameData> frames = t.getStream(retrieved, s);
                         for (FrameData b : frames) {
                             for (Chunk c : b.getDataFrame().getChunks()) {
-                                Object o = c.getEntity();
+                                Object o = c.getEntity(s);
                                 task.call(o);
                             }
                             retrieved.put(b.getFrameId(), b.getAllocId());
@@ -416,7 +416,7 @@ public class Session {
     public Object nfind (Class c, long id) throws Exception {
         final Table t = Instance.getInstance().getTableByName(c.getName());
         if (t != null) {
-            return t.getChunkById(id, this).getEntity();
+            return t.getChunkById(id, this).getEntity(this);
         }
         return null;
     }

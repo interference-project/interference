@@ -163,7 +163,7 @@ public class SQLJoin {
                                 sqlg.add((DataChunk) c);
                             } else {                                          //c start next group
                                 DataChunk gdc = sqlg.getDC(gtarget, s);
-                                Object oo = gdc.getEntity();
+                                Object oo = gdc.getEntity(s);
                                 gtemp.persist(oo, s);
                                 sqlg = new SQLGroup((DataChunk) c, rscols);
                                 sqlg.add((DataChunk) c);
@@ -177,7 +177,7 @@ public class SQLJoin {
                 }
                 if (sqlg != null) {
                     DataChunk gdc = sqlg.getDC(((ResultSetImpl) gtemp).getTarget(), s);
-                    Object oo = gdc.getEntity();
+                    Object oo = gdc.getEntity(s);
 
                     gtemp.persist(oo, s);
 

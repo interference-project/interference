@@ -218,23 +218,13 @@ public class DataChunk implements Chunk {
                 for (int i = 0; i < f.length; i++) {
                     final Id a = f[i].getAnnotation(Id.class);
                     if (a != null) {
-                        if (sa != null) {
-                            id = (Comparable) f[i].get(entity);
-                        } else {
-                            Method z = c.getMethod("get" + f[i].getName().substring(0, 1).toUpperCase() + f[i].getName().substring(1, f[i].getName().length()), new Class<?>[]{Session.class});
-                            Object v = z.invoke(entity, new Object[]{s});
-                            id = (Comparable) v;
-                        }
+                        final Object entity_ = sa != null ? entity : getEntity(s);
+                        id = (Comparable) f[i].get(entity_);
                     }
                 }
             } else {
-                if (sa != null) {
-                    id = (Comparable) idfield.get(entity);
-                } else {
-                    Method z = c.getMethod("get" + idfield.getName().substring(0, 1).toUpperCase() + idfield.getName().substring(1, idfield.getName().length()), new Class<?>[]{Session.class});
-                    Object v = z.invoke(entity, new Object[]{s});
-                    id = (Comparable) v;
-                }
+                final Object entity_ = sa != null ? entity : getEntity(s);
+                id = (Comparable) idfield.get(entity_);
             }
         }
         return id;
@@ -247,15 +237,10 @@ public class DataChunk implements Chunk {
             }
             final Field idf = t.getIdField();
             if (idf != null) {
-                if (t.isNoTran()) {
-                    final Method z = t.getIdmethod();
-                    id = (Comparable) z.invoke(entity, null);
-                    serializedId = this.external ? sr_.serialize(idf.getType().getName(), id) : sr.serialize(idf.getType().getName(), id);
-                } else {
-                    final Method z = t.getIdmethod_();
-                    id = (Comparable) z.invoke(entity, new Object[]{s});
-                    serializedId = this.external ? sr_.serialize(idf.getType().getName(), id) : sr.serialize(idf.getType().getName(), id);
-                }
+                final Object entity_ = getEntity(s);
+                final Method z = t.getIdmethod();
+                id = (Comparable) z.invoke(entity_, null);
+                serializedId = this.external ? sr_.serialize(idf.getType().getName(), id) : sr.serialize(idf.getType().getName(), id);
             }
 
         }
@@ -500,6 +485,14 @@ public class DataChunk implements Chunk {
 
     public Object getExistingEntity() {
         return this.entity;
+    }
+
+    public Object getEntity(Session s) {
+        if (t.isNoTran()) {
+            return getEntity();
+        } else {
+            return ((EntityContainer) getEntity()).getEntity(s);
+        }
     }
 
     public synchronized Object getEntity () {
@@ -850,18 +843,13 @@ public class DataChunk implements Chunk {
     }
 
     public ValueSet getValueByColumnName(String[] columns, Session s) throws Exception {
-        final Object o = this.getEntity();
-        final Class c = o.getClass();
+        final Class c = this.getEntity().getClass();
         final SystemEntity sa = (SystemEntity)c.getAnnotation(SystemEntity.class);
+        final Object o = sa != null ? this.getEntity() : this.getEntity(s);
         final List<Object> res = new ArrayList<>();
         for (String name : columns) {
-            if (sa != null) {
-                final Method z = c.getMethod("get" + name.substring(0, 1).toUpperCase() + name.substring(1, name.length()), null);
-                res.add(z.invoke(o, null));
-            } else {
-                final Method z = c.getMethod("get" + name.substring(0, 1).toUpperCase() + name.substring(1, name.length()), new Class<?>[]{Session.class});
-                res.add(z.invoke(o, new Object[]{s}));
-            }
+            final Method z = c.getMethod("get" + name.substring(0, 1).toUpperCase() + name.substring(1, name.length()), null);
+            res.add(z.invoke(o, null));
         }
         return new ValueSet(res.toArray(new Object[]{}));
     }
