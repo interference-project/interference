@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -31,6 +31,8 @@ import java.util.StringTokenizer;
 import java.util.ArrayList;
 import java.lang.reflect.Field;
 
+import static su.interference.persistent.Table.SYSTEM_PKG_PREFIX;
+
 /**
  * @author Yuriy Glotanov
  * @since 1.0
@@ -38,11 +40,13 @@ import java.lang.reflect.Field;
 
 public class IndexDescript {
 
-    private final Table    t;
-    private final String   name;
+    private final Table t;
+    private final Table index;
+    private final String name;
+    private final String className;
     private final String[] columns;
-    private final Field[]  fields;
-    private final boolean  unique;
+    private final Field[] fields;
+    private final boolean unique;
 
     public IndexDescript(Table t, String name, String columns, boolean unique) throws InternalException {
         this.t = t;
@@ -67,6 +71,8 @@ public class IndexDescript {
         }
 
         this.name = name;
+        this.className = SYSTEM_PKG_PREFIX + name;
+        this.index = Instance.getInstance().getTableByName(this.className);
         this.columns = cs.toArray(new String[]{});
         this.fields = fs.toArray(new Field[]{});
         this.unique = unique;
@@ -86,6 +92,10 @@ public class IndexDescript {
 
     public Table getT() {
         return t;
+    }
+
+    public Table getIndex() {
+        return index;
     }
 
     public boolean isUnique() {

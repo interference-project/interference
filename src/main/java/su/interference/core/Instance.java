@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -39,6 +39,7 @@ import java.lang.reflect.InvocationTargetException;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
 import su.interference.transport.TransportContext;
+import su.interference.transport.TransportSyncTask;
 
 /**
  * @author Yuriy Glotanov
@@ -48,7 +49,7 @@ import su.interference.transport.TransportContext;
 public class Instance implements Interference {
     
     public static final String RELEASE = "2021.1";
-    public static final int SYSTEM_VERSION = 20210201;
+    public static final int SYSTEM_VERSION = 20210412;
 
     public static final String DATA_FILE = "datafile";
     public static final String INDX_FILE = "indxfile";
@@ -578,6 +579,19 @@ public class Instance implements Interference {
         return null;
     }
 
+    public FrameData getFrameByIdForUpdate (long id, LLT llt) {
+        final Table t = getTableByName("su.interference.persistent.FrameData");
+        final MapField ixf = t.getMapFieldByColumn("frameId");
+        final Map ixl = ixf.getMap();
+        final DataChunk dc = (DataChunk)ixl.get(id);
+        if (dc != null) {
+            final FrameData bd = (FrameData) dc.getEntity();
+            llt.add(bd);
+            return bd;
+        }
+        return null;
+    }
+
     public FrameData getFrameByAllocId (long id) {
         final Table t = getTableByName("su.interference.persistent.FrameData");
         final MapField ixf = t.getMapFieldByColumn("allocId");
@@ -647,42 +661,22 @@ public class Instance implements Interference {
         return (FreeFrame)dc.getEntity();
     }
 
-    @Deprecated
-    public ArrayList<FrameSync> getSyncFrames(int nodeId, int amount, boolean bulk) {
+    public ArrayList<FrameSync> getSyncFrames(int nodeId) {
         final Table t = getTableByName("su.interference.persistent.FrameSync");
         final ArrayList<FrameSync> r = new ArrayList<>();
-        for (Object o : t.getIndexFieldByColumn("nodeId").getIndex().getObjectsByKey(nodeId, amount)) {
-            r.add((FrameSync)((DataChunk)o).getEntity());
-        }
-        return r;
-    }
-
-    public ArrayList<FrameSync> getSyncFrames(int nodeId, int amount) {
-        final Table t = getTableByName("su.interference.persistent.FrameSync");
-        final ArrayList<FrameSync> r = new ArrayList<>();
-        for (Object o : t.getIndexFieldByColumn("syncId").getIndex().getContent(amount)) {
+        String uuid = null;
+        for (Object o : t.getIndexFieldByColumn("syncId").getIndex().getContent(TransportSyncTask.REMOTE_SYNC_DEFERRED_AMOUNT)) {
             final FrameSync fs = (FrameSync)((DataChunk)o).getEntity();
             if (fs.getNodeId() == nodeId) {
-                r.add(fs);
+                if (uuid == null) {
+                    uuid = fs.getSyncUUID();
+                    r.add(fs);
+                } else {
+                    if (uuid.equals(fs.getSyncUUID())) {
+                        r.add(fs);
+                    }
+                }
             }
-        }
-        return r;
-    }
-
-    public ArrayList<FrameSync> getSyncFramesByUUID(String UUID) {
-        final Table t = getTableByName("su.interference.persistent.FrameSync");
-        final ArrayList<FrameSync> r = new ArrayList<>();
-        for (Object o : t.getIndexFieldByColumn("syncUUID").getIndex().getObjectsByKey(UUID)) {
-            r.add((FrameSync)((DataChunk)o).getEntity());
-        }
-        return r;
-    }
-
-    public ArrayList<FrameSync> getSyncFramesById(long frameId) {
-        final Table t = getTableByName("su.interference.persistent.FrameSync");
-        final ArrayList<FrameSync> r = new ArrayList<>();
-        for (Object o : t.getIndexFieldByColumn("frameId").getIndex().getObjectsByKey(frameId)) {
-            r.add((FrameSync)((DataChunk)o).getEntity());
         }
         return r;
     }

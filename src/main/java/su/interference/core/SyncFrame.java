@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -117,12 +117,10 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
             lcId = 0;
             this.frameType = t.getName().equals("su.interference.persistent.UndoChunk") ? 99 : frame.getType();
         } else if (frame.getClass().getName().equals("su.interference.core.IndexFrame")) {
-            if (frame.getType()==0|| frame.getType()>2) {
+            if (frame.getType()==0 || frame.getType()>2) {
                 throw new InternalException();
             }
-            final int fileId = (int) frame.getPtr()%4096;
-            final long ptr = frame.getPtr() - frame.getPtr()%4096;
-            started = t.getFileStart() == fileId && t.getFrameStart() == ptr;
+            started = t.getFileStart() == frame.getFile() && t.getFrameStart() == frame.getPointer();
             final IndexFrame ib = (IndexFrame) frame;
             imap = allowR ? ib.getAllocateMap() : null;
             prevId = 0;
@@ -161,6 +159,14 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
         return allocId;
     }
 
+    public long getAllocFile() {
+        return this.allocId%4096;
+    }
+
+    public long getAllocPtr() {
+        return this.allocId - (this.allocId%4096);
+    }
+
     public int getFileType() {
         return fileType;
     }
@@ -169,8 +175,8 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
         return frameType;
     }
 
-    public int getFile() {
-        return (int)frameId%4096;
+    public long getFile() {
+        return frameId%4096;
     }
 
     public long getPointer() {

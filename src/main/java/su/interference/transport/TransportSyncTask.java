@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -43,7 +43,7 @@ import java.util.stream.Collectors;
 public class TransportSyncTask implements Runnable {
 
     private final static Logger logger = LoggerFactory.getLogger(TransportSyncTask.class);
-    private final static int REMOTE_SYNC_DEFERRED_AMOUNT = 10000;
+    public final static int REMOTE_SYNC_DEFERRED_AMOUNT = 10000;
     private final ArrayList<SyncFrame> frames;
     private final Session s;
 
@@ -62,13 +62,9 @@ public class TransportSyncTask implements Runnable {
             for (Map.Entry<Integer, TransportChannel> entry : HeartBeatProcess.channels.entrySet()) {
                 final TransportChannel channel = entry.getValue();
                 if (channel.isStarted() && channel.isConnected()) {
-                    final List<FrameSync> lbs_ = Instance.getInstance().getSyncFrames(channel.getChannelId(), REMOTE_SYNC_DEFERRED_AMOUNT);
-                    final String lbsUUID = lbs_.size() > 0 ? lbs_.get(0).getSyncUUID() : "NONE";
-                    if (lbs_.size() > 0) {
-                        logger.debug("retrieve first framesync: " + lbs_.get(0));
-                    }
-                    final List<FrameSync> lbs = lbs_.size() == 0 ? new ArrayList<>() : Instance.getInstance().getSyncFramesByUUID(lbs_.get(0).getSyncUUID());
+                    final List<FrameSync> lbs = Instance.getInstance().getSyncFrames(channel.getChannelId());
                     Collections.sort(lbs);
+                    String lbsUUID = lbs.size() == 0 ? "NONE" : lbs.get(0).getSyncUUID();
                     logger.info(lbs.size() + " persisted sync frame(s) found (node id = " + channel.getChannelId() + ", UUID = " + lbsUUID + ")");
                     final List<SyncFrame> psb = new ArrayList<>();
                     for (FrameSync bs : lbs) {

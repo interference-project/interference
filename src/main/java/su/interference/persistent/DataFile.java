@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -491,8 +491,10 @@ public class DataFile implements Serializable {
             logger.error("Wrong write frame operation with file = " + this.file + " ptr = " + ptr + ", internal file = " + file_ + " ptr = " + ptr_);
         }
 
-        this.file.seek(ptr);
-        this.file.write(b);
+        synchronized (this) {
+            this.file.seek(ptr);
+            this.file.write(b);
+        }
     }
 
     public void writeFrame(FrameData bd, final long ptr, final byte[] b, LLT llt, Session s) throws Exception {
@@ -508,6 +510,7 @@ public class DataFile implements Serializable {
         if (ptr != ptr_) {
             logger.error("Wrong write frame operation with file = " + this.file + " ptr = " + ptr + ", internal file = " + file_ + " ptr = " + ptr_);
         }
+
         synchronized (this) {
             this.file.seek(ptr);
             this.file.write(b);

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -80,9 +80,10 @@ public class FreeFrame implements Comparable, FilePartitioned {
 
     public FreeFrame(int objectId, long frame, int size) {
         this.objectId = objectId;
-        this.frameId  = frame;
-        this.size     = size;
-        this.fileId   = (int)frame%4096;
+        this.frameId = frame;
+        this.size = size;
+        final long file_ = frame%4096;
+        this.fileId = (int) file_;
     }
 
     public int compareTo(Object obj) {
@@ -123,11 +124,11 @@ public class FreeFrame implements Comparable, FilePartitioned {
     }
 
     public int getFile() {
-        return (int)this.frameId%4096;
+        return this.fileId;
     }
 
     public long getPtr() {
-        return this.frameId - (this.frameId%4096);
+        return this.frameId - this.fileId;
     }
 
     public long getFrameId() {

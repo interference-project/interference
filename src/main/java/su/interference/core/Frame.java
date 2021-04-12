@@ -1,7 +1,7 @@
 /**
 The MIT License (MIT)
 
-Copyright (c) 2010-2020 head systems, ltd
+Copyright (c) 2010-2021 head systems, ltd
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -123,14 +123,14 @@ public class Frame implements Comparable {
     }
 
     public Frame(FrameData bd, Table t) {
-        this.file         = bd.getFile();
-        this.pointer      = bd.getPtr();
-        this.allocFile    = (int)bd.getAllocId()%4096;
-        this.allocPointer = bd.getAllocId() - (bd.getAllocId()%4096);
-        this.rowCntr      = 1;
-        this.frameData    = bd;
-        this.dataObject   = t;
-        this.frameSize      = bd.getSize();
+        this.file = bd.getFile();
+        this.pointer = bd.getPtr();
+        this.allocFile = (int)bd.getAllocFile();
+        this.allocPointer = bd.getAllocPtr();
+        this.rowCntr = 1;
+        this.frameData  = bd;
+        this.dataObject = t;
+        this.frameSize = bd.getSize();
         if (this.frameSize<MIN_FRAME_SIZE) {
             throw new InternalException();
         }
@@ -486,6 +486,10 @@ public class Frame implements Comparable {
         return data.getByPtr(ptr) != null;
     }
 
+    public synchronized Chunk getChunkByPtr(int ptr) {
+        return data.getByPtr(ptr);
+    }
+
     public synchronized void removeChunk (int ptr, LLT llt, boolean ignore) {
         final long sync = LLT.getSyncId();
         final Chunk chunk = data.getByPtr(ptr);
@@ -563,6 +567,8 @@ public class Frame implements Comparable {
 
     public synchronized void rollbackTransaction(Transaction tran, ArrayList<FrameData> ubs, Session s) throws Exception {
         data.check();
+        final LLT llt = LLT.getLLT();
+        llt.add(this);
 
         //rollback inserted records
         final ArrayList<Integer> r = new ArrayList<>();
@@ -585,7 +591,7 @@ public class Frame implements Comparable {
                     final int ucfile = uc.getDataChunk().getHeader().getRowID().getFileId();
                     final long frameptr = uc.getDataChunk().getHeader().getRowID().getFramePointer();
                     if (uc.getTransId() == tran.getTransId() && ucfile == this.file && frameptr == this.pointer) {
-                        final DataChunk rc = uc.getDataChunk().restore(uc);
+                        final DataChunk rc = uc.getDataChunk().restore(uc, s, llt);
                         if (this instanceof IndexFrame && rc.getExistingEntity() != null) {
                             ((IndexChunk) rc.getExistingEntity()).setDataChunk(null);
                         }
@@ -594,8 +600,6 @@ public class Frame implements Comparable {
                 }
             }
         }
-        final LLT llt = LLT.getLLT();
-        llt.add(this);
         llt.commit();
     }
 

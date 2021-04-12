@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -127,6 +127,8 @@ public class IndexFrame extends Frame {
     @Override
     public synchronized void rollbackTransaction(Transaction tran, ArrayList<FrameData> ubs, Session s) throws Exception {
         data.check();
+        final LLT llt = LLT.getLLT();
+        llt.add(this);
         final Map<Integer, DataChunk> ucmap = new HashMap();
 
         if (ubs!=null) {
@@ -143,20 +145,29 @@ public class IndexFrame extends Frame {
         }
 
         //rollback modified index records
+        final ArrayList<Integer> r = new ArrayList<>();
         for (Chunk c : data.getChunks()) {
             if (c.getHeader().getTran().getTransId() == tran.getTransId()) {
                 final DataChunk dc = ucmap.get(c.getHeader().getPtr());
-                final DataChunk dc_ = ((IndexChunk) c.getEntity()).getDataChunk().getUndoChunk().getDataChunk();
-                ((DataChunk) c).setUndoChunk(null);
-                ((DataChunk) c).cleanUpIcs();
-                ((IndexChunk)c.getEntity()).setDataChunk(dc_);
-                ((IndexChunk)c.getEntity()).setFramePtrRowId(dc_.getHeader().getRowID());
-                ((DataChunk)c).getHeader().setFramePtr(dc_.getHeader().getRowID());
+                if (dc != null) {
+                    final DataChunk dc_ = ((IndexChunk) c.getEntity()).getDataChunk().getUndoChunk().getDataChunk();
+                    ((DataChunk) c).setUndoChunk(null);
+                    ((DataChunk) c).cleanUpIcs();
+                    ((IndexChunk) c.getEntity()).setDataChunk(dc_);
+                    ((IndexChunk) c.getEntity()).setFramePtrRowId(dc_.getHeader().getRowID());
+                    ((DataChunk) c).getHeader().setFramePtr(dc_.getHeader().getRowID());
+                    c.getHeader().setState(Header.RECORD_NORMAL_STATE);
+                } else {
+                    if (c.getHeader().getState() == Header.RECORD_NORMAL_STATE) {
+                        r.add(c.getHeader().getPtr());
+                    }
+                }
             }
         }
+        for (Integer i : r) {
+            data.removeByPtr(i);
+        }
 
-        final LLT llt = LLT.getLLT();
-        llt.add(this);
         llt.commit();
     }
 
@@ -445,7 +456,8 @@ public class IndexFrame extends Frame {
     }
 
     public synchronized void setLcId(long lcId) {
-        this.setRes05((int)lcId%4096);
-        this.setRes07(lcId - lcId%4096);
+        final long lcF = lcId%4096;
+        this.setRes05((int)lcF);
+        this.setRes07(lcId - lcF);
     }
 }

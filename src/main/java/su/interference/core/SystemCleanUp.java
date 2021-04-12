@@ -74,76 +74,77 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
         }
     }
 
-    private void cleanUpFrames() throws Exception {
-        Metrics.get("systemCleanUp").start();
-        int i = 0;
-        int d = 0;
-        int x = 0;
-        int xn = 0;
-        int xall = 0;
-        int u = 0;
-        int i_ = 0;
-        int d_ = 0;
-        int x_ = 0;
-        int u_ = 0;
-        for (Object entry : Instance.getInstance().getFramesMap().entrySet()) {
-            final FrameData f = (FrameData) ((DataChunk) ((Map.Entry) entry).getValue()).getEntity();
-            final long frameAmount = f.getDataObject().getFrameAmount();
-            if (f.getDataFile().isData() && cleanupDataEnabled()) {
-                f.decreasePriority();
-                if (f.isSynced() && f.getObjectId() > 999 && frameAmount > Config.getConfig().CLEANUP_PROTECTION_THR) {
-                    if (f.clearFrame()) {
-                        d++;
+    private void cleanUpFrames() {
+        synchronized (SyncQueue.synclock) {
+            Metrics.get("systemCleanUp").start();
+            int i = 0;
+            int d = 0;
+            int x = 0;
+            int xn = 0;
+            int xall = 0;
+            int u = 0;
+            int i_ = 0;
+            int d_ = 0;
+            int x_ = 0;
+            int u_ = 0;
+            for (Object entry : Instance.getInstance().getFramesMap().entrySet()) {
+                final FrameData f = (FrameData) ((DataChunk) ((Map.Entry) entry).getValue()).getEntity();
+                final long frameAmount = f.getDataObject().getFrameAmount();
+                if (f.getDataFile().isData() && cleanupDataEnabled()) {
+                    f.decreasePriority();
+                    if (f.isSynced() && f.getObjectId() > 999 && frameAmount > Config.getConfig().CLEANUP_PROTECTION_THR) {
+                        if (f.clearFrame()) {
+                            d++;
+                        }
+                    }
+                    if (f.isFrame()) {
+                        d_++;
                     }
                 }
-                if (f.isFrame()) {
-                    d_++;
-                }
-            }
-            if (f.getDataFile().isIndex() && cleanupIndxEnabled()) {
-                f.decreasePriority();
-                xall++;
-                if (f.isSynced() && f.getFrameType() == IndexFrame.INDEX_FRAME_NODE) {
-                    xn++;
-                }
-                if (f.isSynced() && f.getFrameType() != IndexFrame.INDEX_FRAME_NODE && !f.isRbck() && frameAmount > Config.getConfig().IX_CLEANUP_PROTECTION_THR) {
-                    if (f.clearFrame()) {
-                        x++;
+                if (f.getDataFile().isIndex() && cleanupIndxEnabled()) {
+                    f.decreasePriority();
+                    xall++;
+                    if (f.isSynced() && f.getFrameType() == IndexFrame.INDEX_FRAME_NODE) {
+                        xn++;
+                    }
+                    if (f.isSynced() && f.getFrameType() != IndexFrame.INDEX_FRAME_NODE && !f.isRbck() && frameAmount > Config.getConfig().IX_CLEANUP_PROTECTION_THR) {
+                        if (f.clearFrame()) {
+                            x++;
+                        }
+                    }
+                    if (f.isFrame()) {
+                        x_++;
                     }
                 }
-                if (f.isFrame()) {
-                    x_++;
-                }
-            }
-            if (f.getDataFile().isTemp() && cleanupTempEnabled()) {
-                if (f.isSynced() && f.getFrameType() != IndexFrame.INDEX_FRAME_NODE && frameAmount > Config.getConfig().CLEANUP_PROTECTION_THR) {
-                    if (f.clearFrame()) {
-                        i++;
+                if (f.getDataFile().isTemp() && cleanupTempEnabled()) {
+                    if (f.isSynced() && f.getFrameType() != IndexFrame.INDEX_FRAME_NODE && frameAmount > Config.getConfig().CLEANUP_PROTECTION_THR) {
+                        if (f.clearFrame()) {
+                            i++;
+                        }
+                    }
+                    if (f.isFrame()) {
+                        i_++;
                     }
                 }
-                if (f.isFrame()) {
-                    i_++;
-                }
-            }
-            if (f.getDataFile().isUndo() && cleanupUndoEnabled()) {
-                if (f.isSynced() && frameAmount > Config.getConfig().CLEANUP_PROTECTION_THR) {
-                    if (f.clearFrame()) {
-                        u++;
+                if (f.getDataFile().isUndo() && cleanupUndoEnabled()) {
+                    if (f.isSynced() && frameAmount > Config.getConfig().CLEANUP_PROTECTION_THR) {
+                        if (f.clearFrame()) {
+                            u++;
+                        }
+                    }
+                    if (f.isFrame()) {
+                        u_++;
                     }
                 }
-                if (f.isFrame()) {
-                    u_++;
-                }
             }
+            Metrics.get("сleanUpDataFrames").put(d);
+            Metrics.get("сleanUpIndexFrames").put(x);
+            Metrics.get("сleanUpUndoFrames").put(u);
+            Metrics.get("imDataFrames").put(d_);
+            Metrics.get("imIndexFrames").put(x_);
+            Metrics.get("imUndoFrames").put(u_);
+            Metrics.get("systemCleanUp").stop();
         }
-        Metrics.get("сleanUpDataFrames").put(d);
-        Metrics.get("сleanUpIndexFrames").put(x);
-        Metrics.get("сleanUpUndoFrames").put(u);
-        Metrics.get("imDataFrames").put(d_);
-        Metrics.get("imIndexFrames").put(x_);
-        Metrics.get("imUndoFrames").put(u_);
-        Metrics.get("systemCleanUp").stop();
-
     }
 
     public static void forceCleanUp() {

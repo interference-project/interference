@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -49,77 +49,80 @@ public class SyncQueue implements Runnable, ManagedProcess {
     private final ExecutorService pool2 = Executors.newFixedThreadPool(1);
     CountDownLatch latch;
     private final static Logger logger = LoggerFactory.getLogger(SyncQueue.class);
+    protected final static Object synclock = new Object();
 
     public SyncQueue() {
     }
 
     private synchronized boolean syncFramesFromQueue() throws Exception {
-        if (running) {
-            return false;
-        }
-        running = true;
-        final LLT llt = LLT.getLLTAndLock();
-        final int famt = Storage.getStorage().getFiles()==null?0:Storage.getStorage().getFiles().size();
-        logger.debug("sync procedure was started with frames amount=" + LLT.getFrames().size());
+        synchronized (synclock) {
+            if (running) {
+                return false;
+            }
+            running = true;
+            final LLT llt = LLT.getLLTAndLock();
+            final int famt = Storage.getStorage().getFiles() == null ? 0 : Storage.getStorage().getFiles().size();
+            logger.debug("sync procedure was started with frames amount=" + LLT.getFrames().size());
 
-        final ArrayList<SyncFrame> frames = new ArrayList<>();
-        final Map<Integer, List<FrameApi>> frames_ = new HashMap<>();
-        final ArrayList<FreeFrame> fframes = new ArrayList<>();
-        final Session s = Session.getDntmSession();
+            final ArrayList<SyncFrame> frames = new ArrayList<>();
+            final Map<Integer, List<FrameApi>> frames_ = new HashMap<>();
+            final ArrayList<FreeFrame> fframes = new ArrayList<>();
+            final Session s = Session.getDntmSession();
 
-        for (Map.Entry<Long, Frame> entry : LLT.getFrames().entrySet()) {
-            FreeFrame fb = null;
-            try {
-                final Frame f = entry.getValue();
-                frames.add(new SyncFrame(f, s, fb));
-                if (f.isLocal()) {
-                    if (frames_.get(f.getObjectId()) == null) {
-                        frames_.put(f.getObjectId(), new ArrayList<>());
+            for (Map.Entry<Long, FrameData> entry : LLT.getFrames().entrySet()) {
+                FreeFrame fb = null;
+                try {
+                    final Frame f = entry.getValue().getFrame();
+                    frames.add(new SyncFrame(f, s, fb));
+                    if (f.isLocal()) {
+                        if (frames_.get(f.getObjectId()) == null) {
+                            frames_.put(f.getObjectId(), new ArrayList<>());
+                        }
+                        frames_.get(f.getObjectId()).add(f.getFrameData());
                     }
-                    frames_.get(f.getObjectId()).add(f.getFrameData());
+                } catch (MissingSyncFrameException e) {
+                    logger.debug("Unable to sync frame " + ((FrameData) entry.getValue()).getPtr() + " because removed by freeing");
                 }
-            } catch (MissingSyncFrameException e) {
-                logger.debug("Unable to sync frame "+((Frame) entry.getValue()).getPtr()+" because removed by freeing");
-            }
-            if (fb!=null) {
-                fframes.add(fb);
-            }
-        }
-
-        for (Map.Entry<Integer, List<FrameApi>> entry: frames_.entrySet()) {
-            SQLCursor.addStreamFrame(new ContainerFrame(entry.getKey(), entry.getValue()));
-        }
-
-        SyncTask[] tasklist = new SyncTask[famt];
-
-        int cnt = 0;
-        for (Map.Entry e : Storage.getStorage().getFiles().entrySet()) {
-            tasklist[cnt] = new SyncTask((DataFile)e.getValue());
-            cnt++;
-        }
-
-        for (SyncTask task : tasklist) {
-            for (SyncFrame bd : frames) {
-                if (task.getDataFile().getFileId()==bd.getFile()) {
-                    task.add(bd);
+                if (fb != null) {
+                    fframes.add(fb);
                 }
             }
-        }
 
-        long t1 = System.currentTimeMillis();
-        pool.invokeAll(Arrays.asList(tasklist));
-        long t2 = System.currentTimeMillis();
-        logger.info("sync procedure was completed in "+(t2-t1)+"ms");
-        llt.commit();
-        Storage.getStorage().clearJournal();
-        for (FreeFrame fb : fframes) {
-            s.persist(fb);
-        }
-        //todo async process must depends from stop() method
-        pool2.submit(new TransportSyncTask(frames));
+            for (Map.Entry<Integer, List<FrameApi>> entry : frames_.entrySet()) {
+                SQLCursor.addStreamFrame(new ContainerFrame(entry.getKey(), entry.getValue()));
+            }
 
-        running = false;
-        return true;
+            SyncTask[] tasklist = new SyncTask[famt];
+
+            int cnt = 0;
+            for (Map.Entry e : Storage.getStorage().getFiles().entrySet()) {
+                tasklist[cnt] = new SyncTask((DataFile) e.getValue());
+                cnt++;
+            }
+
+            for (SyncTask task : tasklist) {
+                for (SyncFrame bd : frames) {
+                    if (task.getDataFile().getFileId() == (int) bd.getFile()) {
+                        task.add(bd);
+                    }
+                }
+            }
+
+            long t1 = System.currentTimeMillis();
+            pool.invokeAll(Arrays.asList(tasklist));
+            long t2 = System.currentTimeMillis();
+            logger.info("sync procedure was completed in " + (t2 - t1) + "ms");
+            llt.commit();
+            Storage.getStorage().clearJournal();
+            for (FreeFrame fb : fframes) {
+                s.persist(fb);
+            }
+            //todo async process must depends from stop() method
+            pool2.submit(new TransportSyncTask(frames));
+
+            running = false;
+            return true;
+        }
     }
 
     public void commit() throws Exception {
