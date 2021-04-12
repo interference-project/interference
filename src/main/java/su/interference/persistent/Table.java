@@ -1036,7 +1036,7 @@ public class Table implements ResultSet {
             try {
                 if (persist) {
                     final Table t = Instance.getInstance().getTableByName(FrameData.class.getName());
-                    final DataChunk dc = t.getChunkByEntity(bd, s);
+                    final DataChunk dc = t.getChunkByEntity(bd, s, llt);
                     final FrameData bd_ = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId() + dc.getHeader().getRowID().getFramePointer());
                     bd_.updateChunk(dc, bd, s, llt);
                 }
@@ -1120,7 +1120,7 @@ public class Table implements ResultSet {
             }
 
             Metrics.get("persistGetChunk").start();
-            final DataChunk dc = isIdFieldNoCheck() ? null : this.getChunkByEntity(o, s);
+            final DataChunk dc = isIdFieldNoCheck() ? null : this.getChunkByEntity(o, s, null);
             Metrics.get("persistGetChunk").stop();
 
             if (dc == null) {
@@ -1217,7 +1217,7 @@ public class Table implements ResultSet {
                     }
 
                     Metrics.get("persistGetChunk").start();
-                    final DataChunk dc = isIdFieldNoCheck() ? null : this.getChunkByEntity(o, s);
+                    final DataChunk dc = isIdFieldNoCheck() ? null : this.getChunkByEntity(o, s, llt);
                     Metrics.get("persistGetChunk").stop();
 
                     if (dc == null) {
@@ -1262,7 +1262,7 @@ public class Table implements ResultSet {
                         final int diff = newlen - len - bd.getFrameFree();
 
                         if (diff > 0) {
-                            lockIndexes(dc, s, llt);
+                            final List<DataChunk> ics = lockIndexes(dc, s, llt);
                             bd.removeChunk(dc.getHeader().getRowID().getRowPointer(), s, llt);
                             final WaitFrame ibw = getAvailableFrame(o, fpart);
                             final FrameData ib = ibw.getBd();
@@ -1279,7 +1279,7 @@ public class Table implements ResultSet {
                                 s.getTransaction().storeFrame(ib, udc == null ? null : udc.getUframe(), newlen, s, llt);
                                 s.getTransaction().storeFrame(ib, newlen, s, llt);
                             }
-                            updateIndexesPtr(dc, s, llt);
+                            updateIndexesPtr(ics, dc);
                             //update rowid
                             ((EntityContainer) o).setRowId(dc.getHeader().getRowID());
                             dc.getUndoChunk().setFile(dc.getHeader().getRowID().getFileId());
@@ -1324,7 +1324,8 @@ public class Table implements ResultSet {
             }
         }
 
-        final DataChunk dc = this.getChunkByEntity(o, s);
+        final LLT llt = extllt==null?LLT.getLLT():extllt;
+        final DataChunk dc = this.getChunkByEntity(o, s, llt);
         if (dc == null) {
             throw new CannotAccessToDeletedRecord();
         }
@@ -1333,7 +1334,6 @@ public class Table implements ResultSet {
         }
         final int len = dc.getBytesAmount();
         final FrameData bd = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId()+dc.getHeader().getRowID().getFramePointer());
-        final LLT llt = extllt==null?LLT.getLLT():extllt;
 
         DataChunk udc = null;
 
@@ -1395,21 +1395,19 @@ public class Table implements ResultSet {
         }
     }
 
-    private void lockIndexes(DataChunk dc, Session s, LLT llt) throws Exception {
+    private List<DataChunk> lockIndexes(DataChunk dc, Session s, LLT llt) throws Exception {
+        final List<DataChunk> res = new ArrayList<>();
         for (IndexDescript ids : this.getIndexNames()) {
-            final DataChunk ic = dc.getIc(ids, s);
-            final int iclen = ic.getBytesAmount();
-            final FrameData ibd = Instance.getInstance().getFrameById(ic.getHeader().getRowID().getFileId() + ic.getHeader().getRowID().getFramePointer());
+            final DataChunk ic = dc.getIcForUpdate(ids, s, llt);
             final DataChunk udc = ic.lock(s, llt);
-            s.getTransaction().storeFrame(ibd, udc == null ? null : udc.getUframe(),0 - iclen, s, llt);
+            s.getTransaction().storeFrame(ic.getFrameData(), udc == null ? null : udc.getUframe(),0 - ic.getBytesAmount(), s, llt);
+            res.add(ic);
         }
+        return res;
     }
 
-    private void updateIndexesPtr(DataChunk dc, Session s, LLT llt) throws Exception {
-        for (IndexDescript ids : this.getIndexNames()) {
-            final DataChunk ic = dc.getIc(ids, s);
-            final FrameData xf = Instance.getInstance().getFrameById(ic.getHeader().getRowID().getFileId() + ic.getHeader().getRowID().getFramePointer());
-            llt.add(xf.getFrame());
+    private void updateIndexesPtr(List<DataChunk> ics, DataChunk dc) {
+        for (DataChunk ic : ics) {
             final IndexChunk ic_ = (IndexChunk) ic.getEntity();
             ic_.setFramePtrRowId(dc.getHeader().getRowID());
             ic_.setDataChunk(dc);
@@ -1674,7 +1672,7 @@ public class Table implements ResultSet {
         return r;
     }
 
-    public DataChunk getChunkByEntity (Object o, Session s) throws Exception {
+    public DataChunk getChunkByEntity (Object o, Session s, LLT llt) throws Exception {
         final Class c = o.getClass();
         final ResultSetEntity ca = (ResultSetEntity)c.getAnnotation(ResultSetEntity.class);
         if (ca!=null) { //ResultSet entities ALWAYS insert only, then, no neccessary for find datachunk
@@ -1689,9 +1687,13 @@ public class Table implements ResultSet {
             final MapField mf = this.getMapFieldByColumn(idf.getName());
             final IndexField ix = this.getIndexFieldByColumn(idf.getName());
             if (mf != null) {
-                return (DataChunk) mf.getMap().get(idmethod.invoke(o, null));
+                final DataChunk dc = (DataChunk) mf.getMap().get(idmethod.invoke(o, null));
+                if (llt != null) { llt.add(dc.getFrameData().getFrame()); }
+                return dc;
             } else if (ix != null) {
-                return (DataChunk) ix.getIndex().getObjectByKey(new IndexElementKey(new Object[]{idMethod.invoke(o, null)}));
+                final DataChunk dc = (DataChunk) ix.getIndex().getObjectByKey(new IndexElementKey(new Object[]{idMethod.invoke(o, null)}));
+                if (llt != null) { llt.add(dc.getFrameData().getFrame()); }
+                return dc;
             } else {
                 final byte[] id = new DataChunkId(o, this, s).getIdBytes();
                 if (id!=null) {
@@ -1704,6 +1706,7 @@ public class Table implements ResultSet {
                         } else {
                             for (Chunk dc : b.getDataFrame().getFrameChunks(s)) {
                                 if (Arrays.equals(id, ((DataChunk) dc).getSerializedId(s))) {
+                                    if (llt != null) { llt.add(((DataChunk) dc).getFrameData().getFrame()); }
                                     return (DataChunk) dc;
                                 }
                             }
@@ -1723,7 +1726,7 @@ public class Table implements ResultSet {
                         return null;
                     }
                     final IndexChunk ibx = (IndexChunk) idc.getEntity();
-                    return ibx.getDataChunk();
+                    return ibx.getDataChunkForUpdate(llt);
                 } else {
                     final byte[] id = dcid.getIdBytes();
                     if (id != null) {
@@ -1736,6 +1739,7 @@ public class Table implements ResultSet {
                             } else {
                                 for (Chunk dc : b.getDataFrame().getFrameChunks(s)) {
                                     if (Arrays.equals(id, ((DataChunk) dc).getSerializedId(s))) {
+                                        if (llt != null) { llt.add(((DataChunk) dc).getFrameData().getFrame()); }
                                         return (DataChunk) dc;
                                     }
                                 }
@@ -1744,6 +1748,7 @@ public class Table implements ResultSet {
                     }
                 }
             } else {
+                if (llt != null) { llt.add(to.getDataChunk().getFrameData().getFrame()); }
                 return to.getDataChunk();
             }
         }

@@ -43,8 +43,6 @@ import java.lang.reflect.*;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static su.interference.persistent.Table.SYSTEM_PKG_PREFIX;
-
 /**
  * @author Yuriy Glotanov
  * @since 1.0
@@ -355,7 +353,7 @@ public class DataChunk implements Chunk {
         this.chunk = bsc.getBytes();
     }
 
-    //constructor for clone method - de-serialize chunk only without header 
+    //constructor for clone method - de-serialize chunk only without header
     public DataChunk (byte[] b, Table t, RowHeader h, DataChunk source) {
         this.chunk  = b;
         this.header = h;
@@ -695,13 +693,13 @@ public class DataChunk implements Chunk {
         return dc_;
     }
 
-    public DataChunk restore(UndoChunk uc) throws Exception {
+    public DataChunk restore(UndoChunk uc, Session s, LLT llt) throws Exception {
         // since we are using a dirty hack with changing the header in a source chunk for rollback his,
         // we need to first delete the source chunk in the target block to prevent inconsistency within ChunkMap / chunk headers
         if (!(this.getHeader().getRowID().getFileId() == uc.getFile() && this.getHeader().getRowID().getFramePointer() == uc.getFrame())) {
             final long srcFrameId = uc.getFile() + uc.getFrame();
             final Frame srcFrame = Instance.getInstance().getFrameById(srcFrameId).getFrame();
-            srcFrame.removeChunk(uc.getPtr(), null, true);
+            srcFrame.removeChunk(uc.getPtr(), llt, true);
         }
         return this;
     }
@@ -727,7 +725,6 @@ public class DataChunk implements Chunk {
     }
 
     //lock mechanism
-
     private synchronized DataChunk insertUC (UndoChunk uc, Session s, LLT llt) throws Exception {
         final WaitFrame ubw = s.getTransaction().getAvailableFrame(uc, true);
         final FrameData ub = ubw.getBd();
@@ -827,19 +824,25 @@ public class DataChunk implements Chunk {
     }
 
     public DataChunk getIc(IndexDescript ids, Session s) throws Exception {
-        final Table ixt = Instance.getInstance().getTableByName(SYSTEM_PKG_PREFIX + ids.getName());
-        final DataChunk ic = this.ics.get(ixt.getObjectId());
+        final DataChunk ic = this.ics.get(ids.getIndex().getObjectId());
         if (ic == null) {
             final ValueSet key = this.getValueByColumnName(ids.getColumns(), s);
-            final DataChunk ic_ = ixt.getObjectByKey(key, s);
+            final DataChunk ic_ = ids.getIndex().getObjectByKey(key, s);
             if (ic_ != null) {
-                this.ics.put(ixt.getObjectId(), ic_);
+                this.ics.put(ids.getIndex().getObjectId(), ic_);
                 return ic_;
             } else {
                 throw new RuntimeException("Unable to retrieve index chunk: " + ids.getName());
             }
         }
         return ic;
+    }
+
+    public DataChunk getIcForUpdate(IndexDescript ids, Session s, LLT llt) throws Exception {
+        final DataChunk ic = getIc(ids, s);
+        llt.add(ic.getFrameData().getFrame());
+        this.ics.remove(ids.getIndex().getObjectId());
+        return getIc(ids, s);
     }
 
     public ValueSet getValueByColumnName(String[] columns, Session s) throws Exception {
@@ -872,6 +875,11 @@ public class DataChunk implements Chunk {
             if (s.length()==8) {sb.append(s.substring(6,8));}
         }
         return sb.toString();
+    }
+
+    public FrameData getFrameData() {
+        final long ptr = this.getHeader().getRowID().getFileId() + this.getHeader().getRowID().getFramePointer();
+        return Instance.getInstance().getFrameById(ptr);
     }
 
 }

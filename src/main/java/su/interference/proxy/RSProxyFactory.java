@@ -80,6 +80,7 @@ public class RSProxyFactory {
         sb.append("import su.interference.core.ResultSetEntity;\n");
         sb.append("import su.interference.core.IndexEntity;\n");
         sb.append("import su.interference.core.DisableSync;\n");
+        sb.append("import su.interference.core.LLT;\n");
         sb.append("import su.interference.mgmt.MgmtColumn;\n");
         sb.append("\n");
         sb.append("@Entity\n");
@@ -106,6 +107,7 @@ public class RSProxyFactory {
         sb.append("    @Transient\n");
         sb.append("    public su.interference.core.DataChunk dc;\n");
         sb.append("    public su.interference.core.DataChunk getDataChunk() { return dc; }\n");
+        sb.append("    public su.interference.core.DataChunk getDataChunkForUpdate(LLT llt) { return dc; }\n");
         sb.append("    public void setDataChunk(su.interference.core.DataChunk c) { dc = c; }\n");
         sb.append("    public su.interference.core.RowId getFramePtrRowId() { return framePtrRowId; }\n");
         sb.append("    public void setFramePtrRowId(su.interference.core.RowId r) { framePtrRowId = r; }\n");

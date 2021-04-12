@@ -149,7 +149,7 @@ public class TransportContext implements TransportApi {
             transportMessage.getTransportEvent().setCallbackNodeId(transportMessage.getSender());
             final EventResult result = transportMessage.getTransportEvent().process();
             TransportCallback transportCallback = new TransportCallback(Config.getConfig().LOCAL_NODE_ID, transportMessage.getUuid(), result);
-            sendCallback(transportMessage.getSender(), new TransportMessage(TransportMessage.CALLBACK_MESSAGE, Config.getConfig().LOCAL_NODE_ID, transportMessage.getTransportEvent(), transportCallback));
+            sendCallback(transportMessage.getSender(), new TransportMessage(TransportMessage.CALLBACK_MESSAGE, Config.getConfig().LOCAL_NODE_ID, null, transportCallback));
             logger.debug("callback sent with UUID: " + transportMessage.getUuid() + ", type = " + transportMessage.getTransportEvent().getClass()+", destination="+transportMessage.getSender());
         }
     }
@@ -182,7 +182,6 @@ public class TransportContext implements TransportApi {
         if (channel != null) {
             if (transportMessage.getType() == TransportMessage.CALLBACK_MESSAGE) {
                 channel.send(transportMessage);
-                mmap.put(transportMessage.getUuid(), transportMessage);
             }
         } else {
             logger.error("Unable to find channel for channelId = "+channelId);

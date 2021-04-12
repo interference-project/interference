@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -26,6 +26,7 @@ package su.interference.core;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import su.interference.persistent.FrameData;
 
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
@@ -43,7 +44,7 @@ public class LLT {
     private static final AtomicLong sync = new AtomicLong();
     private static final ReentrantLock rlck = new ReentrantLock();
     private static final ConcurrentHashMap<Long, LLT> pool = new ConcurrentHashMap<Long, LLT>();
-    private static final ConcurrentHashMap<Long, Frame> frames = new ConcurrentHashMap<Long, Frame>();
+    private static final ConcurrentHashMap<Long, FrameData> frames = new ConcurrentHashMap<>();
     private final static Logger logger = LoggerFactory.getLogger(LLT.class);
     private final boolean lock;
     private final long id;
@@ -104,16 +105,21 @@ public class LLT {
     }
 
     public void add(Frame b) {
-        b.getFrameData().setSynced(false);
-        frames.put(b.getFrameData().getFrameId(), b);
+        b.getFrameData().setUnsynced();
+        frames.put(b.getFrameData().getFrameId(), b.getFrameData());
     }
 
-    public void commit() {
+    public void add(FrameData b) {
+        b.setUnsynced();
+        frames.put(b.getFrameId(), b);
+    }
+
+    public void commit() throws Exception {
         pool.remove(this.id);
         if (this.lock) {
-            for (Map.Entry<Long, Frame> entry : frames.entrySet()) {
-                entry.getValue().getFrameData().setSynced(true);
-                entry.getValue().clearSnaps(this.id);
+            for (Map.Entry<Long, FrameData> entry : frames.entrySet()) {
+                entry.getValue().setSynced();
+                entry.getValue().getFrame().clearSnaps(this.id);
             }
             frames.clear();
             sync.compareAndSet(this.id, 0);
@@ -123,7 +129,7 @@ public class LLT {
         }
     }
 
-    public static ConcurrentHashMap<Long, Frame> getFrames() {
+    public static ConcurrentHashMap<Long, FrameData> getFrames() {
         return frames;
     }
 

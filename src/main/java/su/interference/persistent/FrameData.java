@@ -37,6 +37,7 @@ import javax.persistence.Transient;
 import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -105,7 +106,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @Transient
     private AtomicInteger priority = new AtomicInteger(2);
     @Transient
-    private volatile boolean synced = true;
+    private AtomicBoolean synced = new AtomicBoolean(true);
     @Transient
     private volatile boolean rbck;
     @Transient
@@ -208,6 +209,10 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return frame;
     }
 
+    public synchronized Chunk getChunkByPtr(int ptr) throws Exception {
+        return getFrame().getChunkByPtr(ptr);
+    }
+
     public int getFrameType() {
         return frameType;
     }
@@ -236,6 +241,14 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return this.allocId;
     }
 
+    public long getAllocFile() {
+        return this.allocId%4096;
+    }
+
+    public long getAllocPtr() {
+        return this.allocId - (this.allocId%4096);
+    }
+
     public void setAllocId(long allocId) {
         this.allocId = allocId;
     }
@@ -250,7 +263,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     //real current transactional value
     //skip negative differences for prevent frame oversize when many transactions change data
-    public int getFrameUsed() {
+    public synchronized int getFrameUsed() {
         int tdiff = 0;
         for (Map.Entry<Long, Map<Long, TransFrame>> entry : tcounter.entrySet()) {
             for (Map.Entry<Long, TransFrame> entry_ : entry.getValue().entrySet()) {
@@ -438,7 +451,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     }
 
     public synchronized boolean clearFrame() {
-        if (this.frame != null) {
+        if (this.frame != null && this.isSynced()) {
             this.frame.cleanUpIcs();
             this.frame = null;
             return true;
@@ -454,7 +467,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         this.entityClass = entityClass;
     }
 
-    public boolean isFrameBusy() {
+    public synchronized boolean isFrameBusy() {
         for (Map.Entry<Long, Map<Long, TransFrame>> entry : tcounter.entrySet()) {
             for (Map.Entry<Long, TransFrame> entry_ : entry.getValue().entrySet()) {
                 if (entry_.getValue().getCframeId() == getFrameId()) {
@@ -476,8 +489,8 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         tcounter.remove(id);
     }
 
-    public Map<Long, List<Long>> getLiveUFrameAllocIds() {
-        Map<Long, List<Long>> uframes = new HashMap<>();
+    public synchronized Map<Long, List<Long>> getLiveUFrameAllocIds() {
+        final Map<Long, List<Long>> uframes = new HashMap<>();
         for (Map.Entry<Long, Map<Long, TransFrame>> entry : tcounter.entrySet()) {
             uframes.put(entry.getKey(), new ArrayList<>());
             for (Map.Entry<Long, TransFrame> entry_ : entry.getValue().entrySet()) {
@@ -493,7 +506,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return uframes;
     }
 
-    public void updateTCounter(long transId, List<Long> ulist) {
+    public synchronized void updateTCounter(long transId, List<Long> ulist) {
         if (this.frameId == this.allocId) {
             throw new RuntimeException("cannot update tcounter for local frame");
         }
@@ -501,6 +514,10 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         for (Long l : ulist) {
             this.tcounter.get(transId).put(l, null);
         }
+    }
+
+    public synchronized void rollbackTransaction(Transaction tran, ArrayList<FrameData> ubs, Session s) throws Exception {
+        this.getFrame().rollbackTransaction(tran, ubs, s);
     }
 
     public int getPriority() {
@@ -514,11 +531,15 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     }
 
     public boolean isSynced() {
-        return synced;
+        return synced.get();
     }
 
-    public void setSynced(boolean synced) {
-        this.synced = synced;
+    public void setSynced() {
+        this.synced.set(true);
+    }
+
+    public void setUnsynced() {
+        this.synced.set(false);
     }
 
     public boolean isRbck() {

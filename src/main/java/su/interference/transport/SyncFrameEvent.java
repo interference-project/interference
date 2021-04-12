@@ -86,7 +86,7 @@ public class SyncFrameEvent extends TransportEventImpl {
                     s.delete(bd);
                 } else {
                     if (bd == null) {
-                        final int allocFileId = (int) b.getAllocId() % 4096;
+                        final int allocFileId = (int) b.getAllocFile();
                         final int allocOrder = (allocFileId % Storage.MAX_NODES) % Config.getConfig().FILES_AMOUNT;
                         ArrayList<DataFile> dfs = Instance.getInstance().getDataFilesByType(b.getFileType());
                         for (DataFile f : dfs) {
@@ -128,18 +128,18 @@ public class SyncFrameEvent extends TransportEventImpl {
                     final Table t = Instance.getInstance().getTableByName(b.getClassName());
                     final long prevId_ = b.getPrevId() == 0 ? 0 : hmap.get(b.getPrevId()) != null ? hmap.get(b.getPrevId()) : Instance.getInstance().getFrameByAllocId(b.getPrevId()).getFrameId();
                     final long nextId_ = b.getNextId() == 0 ? 0 : hmap.get(b.getNextId()) != null ? hmap.get(b.getNextId()) : Instance.getInstance().getFrameByAllocId(b.getNextId()).getFrameId();
-                    final int prevF = (int) prevId_ % 4096;
-                    final long prevB = prevId_ - prevId_ % 4096;
-                    final int nextF = (int) nextId_ % 4096;
-                    final long nextB = nextId_ - nextId_ % 4096;
+                    final long prevF = prevId_ % 4096;
+                    final long prevB = prevId_ - prevF;
+                    final long nextF = nextId_ % 4096;
+                    final long nextB = nextId_ - nextF;
 
                     if (b.getBd() == null) {
                         throw new InternalException();
                     } else {
                         if (b.getFrameType() == 99) {
                             Frame frame = new DataFrame(b.getBytes(), b.getBd().getFile(), b.getBd().getPtr(), b.getImap(), hmap, t, s);
-                            frame.setRes01(prevF);
-                            frame.setRes02(nextF);
+                            frame.setRes01((int)prevF);
+                            frame.setRes02((int)nextF);
                             frame.setRes06(prevB);
                             frame.setRes07(nextB);
                             frame.setFrameData(b.getBd());
@@ -190,18 +190,18 @@ public class SyncFrameEvent extends TransportEventImpl {
                     final Table t = Instance.getInstance().getTableByName(b.getClassName());
                     final long prevId_ = b.getPrevId() == 0 ? 0 : hmap.get(b.getPrevId()) != null ? hmap.get(b.getPrevId()) : Instance.getInstance().getFrameByAllocId(b.getPrevId()).getFrameId();
                     final long nextId_ = b.getNextId() == 0 ? 0 : hmap.get(b.getNextId()) != null ? hmap.get(b.getNextId()) : Instance.getInstance().getFrameByAllocId(b.getNextId()).getFrameId();
-                    final int prevF = (int) prevId_ % 4096;
-                    final long prevB = prevId_ - prevId_ % 4096;
-                    final int nextF = (int) nextId_ % 4096;
-                    final long nextB = nextId_ - nextId_ % 4096;
+                    final long prevF = prevId_ % 4096;
+                    final long prevB = prevId_ - prevF;
+                    final long nextF = nextId_ % 4096;
+                    final long nextB = nextId_ - nextF;
 
                     if (b.getBd() == null) {
                         throw new InternalException();
                     } else {
                         if (b.getFrameType() == 0) {
                             Frame frame = new DataFrame(b.getBytes(), b.getBd().getFile(), b.getBd().getPtr(), t);
-                            frame.setRes01(prevF);
-                            frame.setRes02(nextF);
+                            frame.setRes01((int)prevF);
+                            frame.setRes02((int)nextF);
                             frame.setRes06(prevB);
                             frame.setRes07(nextB);
                             frame.setFrameData(b.getBd());
@@ -227,18 +227,18 @@ public class SyncFrameEvent extends TransportEventImpl {
                     final Table t = Instance.getInstance().getTableByName(b.getClassName());
                     final long parentId_ = b.getParentId() == 0 ? 0 : hmap.get(b.getParentId()) != null ? hmap.get(b.getParentId()) : Instance.getInstance().getFrameByAllocId(b.getParentId()).getFrameId();
                     final long lcId_ = b.getLcId() == 0 ? 0 : hmap.get(b.getLcId()) != null ? hmap.get(b.getLcId()) : Instance.getInstance().getFrameByAllocId(b.getLcId()).getFrameId();
-                    final int parentF = (int) parentId_ % 4096;
-                    final long parentB = parentId_ - parentId_ % 4096;
-                    final int lcF = (int) lcId_ % 4096;
-                    final long lcB = lcId_ - lcId_ % 4096;
+                    final long parentF = parentId_ % 4096;
+                    final long parentB = parentId_ - parentF;
+                    final long lcF = lcId_ % 4096;
+                    final long lcB = lcId_ - lcF;
 
                     if (b.getBd() == null) {
                         throw new InternalException();
                     } else {
                         if (b.getFrameType() == 1 || b.getFrameType() == 2) {
                             IndexFrame frame = new IndexFrame(b.getBytes(), b.getBd().getFile(), b.getBd().getPtr(), b.getImap(), hmap, t);
-                            frame.setRes04(parentF);
-                            frame.setRes05(lcF);
+                            frame.setRes04((int)parentF);
+                            frame.setRes05((int)lcF);
                             frame.setRes06(parentB);
                             frame.setRes07(lcB);
                             b.setRFrame(frame);
@@ -268,6 +268,8 @@ public class SyncFrameEvent extends TransportEventImpl {
         final Map<Integer, List<FrameApi>> frames_ = new HashMap<>();
         for (SyncFrame f : sb) {
             if (f.isAllowR() && f.isProc()) {
+                f.getBd().setSynced();
+
                 final Table t = Instance.getInstance().getTableByName(f.getClassName());
                 if (frames_.get(t.getObjectId()) == null) {
                     frames_.put(t.getObjectId(), new ArrayList<>());

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -152,7 +152,7 @@ public class Transaction implements Serializable {
         final Table t = Instance.getInstance().getTableByName("su.interference.persistent.UndoChunk");
         for (DataFile f : Storage.getStorage().getUndoFiles()) {
             final FrameData ub = t.createNewFrame(null, null, f.getFileId(), 0, 0, false, true, false, s, llt);
-            ub.setSynced(false);
+            ub.setUnsynced();
             setNewLB(null, ub);
         }
     }
@@ -218,6 +218,7 @@ public class Transaction implements Serializable {
                     this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
                     this.transType = TRAN_THR;
                     s.persist(this);
+                    rframes.clear();
                     syncq.commit();
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -281,6 +282,7 @@ public class Transaction implements Serializable {
                     this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
                     this.transType = TRAN_THR;
                     s.persist(this); //update
+                    rframes.clear();
 /*
                 if (this.join != null) {
                     join.deallocate(s);
@@ -320,10 +322,9 @@ public class Transaction implements Serializable {
                             }
                         }
 
-                        final Frame frame_ = ub.getFrame();
-                        if (frame_ instanceof IndexFrame) {
+                        if (ub.isIndex()) {
                             ub.setRbck(true);
-                            frame_.rollbackTransaction(this, ubs, s);
+                            ub.rollbackTransaction(this, ubs, s);
                         }
                     }
                     for (FrameData ub : ubd1) {
@@ -337,9 +338,8 @@ public class Transaction implements Serializable {
                             }
                         }
 
-                        final Frame frame_ = ub.getFrame();
-                        if (frame_ instanceof DataFrame) {
-                            frame_.rollbackTransaction(this, ubs, s);
+                        if (!ub.isIndex()) {
+                            ub.rollbackTransaction(this, ubs, s);
                         }
                     }
                     for (FrameData ub : ubd2) {
@@ -392,7 +392,7 @@ public class Transaction implements Serializable {
         if (this.getTransType()!=TRAN_THR) {
             throw new InternalException();  //ONLY FOR FIXED TRANSACTIONS
         }
-        final ArrayList<Long> fptr = new ArrayList<Long>();
+        final ArrayList<Long> fptr = new ArrayList<>();
         try {
             for (TransFrame tb : tframes) {
                 if (tb.getObjectId()==objectId) {
@@ -567,7 +567,8 @@ public class Transaction implements Serializable {
     }
 
     public int getNodeId() {
-        return (int)this.transId%Storage.MAX_NODES;
+        final long n = this.transId%Storage.MAX_NODES;
+        return (int)n;
     }
 
     public boolean isLocal() {

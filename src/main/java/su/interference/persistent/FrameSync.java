@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -50,19 +50,15 @@ public class FrameSync implements Comparable {
     @MgmtColumn(width=20, show=true, form=false, edit=false)
     private long syncId;
     @Column
-    @IndexColumn
     @MgmtColumn(width=20, show=true, form=false, edit=false)
     private long allocId;
     @Column
-    @IndexColumn
     @MgmtColumn(width=20, show=true, form=false, edit=false)
     private int nodeId;
     @Column
-    @IndexColumn
     @MgmtColumn(width=20, show=true, form=false, edit=false)
     private String syncUUID;
     @Column
-    @IndexColumn
     @MgmtColumn(width=20, show=true, form=false, edit=false)
     private long frameId;
     @Transient

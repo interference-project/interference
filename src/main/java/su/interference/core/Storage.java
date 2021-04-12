@@ -349,7 +349,7 @@ public class Storage {
         }
     }
 
-    public void closeDataFiles () throws IOException, InvalidFrame, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    public void closeDataFiles () throws IOException, InvalidFrame {
         for (Map.Entry e : ifs.entrySet()) {
             if (((DataFile)e.getValue()).isOpen()) {
                 ((DataFile)e.getValue()).closeFile();
@@ -357,7 +357,7 @@ public class Storage {
         }
     }
 
-    public DataFile getInitFile() throws ClassNotFoundException, InternalException, IllegalAccessException, InstantiationException {
+    public DataFile getInitFile() throws InternalException {
         for (Map.Entry e : ifs.entrySet()) {
             if (((DataFile)e.getValue()).getFileId()==INITFILE_ID) {
                 if (!((DataFile)e.getValue()).isOpen()) {
@@ -369,7 +369,7 @@ public class Storage {
         return null;
     }
 
-    public int openStorage (DataFile[] files) throws ClassNotFoundException, InstantiationException, IllegalAccessException, InternalException {
+    public int openStorage (DataFile[] files) throws InternalException {
         if (state==STORAGE_STATE_OPEN) {
             return state;
         }
@@ -456,17 +456,17 @@ public class Storage {
     }
 
     public int writeFrame (byte[] b, long frameId) throws IOException, InternalException, ClassNotFoundException, IllegalAccessException, InstantiationException {
-        final int file = (int)frameId%4096;
-        final long ptr = frameId - (frameId%4096);
-        final DataFile f = getDataFileById(file);
+        final long file = frameId%4096;
+        final long ptr = frameId - file;
+        final DataFile f = getDataFileById((int)file);
         f.writeFrame(ptr, b);
         return 0;
     }
 
     public int writeFrameWithBackup (byte[] b, long frameId) throws IOException, InternalException, ClassNotFoundException, IllegalAccessException, InstantiationException {
-        final int file = (int)frameId%4096;
-        final long ptr = frameId - (frameId%4096);
-        final DataFile f = getDataFileById(file);
+        final long file = frameId%4096;
+        final long ptr = frameId - file;
+        final DataFile f = getDataFileById((int)file);
         final byte[] bb = f.readDataFromPtr(ptr, b.length);
         if (bb!=null) {
             jrnFile.seek(jrnptr.getAndAdd(bb.length));
@@ -476,7 +476,7 @@ public class Storage {
         return 0;
     }
 
-    public int writeFrameWithBackup (final DataFile f, final byte[] b, final long ptr) throws IOException, InternalException, ClassNotFoundException, IllegalAccessException, InstantiationException {
+    public int writeFrameWithBackup (final DataFile f, final byte[] b, final long ptr) throws IOException, InternalException {
         final byte[] bb = f.readDataFromPtr(ptr, b.length);
         if (bb != null) {
             jrnFile.seek(jrnptr.getAndAdd(bb.length));

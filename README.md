@@ -65,8 +65,7 @@ Next, specify the necessary set of keys in the project
 -Dcom.sun.management.jmxremote.local.only=false 
 -Dcom.sun.management.jmxremote.authenticate=false 
 -Dcom.sun.management.jmxremote.ssl=false
--Xms256m
--Xmn512m
+-Xms1g
 -Xmx4g
 -XX:MaxMetaspaceSize=256m
 -XX:ParallelGCThreads=8

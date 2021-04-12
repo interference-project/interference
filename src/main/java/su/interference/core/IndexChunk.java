@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -32,6 +32,7 @@ package su.interference.core;
 public interface IndexChunk {
 
     DataChunk getDataChunk();
+    DataChunk getDataChunkForUpdate(LLT llt);
     RowId getFramePtrRowId();
     void setDataChunk(DataChunk c);
     void setFramePtrRowId(RowId r);

@@ -99,7 +99,9 @@ public class TransportChannel {
                                             oos.flush();
                                             oos.reset();
                                             transportMessage.setSendChannel(TransportChannel.this);
-                                            mmap.put(transportMessage.getUuid(), transportMessage);
+                                            if (transportMessage.getType() == TransportMessage.TRANSPORT_MESSAGE || transportMessage.getType() == TransportMessage.HEARTBEAT_MESSAGE) {
+                                                mmap.put(transportMessage.getUuid(), transportMessage);
+                                            }
                                             logger.debug("channel id = " + channelId + " sent " + transportMessage + " message with UUID: " + transportMessage.getUuid());
                                         } else {
                                             if (transportMessage.getType() == TransportMessage.TRANSPORT_MESSAGE || transportMessage.getType() == TransportMessage.HEARTBEAT_MESSAGE) {
