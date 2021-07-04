@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -25,8 +25,6 @@
 package su.interference.core;
 
 import java.util.*;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author Yuriy Glotanov
@@ -34,38 +32,42 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 
 public class ChunkMap {
-    private final ConcurrentHashMap<Integer, Chunk> hmap;
-    private final ConcurrentHashMap<ValueSet, List<Chunk>> imap;
+    private final HashMap<Integer, Chunk> hmap;
+    private final HashMap<ValueSet, List<Chunk>> imap;
     private final List<Chunk> list;
     private final Frame frame;
     private volatile boolean sorted;
+    private volatile int used;
 
     public ChunkMap(Frame frame) {
-        hmap = new ConcurrentHashMap<>();
-        imap = new ConcurrentHashMap<>();
-        list = new CopyOnWriteArrayList<>();
+        hmap = new HashMap<>();
+        imap = frame instanceof IndexFrame ? new HashMap<>() : null;
+        list = frame instanceof IndexFrame ? new ArrayList<>() : null;
         this.frame = frame;
     }
 
     @SuppressWarnings("unchecked")
-    public synchronized void sort() {
-        Collections.sort(list);
-        sorted = true;
+    protected synchronized void sort() {
+        if (frame instanceof IndexFrame) {
+            Collections.sort(list);
+            sorted = true;
+        }
     }
 
-    public synchronized void add(Chunk c) {
+    protected synchronized void add(Chunk c) {
         hmap.put(c.getHeader().getPtr(), c);
         if (frame instanceof IndexFrame) {
             if (imap.get(c.getDcs()) == null) {
                 imap.put(c.getDcs(), new ArrayList<>());
             }
             imap.get(c.getDcs()).add(c);
+            list.add(c);
         }
-        list.add(c);
         sorted = false;
+        used = used + c.getBytesAmount();
     }
 
-    public synchronized void check() {
+    protected synchronized void check() {
         for (Map.Entry<Integer, Chunk> entry : hmap.entrySet()) {
             Chunk c = entry.getValue();
             if (c.getHeader().getPtr() != entry.getKey()) {
@@ -74,26 +76,29 @@ public class ChunkMap {
         }
     }
 
-    public synchronized List<Chunk> getChunks() {
-        return list;
+    protected synchronized Collection<Chunk> getChunks() {
+        if (frame instanceof IndexFrame) {
+            return list;
+        }
+        return hmap.values();
     }
 
-    public synchronized Chunk getByPtr(int i) {
+    protected synchronized Chunk getByPtr(int i) {
         return hmap.get(i);
     }
 
-    public synchronized Chunk get(int i) {
+    // index only
+    protected synchronized Chunk get(int i) {
         return list.get(i);
     }
 
     //for unique indexes
-    public synchronized List<Chunk> getByKey(ValueSet key) {
+    protected synchronized List<Chunk> getByKey(ValueSet key) {
         return imap.get(key);
     }
 
-    public synchronized void removeByPtr(int i) {
-        final boolean x = list.remove(hmap.get(i));
-        final Chunk c = (Chunk)hmap.remove(i);
+    protected synchronized void removeByPtr(int i) {
+        final Chunk c = hmap.remove(i);
         if (frame instanceof IndexFrame) {
             int i_ = 0;
             for (int i__ = 0; i__ <  imap.get(c.getDcs()).size(); i__++) {
@@ -102,14 +107,17 @@ public class ChunkMap {
                 }
             }
             imap.get(c.getDcs()).remove(i_);
+            list.remove(hmap.get(i));
         }
         sorted = false;
-        if (!x || c == null) {
+        used = used - c.getBytesAmount();
+        if (c == null) {
             throw new RuntimeException("Internal error during remove object from frame");
         }
     }
 
-    public synchronized void remove(int i) {
+    // index only
+    protected synchronized void remove(int i) {
         final Chunk c = list.get(i);
         list.remove(i);
         hmap.remove(c.getHeader().getPtr());
@@ -122,21 +130,29 @@ public class ChunkMap {
             }
             imap.get(c.getDcs()).remove(i_);
         }
+        used = used - c.getBytesAmount();
         sorted = false;
     }
 
-    public synchronized int size() {
+    //index only
+    protected synchronized int size() {
         return list.size();
     }
 
-    public synchronized void clear() {
+    protected synchronized void clear() {
         hmap.clear();
         list.clear();
         imap.clear();
+        used = 0;
         sorted = false;
     }
 
-    public synchronized boolean isSorted() {
+    protected synchronized boolean isSorted() {
         return sorted;
     }
+
+    protected int getUsed() {
+        return used;
+    }
+
 }
