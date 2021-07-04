@@ -274,14 +274,6 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return this.getUsed() + tdiff;
     }
 
-    //real current non-tran amount of chunk bytes
-    public int getCUsed() {
-        if (frame == null) {
-            return -1;
-        }
-        return frame.getBytesAmount();
-    }
-
     public int getFrameFree() {
         return size - Frame.FRAME_HEADER_SIZE - getFrameUsed();
     }

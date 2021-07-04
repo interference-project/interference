@@ -30,10 +30,7 @@ import su.interference.persistent.*;
 import su.interference.exception.*;
 import su.interference.serialize.ByteString;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -69,7 +66,6 @@ public class Frame implements Comparable {
     public static final int ROW_HEADER_SIZE   = 16;
     public static final int INDEX_HEADER_SIZE = 32;
     public static final int MIN_FRAME_SIZE    = 256; //test implementation only
-    public static final int MAX_FRAME_SIZE    = 65535;
     public static final int MAX_PTR_VALUE     = Integer.MAX_VALUE;
     public static final int DATA_FRAME        = 1;
     public static final int INDEX_FRAME       = 2;
@@ -374,7 +370,7 @@ public class Frame implements Comparable {
         return 0;
     }
 
-    public int getFrameFree () {
+    protected int getFrameFree () {
         return getFrameSize() - getBytesAmount();
     }
 
@@ -430,7 +426,6 @@ public class Frame implements Comparable {
             data.add(c);
             return ptr;
         }
-
     }
 
     public synchronized int updateChunk(DataChunk chunk, Object o, Session s, LLT llt) throws Exception {
@@ -478,7 +473,7 @@ public class Frame implements Comparable {
         header.setState(Header.RECORD_DELETED_STATE);
     }
 
-    public synchronized List<Chunk> getChunks() {
+    public synchronized Collection<Chunk> getChunks() {
         return data.getChunks();
     }
 
@@ -615,13 +610,8 @@ public class Frame implements Comparable {
         return rtran;
     }
 
-    public int getBytesAmount() {
-        int used = FRAME_HEADER_SIZE;
-        final int size = data.getChunks().size();
-        for (int i=0; i<size; i++) {
-            used = used + data.getChunks().get(i).getBytesAmount();
-        }
-        return used;
+    private int getBytesAmount() {
+        return FRAME_HEADER_SIZE + data.getUsed();
     }
 
     public int getBytesAmountWoHead() {

@@ -106,12 +106,16 @@ public class LLT {
 
     public void add(Frame b) {
         b.getFrameData().setUnsynced();
-        frames.put(b.getFrameData().getFrameId(), b.getFrameData());
+        if (frames.get(b.getFrameData().getFrameId()) == null) {
+            frames.put(b.getFrameData().getFrameId(), b.getFrameData());
+        }
     }
 
     public void add(FrameData b) {
         b.setUnsynced();
-        frames.put(b.getFrameId(), b);
+        if (frames.get(b.getFrameId()) == null) {
+            frames.put(b.getFrameId(), b);
+        }
     }
 
     public void commit() throws Exception {

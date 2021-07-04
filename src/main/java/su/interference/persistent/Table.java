@@ -525,8 +525,8 @@ public class Table implements ResultSet {
         return null;
     }
 
-    public boolean isIdFieldNoCheck() throws ClassNotFoundException, MalformedURLException {
-        java.lang.reflect.Field f = getTableIdField();
+    public boolean isIdFieldNoCheck() {
+        java.lang.reflect.Field f = getIdField();
         if (f != null) {
             NoCheck a = f.getAnnotation(NoCheck.class);
             return a != null;
