@@ -342,7 +342,7 @@ public class Storage {
                         "--- data files were created by a different version of the software ---\n" +
                         "--- datafile version: "+filesv+" ---------------------------------------\n" +
                         "--- software version: "+Instance.SYSTEM_VERSION+" ---------------------------------------\n" +
-                        "--- SERVICE MAY BE UNSTABLE ------------------------------------------\n" +
+                        "--- SERVICE  MAY  BE  UNSTABLE ---------------------------------------\n" +
                         "----------------------------------------------------------------------");
                 ((DataFile)e.getValue()).openFile(Config.getConfig().DISKIO_MODE);
             }

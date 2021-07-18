@@ -73,7 +73,7 @@ public class SystemFrame extends Frame {
         }
     }
 
-    public void insertSU (Session s, LLT llt) throws IOException, InvocationTargetException, NoSuchMethodException, InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    public void insertSU (Session s, LLT llt) throws InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         SystemData sd = new SystemData(Instance.getInstance().getLocalNodeId(),
                                        Instance.getInstance().getFrameSize(),
                                        Instance.getInstance().getFrameSize2(),
@@ -88,7 +88,7 @@ public class SystemFrame extends Frame {
         this.insertChunk(new DataChunk(sd, s), s, true, llt);
     }
 
-    int auth (int user, int pass, Session s) throws NoSuchMethodException, InvocationTargetException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    int auth (int user, int pass, Session s) {
         if (user>0&&pass>0) {
             final SystemData sd = getSystemData();
             if (user==sd.getUser()&&pass==sd.getPasswd()) {

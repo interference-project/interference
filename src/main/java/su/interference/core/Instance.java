@@ -49,7 +49,8 @@ import su.interference.transport.TransportSyncTask;
 public class Instance implements Interference {
     
     public static final String RELEASE = "2021.1";
-    public static final int SYSTEM_VERSION = 20210412;
+//    public static final int SYSTEM_VERSION = 20210412;
+    public static final int SYSTEM_VERSION = 20210718;
 
     public static final String DATA_FILE = "datafile";
     public static final String INDX_FILE = "indxfile";
@@ -81,6 +82,7 @@ public class Instance implements Interference {
     private String osVersion;
     private String osArch;
     private String fileSeparator;
+    private String userHome;
 
     private static Instance instance;
     private int systemState;
@@ -243,6 +245,7 @@ public class Instance implements Interference {
             instance.osArch = System.getProperty("os.arch");
             instance.osVersion = System.getProperty("os.version");
             instance.fileSeparator = System.getProperty("file.separator");
+            instance.userHome = System.getProperty("user.home");
 
             logger.info("interference "+SYSTEM_VERSION+" initializing...");
             logger.info("System state:          "+instance.systemState);
@@ -257,6 +260,7 @@ public class Instance implements Interference {
             logger.info("Architecture:          "+instance.osArch);
             logger.info("OS vesrion:            "+instance.osVersion);
             logger.info("File separator:        "+instance.fileSeparator);
+            logger.info("User home:             "+instance.userHome);
             logger.info("Processors amount      "+Runtime.getRuntime().availableProcessors());
             logger.info("System state:          "+instance.systemState);
 
@@ -810,6 +814,10 @@ public class Instance implements Interference {
         return fileSeparator;
     }
 
+    public String getUserHome() {
+        return userHome;
+    }
+
     public static final String[] cps = new String[]{"Cp858","Cp437","Cp775","Cp850","Cp852","Cp855","Cp857","Cp862","Cp866","ISO8859_1","ISO8859_2","ISO8859_4","ISO8859_5","ISO8859_7",
                          "ISO8859_9","ISO8859_13","ISO8859_15","KOI8_R","KOI8_U","ASCII","UTF8","UTF-16","UnicodeBigUnmarked","UnicodeLittleUnmarked","UTF_32","UTF_32BE","UTF_32LE",
                          "UTF_32BE_BOM","UTF_32LE_BOM","Cp1250","Cp1251","Cp1252","Cp1253","Cp1254","Cp1257","UnicodeBig","Cp737","Cp874","UnicodeLittle"};
@@ -818,5 +826,5 @@ public class Instance implements Interference {
                                                     "MM.dd.yyyy", "MM.dd.yyyy HH:mm", "MM.dd.yyyy HH:mm:ss",
                                                     "yyyy.MM.dd", "yyyy.MM.dd HH:mm", "yyyy.MM.dd HH:mm:ss"};
 
-    public static final int[] bss = new int[]{4096, 8192, 16384, 32768, 65536, 131072, 262044, 524288};
+    public static final int[] bss = new int[]{4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576};
 }

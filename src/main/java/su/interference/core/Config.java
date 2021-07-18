@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -48,10 +48,6 @@ public class Config {
     private static final String P_REGISTER_CLASSES = "auto.register.classes";
     private static final String P_MMPORT = "mmport";
     private static final String P_RMPORT = "rmport";
-    private static final String P_RMHOST_START="rmhost.start";
-    private static final String P_RMHOST_RANGE="rmhost.range";
-    private static final String P_RMPORT_START="rmport.start";
-    private static final String P_RMPORT_RANGE="rmport.range";
     private static final String P_FRAMESIZE = "frame.size";
     private static final String P_FRAMESIZE2 = "frame.size.ix";
     private static final String P_FILES_AMOUNT = "files.amount";
@@ -59,31 +55,57 @@ public class Config {
     private static final String P_SYNC_LOCK_ENABLE = "sync.lock.enable";
     private static final String P_SYNC_PERIOD = "sync.period";
     private static final String P_RETRIEVE_QUEUE_SIZE = "retrieve.queue.size";
+    private static final String P_RETRIEVE_THREADS_AMOUNT = "retrieve.threads.amount";
     private static final String P_CODEPAGE = "codepage";
     private static final String P_DATEFORMAT = "dateformat";
+    // transport
+    private static final String P_REMOTE_SYNC_TIMEOUT = "transport.sync.timeout";
+    private static final String P_READ_BUFFER_SIZE = "transport.read.buffer";
+    private static final String P_WRITE_BUFFER_SIZE = "transport.write.buffer";
+    // cleanup
+    private static final String P_TRANS_CLEANUP_TIMEOUT = "cleanup.tx.timeout";
+    private static final String P_CLEANUP_ENABLE = "cleanup.enable";
+    private static final String P_CLEANUP_TIMEOUT = "cleanup.frames.timeout";
+    private static final String P_CLEANUP_PROTECTION_THR = "cleanup.data.threshold";
+    private static final String P_IX_CLEANUP_PROTECTION_THR = "cleanup.ix.threshold";
+    private static final String P_HEAP_USE_THR_DATA = "cleanup.heap.data.threshold";
+    private static final String P_HEAP_USE_THR_INDX = "cleanup.heap.ix.threshold";
+    private static final String P_HEAP_USE_THR_TEMP = "cleanup.heap.temp.threshold";
+    private static final String P_HEAP_USE_THR_UNDO = "cleanup.heap.undo.threshold";
     private static final int MAX_NODE_ID = 64;
     private static final int MAX_FILES_AMOUNT = 32;
 
     private static final int LOCAL_NODE_ID_DEFAULT=1;
-    private static final String DB_PATH_DEFAULT="";
-    private static final String JOURNAL_PATH_DEFAULT="";
+    private static final String DB_PATH_DEFAULT=System.getProperty("user.home");
+    private static final String JOURNAL_PATH_DEFAULT=System.getProperty("user.home");
     private static final String[] CLUSTER_NODES_DEFAULT=new String[]{};
     private static final String[] REGISTER_CLASSES_DEFAULT=new String[]{};
     private static final int MMPORT_DEFAULT=8086;
     private static final int RMPORT_DEFAULT=8050;
-    private static final String RMHOST_START_DEFAULT="127.0.0.1";
-    private static final int RMHOST_RANGE_DEFAULT=1;
-    private static final int RMPORT_START_DEFAULT=8050;
-    private static final int RMPORT_RANGE_DEFAULT=1;
-    private static final int FRAMESIZE_DEFAULT=4096;
-    private static final int FRAMESIZE2_DEFAULT=4096;
+    private static final int FRAMESIZE_DEFAULT=16384;
+    private static final int FRAMESIZE2_DEFAULT=16384;
     private static final int FILES_AMOUNT_DEFAULT=4;
     private static final String DISKIO_MODE_DEFAULT="rws";
     private static final boolean SYNC_LOCK_ENABLE_DEFAULT=false;
     private static final int SYNC_PERIOD_DEFAULT=2000;
-    private static final int RETRIEVE_QUEUE_SIZE_DEFAULT=10000;
-    private static final String CODEPAGE_DEFAULT="UTF-8";
+    private static final int RETRIEVE_QUEUE_SIZE_DEFAULT=100000;
+    private static final int RETRIEVE_THREADS_AMOUNT_DEFAULT=8;
+    private static final String CODEPAGE_DEFAULT="UTF8";
     private static final String DATEFORMAT_DEFAULT="dd.MM.yyyy";
+    // transport
+    private static final int REMOTE_SYNC_TIMEOUT_DEFAULT = 60000;
+    private static final int READ_BUFFER_SIZE_DEFAULT = 33554432;
+    private static final int WRITE_BUFFER_SIZE_DEFAULT = 33554432;
+    // cleanup
+    private static final int TRANS_CLEANUP_TIMEOUT_DEFAULT = 5000;
+    private static final boolean CLEANUP_ENABLE_DEFAULT = true;
+    private static final int CLEANUP_TIMEOUT_DEFAULT = 3000;
+    private static final int CLEANUP_PROTECTION_THR_DEFAULT = 1000;
+    private static final int IX_CLEANUP_PROTECTION_THR_DEFAULT = 2000;
+    private static final int HEAP_USE_THR_DATA_DEFAULT = 60;
+    private static final int HEAP_USE_THR_INDX_DEFAULT = 60;
+    private static final int HEAP_USE_THR_TEMP_DEFAULT = 40;
+    private static final int HEAP_USE_THR_UNDO_DEFAULT = 50;
 
     public final int LOCAL_NODE_ID;
     public final String DB_PATH;
@@ -92,10 +114,6 @@ public class Config {
     public final String[] REGISTER_CLASSES;
     public final int MMPORT;
     public final int RMPORT;
-    public final String RMHOST_START;
-    public final int RMHOST_RANGE;
-    public final int RMPORT_START;
-    public final int RMPORT_RANGE;
     public final int FRAMESIZE;
     public final int FRAMESIZE2;
     public final int FILES_AMOUNT;
@@ -103,26 +121,26 @@ public class Config {
     public final boolean SYNC_LOCK_ENABLE;
     public final int SYNC_PERIOD;
     public final int RETRIEVE_QUEUE_SIZE;
-    public final int RETRIEVE_THREADS_AMOUNT = 8;
+    public final int RETRIEVE_THREADS_AMOUNT;
     public final String CODEPAGE;
     public final String DATEFORMAT;
+    // transport
+    public final int REMOTE_SYNC_TIMEOUT;
+    public final int READ_BUFFER_SIZE;
+    public final int WRITE_BUFFER_SIZE;
+    // cleanup
+    public final int TRANS_CLEANUP_TIMEOUT;
+    public final boolean CLEANUP_ENABLE;
+    public final int CLEANUP_TIMEOUT;
+    public final int CLEANUP_PROTECTION_THR;
+    public final int IX_CLEANUP_PROTECTION_THR;
+    public final int HEAP_USE_THR_DATA;
+    public final int HEAP_USE_THR_INDX;
+    public final int HEAP_USE_THR_TEMP;
+    public final int HEAP_USE_THR_UNDO;
+    // internal
     public final int TEST_DISTRIBUTE_MODE = 1;
     public final int CHECK_AVAIL_FRAME_TIMEOUT = 3000;
-    // transport
-    public final int REMOTE_SYNC_TIMEOUT = 60000;
-    public final int READ_BUFFER_SIZE = 33554432;
-    public final int WRITE_BUFFER_SIZE = 33554432;
-    // cleanup
-    public final int TRANS_CLEANUP_TIMEOUT = 5000;
-    public final int CLEANUP_ENABLE = 1;
-    public final int CLEANUP_TIMEOUT = 3000;
-    public final int CLEANUP_PROTECTION_THR = 1000;
-    public final int IX_CLEANUP_PROTECTION_THR = 2000;
-    public final int HEAP_USE_THR_DATA = 60;
-    public final int HEAP_USE_THR_INDX = 60;
-    public final int HEAP_USE_THR_TEMP = 40;
-    public final int HEAP_USE_THR_UNDO = 50;
-
 
     private final Properties p;
 
@@ -134,7 +152,7 @@ public class Config {
                                                     "MM.dd.yyyy", "MM.dd.yyyy HH:mm", "MM.dd.yyyy HH:mm:ss",
                                                     "yyyy.MM.dd", "yyyy.MM.dd HH:mm", "yyyy.MM.dd HH:mm:ss"};
 
-    public static final int[] bss = new int[]{4096, 8192, 16384, 32768, 65536, 131072, 262044, 524288};
+    public static final int[] bss = new int[]{4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288};
     private final static Logger logger = LoggerFactory.getLogger(Config.class);
     private static Config config;
 
@@ -157,6 +175,7 @@ public class Config {
             }
             ok = true;
         } catch (IOException e) {
+            logger.warn("exception occured when trying to read configuration file");
         }
         if (ok) {
             DB_PATH = validatePath(p.getProperty(P_DB_PATH));
@@ -166,10 +185,6 @@ public class Config {
             REGISTER_CLASSES = validateRegisterClasses(p.getProperty(P_REGISTER_CLASSES));
             MMPORT = validateMMPort(p.getProperty(P_MMPORT));
             RMPORT = validateRMPort(p.getProperty(P_RMPORT));
-            RMHOST_START = validateRMHost(p.getProperty(P_RMHOST_START));
-            RMHOST_RANGE = validateHostRange(p.getProperty(P_RMHOST_RANGE));
-            RMPORT_START = validateRMPort(p.getProperty(P_RMPORT_START));
-            RMPORT_RANGE = validatePortRange(p.getProperty(P_RMPORT_RANGE));
             FRAMESIZE = validateFrameSize(p.getProperty(P_FRAMESIZE));
             FRAMESIZE2 = validateFrameSize(p.getProperty(P_FRAMESIZE2));
             CODEPAGE = validateCodePage(p.getProperty(P_CODEPAGE));
@@ -179,7 +194,23 @@ public class Config {
             SYNC_LOCK_ENABLE = validateSyncLock(p.getProperty(P_SYNC_LOCK_ENABLE));
             SYNC_PERIOD = validateSyncPeriod(p.getProperty(P_SYNC_PERIOD));
             RETRIEVE_QUEUE_SIZE = validateQueueSize(p.getProperty(P_RETRIEVE_QUEUE_SIZE));
+            RETRIEVE_THREADS_AMOUNT = validateThreadsAmount(p.getProperty(P_RETRIEVE_THREADS_AMOUNT));
+            // transport
+            REMOTE_SYNC_TIMEOUT = validateInt(p.getProperty(P_REMOTE_SYNC_TIMEOUT), "remote sync timeout", REMOTE_SYNC_TIMEOUT_DEFAULT);
+            READ_BUFFER_SIZE = validateInt(p.getProperty(P_READ_BUFFER_SIZE), "read buffer size", READ_BUFFER_SIZE_DEFAULT);;
+            WRITE_BUFFER_SIZE = validateInt(p.getProperty(P_WRITE_BUFFER_SIZE), "write buffer size", WRITE_BUFFER_SIZE_DEFAULT);;
+            // cleanup
+            TRANS_CLEANUP_TIMEOUT = validateInt(p.getProperty(P_TRANS_CLEANUP_TIMEOUT), "tx cleanup timeout", TRANS_CLEANUP_TIMEOUT_DEFAULT);
+            CLEANUP_ENABLE = validateEnableFlag(p.getProperty(P_CLEANUP_ENABLE), "cleanup enable", CLEANUP_ENABLE_DEFAULT);
+            CLEANUP_TIMEOUT = validateInt(p.getProperty(P_CLEANUP_TIMEOUT), "cleanup timeout", CLEANUP_TIMEOUT_DEFAULT);
+            CLEANUP_PROTECTION_THR = validateInt(p.getProperty(P_CLEANUP_PROTECTION_THR), "data cleanup threshold", CLEANUP_PROTECTION_THR_DEFAULT);
+            IX_CLEANUP_PROTECTION_THR = validateInt(p.getProperty(P_IX_CLEANUP_PROTECTION_THR), "index cleanup threshold", IX_CLEANUP_PROTECTION_THR_DEFAULT);
+            HEAP_USE_THR_DATA = validatePercent(p.getProperty(P_HEAP_USE_THR_DATA), "heap data cleanup threshold", HEAP_USE_THR_DATA_DEFAULT);
+            HEAP_USE_THR_INDX = validatePercent(p.getProperty(P_HEAP_USE_THR_INDX), "heap index cleanup threshold", HEAP_USE_THR_INDX_DEFAULT);
+            HEAP_USE_THR_TEMP = validatePercent(p.getProperty(P_HEAP_USE_THR_TEMP), "heap temp cleanup threshold", HEAP_USE_THR_TEMP_DEFAULT);
+            HEAP_USE_THR_UNDO = validatePercent(p.getProperty(P_HEAP_USE_THR_UNDO), "heap undo cleanup threshold", HEAP_USE_THR_UNDO_DEFAULT);
         } else {
+            logger.warn("use default configuration values");
             DB_PATH = DB_PATH_DEFAULT;
             JOURNAL_PATH = JOURNAL_PATH_DEFAULT;
             LOCAL_NODE_ID = LOCAL_NODE_ID_DEFAULT;
@@ -187,10 +218,6 @@ public class Config {
             REGISTER_CLASSES = REGISTER_CLASSES_DEFAULT;
             MMPORT = MMPORT_DEFAULT;
             RMPORT = RMPORT_DEFAULT;
-            RMHOST_START = RMHOST_START_DEFAULT;
-            RMHOST_RANGE = RMHOST_RANGE_DEFAULT;
-            RMPORT_START = RMPORT_START_DEFAULT;
-            RMPORT_RANGE = RMPORT_RANGE_DEFAULT;
             FRAMESIZE = FRAMESIZE_DEFAULT;
             FRAMESIZE2 = FRAMESIZE2_DEFAULT;
             CODEPAGE = CODEPAGE_DEFAULT;
@@ -200,6 +227,21 @@ public class Config {
             SYNC_LOCK_ENABLE = SYNC_LOCK_ENABLE_DEFAULT;
             SYNC_PERIOD = SYNC_PERIOD_DEFAULT;
             RETRIEVE_QUEUE_SIZE = RETRIEVE_QUEUE_SIZE_DEFAULT;
+            RETRIEVE_THREADS_AMOUNT = RETRIEVE_THREADS_AMOUNT_DEFAULT;
+            // transport
+            REMOTE_SYNC_TIMEOUT = REMOTE_SYNC_TIMEOUT_DEFAULT;
+            READ_BUFFER_SIZE = READ_BUFFER_SIZE_DEFAULT;
+            WRITE_BUFFER_SIZE = WRITE_BUFFER_SIZE_DEFAULT;
+            // cleanup
+            TRANS_CLEANUP_TIMEOUT = TRANS_CLEANUP_TIMEOUT_DEFAULT;
+            CLEANUP_ENABLE = CLEANUP_ENABLE_DEFAULT;
+            CLEANUP_TIMEOUT = CLEANUP_TIMEOUT_DEFAULT;
+            CLEANUP_PROTECTION_THR = CLEANUP_PROTECTION_THR_DEFAULT;
+            IX_CLEANUP_PROTECTION_THR = IX_CLEANUP_PROTECTION_THR_DEFAULT;
+            HEAP_USE_THR_DATA = HEAP_USE_THR_DATA_DEFAULT;
+            HEAP_USE_THR_INDX = HEAP_USE_THR_INDX_DEFAULT;
+            HEAP_USE_THR_TEMP = HEAP_USE_THR_TEMP_DEFAULT;
+            HEAP_USE_THR_UNDO = HEAP_USE_THR_UNDO_DEFAULT;
         }
         System.setProperty("com.sun.management.jmxremote.port","8111");
         System.setProperty("com.sun.management.jmxremote.authenticate","false");
@@ -207,7 +249,7 @@ public class Config {
     }
 
     private static String[] validateClusterNodes(String value) {
-        ArrayList<String> l = new ArrayList<String>();
+        ArrayList<String> l = new ArrayList<>();
         if (value!=null) {
             StringTokenizer st = new StringTokenizer(value, ",");
             while (st.hasMoreTokens()) {
@@ -218,7 +260,7 @@ public class Config {
     }
 
     private static String[] validateRegisterClasses(String value) {
-        ArrayList<String> l = new ArrayList<String>();
+        ArrayList<String> l = new ArrayList<>();
         if (value!=null) {
             StringTokenizer st = new StringTokenizer(value, ",");
             while (st.hasMoreTokens()) {
@@ -235,8 +277,19 @@ public class Config {
         if ("false".equals(value)) {
             return false;
         }
-        logger.error("sync.lock.enable value is not valid - use default");
+        logger.warn("sync.lock.enable value is not valid - use default");
         return SYNC_LOCK_ENABLE_DEFAULT;
+    }
+
+    private static boolean validateEnableFlag(String value, String description, boolean def) {
+        if ("true".equals(value)) {
+            return true;
+        }
+        if ("false".equals(value)) {
+            return false;
+        }
+        logger.warn(description + " value is not valid - use default");
+        return def;
     }
 
     private static int validateNodeId(String value) {
@@ -246,14 +299,14 @@ public class Config {
                 return id;
             }
         } catch(NumberFormatException e) {
-            logger.error("node id " + value + " is not valid - use default");
+            logger.warn("node id " + value + " is not valid - use default");
         }
         return LOCAL_NODE_ID_DEFAULT;
     }
 
     private static String validatePath(String path) {
         if (path==null||path.equals("")) {
-            logger.error("path is not valid - use default");
+            logger.warn("path is not valid - use default");
         }
         return path;
     }
@@ -267,7 +320,7 @@ public class Config {
                 }
             }
         } catch (NumberFormatException e) {
-            logger.error("frame size " + value + " is not valid - use default");
+            logger.warn("frame size " + value + " is not valid - use default");
         }
         return FRAMESIZE_DEFAULT;
     }
@@ -279,7 +332,7 @@ public class Config {
                 return port;
             }
         } catch (NumberFormatException e) {
-            logger.error("management console port " + value + " is not valid - use default");
+            logger.warn("management console port " + value + " is not valid - use default");
         }
         return MMPORT_DEFAULT;
     }
@@ -291,7 +344,7 @@ public class Config {
                 return port;
             }
         } catch (NumberFormatException e) {
-            logger.error("remote port " + value + " is not valid - use default");
+            logger.warn("remote port " + value + " is not valid - use default");
         }
         return RMPORT_DEFAULT;
     }
@@ -302,7 +355,7 @@ public class Config {
                 return cp;
             }
         }
-        logger.error("codepage '"+cp+"' is not valid - use default");
+        logger.warn("codepage '"+cp+"' is not valid - use default");
         return CODEPAGE_DEFAULT;
     }
 
@@ -312,7 +365,7 @@ public class Config {
                 return df;
             }
         }
-        logger.error("dateformat '"+df+"' is not valid - use default");
+        logger.warn("dateformat '"+df+"' is not valid - use default");
         return DATEFORMAT_DEFAULT;
     }
 
@@ -323,9 +376,21 @@ public class Config {
                 return id;
             }
         } catch(NumberFormatException e) {
-            logger.error("files amount " + value + " is not valid - use default");
+            logger.warn("files amount " + value + " is not valid - use default");
         }
         return FILES_AMOUNT_DEFAULT;
+    }
+
+    private static int validateThreadsAmount(String value) {
+        try {
+            final int id = Integer.valueOf(value);
+            if (id >= 1 && id <= MAX_FILES_AMOUNT) {
+                return id;
+            }
+        } catch(NumberFormatException e) {
+            logger.warn("threads amount value is not valid - use default");
+        }
+        return RETRIEVE_THREADS_AMOUNT_DEFAULT;
     }
 
     private static String validateDiskioMode(String mode) {
@@ -338,7 +403,7 @@ public class Config {
         } else if (mode.toUpperCase().equals("ASYNC")) {
             return "rw";
         } else {
-            logger.error("diskio mode is not valid - use default");
+            logger.warn("diskio mode is not valid - use default");
             return DISKIO_MODE_DEFAULT;
         }
     }
@@ -350,7 +415,7 @@ public class Config {
                 return p;
             }
         } catch(NumberFormatException e) {
-            logger.error("sync period value is not valid - use default value");
+            logger.warn("sync period value is not valid - use default value");
         }
         return SYNC_PERIOD_DEFAULT;
     }
@@ -362,85 +427,33 @@ public class Config {
                 return p;
             }
         } catch(NumberFormatException e) {
-            logger.error("sync period value is not valid - use default value");
+            logger.warn("queue size value is not valid - use default value");
         }
-        return SYNC_PERIOD_DEFAULT;
+        return RETRIEVE_QUEUE_SIZE_DEFAULT;
     }
 
-    private static String validateRMHost(String value) {
-        if (value==null||value.equals("")) {
-            logger.error("host start is not valid - use default");
-            return RMHOST_START_DEFAULT;
-        }
-        if (value.equals("localhost")) {
-            return "localhost";
-        } else {
-            StringTokenizer st = new StringTokenizer(value, ".");
-            try {
-                while (st.hasMoreTokens()) {
-                    int v = Integer.valueOf(st.nextToken());
-                }
-                return value;
-            } catch(NumberFormatException e) {
-                logger.error("host start is not valid - use default");
-                return RMHOST_START_DEFAULT;
-            }
-        }
-    }
-
-    private static int validateHostRange(String value) {
+    private static int validateInt(String value, String description, int def) {
         try {
             int p = Integer.valueOf(value);
-            if (p > 0 && p < 256) {
+            if (p > 0 && p < Integer.MAX_VALUE) {
                 return p;
             }
         } catch(NumberFormatException e) {
-            logger.error("host range value is not valid - use default value");
+            logger.warn(description + " value is not valid - use default value");
         }
-        return RMHOST_RANGE_DEFAULT;
+        return def;
     }
 
-    private static int validatePortRange(String value) {
+    private static int validatePercent(String value, String description, int def) {
         try {
             int p = Integer.valueOf(value);
-            if (p > 0 && p < 1000) {
+            if (p > 0 && p <= 100) {
                 return p;
             }
         } catch(NumberFormatException e) {
-            logger.error("port range value is not valid - use default value");
+            logger.warn(description + " value is not valid - use default value");
         }
-        return RMPORT_RANGE_DEFAULT;
-    }
-
-    public String[] getRMHostRange() {
-        if (RMHOST_START.equals("localhost")) {
-            return new String[]{"localhost"};
-        } else if (RMHOST_START.equals("127.0.0.1")) {
-                return new String[]{"127.0.0.1"};
-        } else {
-            StringTokenizer st = new StringTokenizer(RMHOST_START, ".");
-            int v = 0;
-            int c = 0;
-            String s = "";
-            while (st.hasMoreTokens()) {
-                v = Integer.valueOf(st.nextToken());
-                if (c<3) s = s + v + ".";
-                c++;
-            }
-            String[] r = new String[RMHOST_RANGE];
-            for (int i=0; i<RMHOST_RANGE; i++) {
-                r[i] = s + (v+i);
-            }
-            return r;
-        }
-    }
-
-    public int[] getRMPortRange() {
-        int[] r = new int[RMPORT_RANGE];
-        for (int i=0; i<RMPORT_RANGE; i++) {
-            r[i] = RMPORT_START+i;
-        }
-        return r;
+        return def;
     }
 
 }
