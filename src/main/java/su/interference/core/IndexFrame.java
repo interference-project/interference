@@ -237,7 +237,8 @@ public class IndexFrame extends Frame {
                         if (i==this.data.size()-1) {
                             keyrpt = false;
                         }
-                        if (this.getFrameSize()-resamt>this.data.get(i).getBytesAmount()&&(keyrpt||this.data.get(i).getDcs().compareTo(max2)<0)) {
+                        final int half = this.data.size() / 2;
+                        if (this.getFrameSize()-resamt>this.data.get(i).getBytesAmount()&&(keyrpt||(this.data.get(i).getDcs().compareTo(max2)<0&&i<=half))) {
                             res.insertChunk(this.data.get(i), s, false, true, llt);
                             resamt = resamt + this.data.get(i).getBytesAmount();
                             res.setHasMV(1);

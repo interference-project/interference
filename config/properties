@@ -1,30 +1,26 @@
 ###########################################
-# init storage parameters:
+#        init storage parameters
+#       (cannot be changed after
+#        the 1st launch of node)
 ###########################################
 
-# node identifier of the current instance
-
+# identifier of current node in the cluster - integer value from 1 to 64
 local.node.id=1
 
-# amount of internal storage threads
-# = amount of files for each storage types:
-# data, index, temp, undo                                       
-
+# amount of internal storage threads and amount of files for each storage types
 files.amount=4
 
-# frame size for all data, temp, undo files
-
+# the size of physical storage frame (in bytes) for all data, temp, undo files
 frame.size=8192
 
-# frame size for index files
-
+# the size of physical storage frame (in bytes) for index files
 frame.size.ix=8192
 
-# system code page
+# system code page for serialize/deserialize String objects
 codepage=UTF8
 
 ###########################################
-# runtime parameters
+# runtime parameters (may be changed later)
 ###########################################
 
 # path where datafiles stored
@@ -33,15 +29,11 @@ db.path=c:/test0
 # path where checkpoint log files stored
 journal.path=c:/test0
 
-# management console
+# management console (not used now)
 mmport=8086
 
-# remote api
+# current node's server port for transport interactions
 rmport=8059
-rmhost.start=localhost
-rmhost.range=1
-rmport.start=8059
-rmport.range=10
 
 # date format used in management console
 dateformat=dd.MM.yyyy
@@ -49,13 +41,58 @@ dateformat=dd.MM.yyyy
 # disk write mode: write through = sync/write back = async
 diskio.mode=sync
 
+# time between writes of changed frames from the queue to disk in milliseconds
 sync.period=1000
-sync.lock.enable=true
-retrieve.queue.size=20000
 
+# lock data changes for the duration of a scheduled sync of frames to disk
+sync.lock.enable=true
+
+# size of blocking queue, which use in SQL retrieve
+# mechanism for prevent of heap overload
+retrieve.queue.size=100000
+
+# the number of threads for parallel processing of the SQL query
+retrieve.threads.amount=8
+
+# list of nodeIds, hosts and ports of cluster nodes, separated by commas.
+# the list must contains string of the following format:
+# nodeId:host:port,nodeId:host:port, : etc.
+# list of nodes must contains all cluster nodes exclude current one
+# if the value is not set, the node will function in single mode (as local database)
 cluster.nodes=
+
+# a list of fully qualified names of entity classes, separated by commas,
+# for which when the service starts, verification will be performed and,
+# if necessary, automatic registration
 auto.register.classes=su.interference.test.entity.Dept,su.interference.test.entity.Emp,su.interference.test.entity.StreamTable
 
+# transport parameters - do not change this values
+transport.sync.timeout=60000
+transport.read.buffer=33554432
+transport.write.buffer=33554432
+
+# cleanup parameters
+
+# enable heap cleanup if possible
+cleanup.enable=true
+
+# closed transaction cleanup timeout
+cleanup.tx.timeout=5000
+
+# cleanup of unused frames in heap timeout
+cleanup.frames.timeout=3000
+
+# max amount of data frames in cleanup excluded table
+cleanup.data.threshold=1000
+
+# max amount of index frames in cleanup excluded index
+cleanup.ix.threshold=2000
+
+# thresholds in percent in heap for cleanup launch
+cleanup.heap.data.threshold=60
+cleanup.heap.ix.threshold=70
+cleanup.heap.temp.threshold=50
+cleanup.heap.undo.threshold=50
 
 #-Dlogback.configurationFile=config/app-log-config.xml
 #-Dsu.interference.config=properties

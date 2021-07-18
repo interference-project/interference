@@ -49,7 +49,7 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
         while (f) {
             latch = new CountDownLatch(1);
             try {
-                if (Config.getConfig().CLEANUP_ENABLE == 1) {
+                if (Config.getConfig().CLEANUP_ENABLE) {
                     cleanUpFrames();
                 } else {
                     logger.warn("system cleanup currently disabled");
