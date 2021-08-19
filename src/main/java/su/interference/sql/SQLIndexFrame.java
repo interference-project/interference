@@ -32,9 +32,7 @@ import su.interference.persistent.FrameData;
 import su.interference.persistent.Session;
 import su.interference.persistent.Table;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.*;
 
 /**
  * @author Yuriy Glotanov
@@ -50,14 +48,14 @@ public class SQLIndexFrame implements FrameApi, Finder {
     private final boolean left;
     private final boolean unique;
     private final boolean merged;
+    private final boolean vccheck;
     private final int join;
-    private ArrayList<Object> mcontent;
     private RetrieveQueue rqueue;
-    private AtomicInteger mptr = new AtomicInteger();
     private final ValueCondition vc;
+    private final Map<ValueSet, Object> vcmap;
 
-    public SQLIndexFrame(Table t, Table parent, FrameData bd, SQLColumn lkey, SQLColumn rkey, ValueCondition vc, boolean left, boolean unique, boolean merged, int join)
-            throws InternalException {
+    public SQLIndexFrame(Table t, Table parent, FrameData bd, SQLColumn lkey, SQLColumn rkey, ValueCondition vc, boolean left, boolean unique, boolean merged, int join, Session s)
+            throws Exception {
         if (!t.isIndex()) {
             throw new InternalException();
         }
@@ -71,6 +69,18 @@ public class SQLIndexFrame implements FrameApi, Finder {
         this.unique = unique;
         this.merged = merged;
         this.join = join;
+        this.vcmap = new HashMap<>();
+        if (vc != null && (vc.getCondition() == Condition.C_EQUAL || vc.getCondition() == Condition.C_IN)) {
+            this.vccheck = true;
+            for (Object o : vc.getValues()) {
+                final ValueSet vs = new ValueSet(o);
+                for (Chunk c : t.getObjectsByKey(vs, s)) {
+                    vcmap.put(vs, c.getEntity(s));
+                }
+            }
+        } else {
+            vccheck = false;
+        }
     }
 
     public int getImpl() {
@@ -78,15 +88,19 @@ public class SQLIndexFrame implements FrameApi, Finder {
     }
 
     public List<Object> get(Object key, Session s) throws Exception {
-        List<Object> res = new ArrayList<>();
-        if (!left&&unique) {
-            res.add(t.getObjectByKey(new ValueSet(key), s));
-            return res;
-        } else if (!left) {
-            res.addAll(t.getObjectsByKey(new ValueSet(key), s));
-            return res;
+        if (vccheck) {
+            return Arrays.asList(vcmap.get(new ValueSet(key)));
         }
-        return null;
+        List<Object> res = new ArrayList<>();
+        if (unique) {
+            Object o = t.getObjectByKey(new ValueSet(key), s);
+            if (o != null) {
+                res.add(o);
+            }
+        } else {
+            res.addAll(t.getObjectsByKey(new ValueSet(key), s));
+        }
+        return res;
     }
 
     public long getFrameId() {
@@ -112,7 +126,7 @@ public class SQLIndexFrame implements FrameApi, Finder {
     public ArrayList<Object> getFrameEntities(Session s) throws Exception {
         //todo need refactor on SQLIndex level - returns one to many frames by value
         synchronized (this) {
-            if (vc != null && (vc.getCondition() == Condition.C_EQUAL || vc.getCondition() == Condition.C_IN)) {
+            if (vccheck) {
                 ArrayList<Object> res = new ArrayList<>();
                 for (Object o : vc.getValues()) {
                     for (Chunk c : t.getObjectsByKey(new ValueSet(o), s)) {
@@ -121,45 +135,19 @@ public class SQLIndexFrame implements FrameApi, Finder {
                 }
                 return res;
             } else {
-                if (left) {
-                    return bd.getFrameEntities(s);
-                } else {
-                    if (merged) {
-                        //todo deprecated implementation
-                        if (mcontent == null) {
-                            mcontent = new ArrayList<>();
-                            for (Chunk c : t.getContent(s)) {
-                                mcontent.add(c.getEntity(s));
-                            }
-                        }
-                        return mcontent;
-                    }
-                }
-                return null;
+                return bd.getFrameEntities(s);
             }
         }
     }
 
-    public Object poll(Session s) throws Exception {
+    public Object poll(Session s) {
         if (!left || join == SQLJoinDispatcher.MERGE) {
             if (rqueue == null) {
                 rqueue = s.getContentQueue(t);
             }
             return rqueue.poll(s);
         } else {
-            synchronized (this) {
-                if (mcontent == null) {
-                    mcontent = new ArrayList<>();
-                    for (Chunk c : t.getContent(s)) {
-                        mcontent.add(c.getEntity(s));
-                    }
-                }
-            }
-            if (mptr.get() == mcontent.size()) {
-                return null;
-            } else {
-                return mcontent.get(mptr.getAndIncrement());
-            }
+            throw new RuntimeException("Wrong issue of internal join mechanism occured");
         }
     }
 

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -44,7 +44,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 
 public class SystemInit {
-    private final static int INITIAL_CLASSES_AMT = 15;
+    private final static int INITIAL_CLASSES_AMT = 16;
     private final static Logger logger = LoggerFactory.getLogger(SystemInit.class);
 
     public static Table initSystem (boolean initStorage, int nodeType, Session s) throws Exception {
@@ -69,6 +69,7 @@ public class SystemInit {
         initialClasses[12] = "su.interference.persistent.MgmtModule";
         initialClasses[13] = "su.interference.persistent.Cursor";
         initialClasses[14] = "su.interference.persistent.FrameSync";
+        initialClasses[15] = "su.interference.persistent.EventSubscriber";
         return initialClasses;
     }
 

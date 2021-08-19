@@ -44,10 +44,10 @@ public class TransportSyncTask implements Runnable {
 
     private final static Logger logger = LoggerFactory.getLogger(TransportSyncTask.class);
     public final static int REMOTE_SYNC_DEFERRED_AMOUNT = 10000;
-    private final ArrayList<SyncFrame> frames;
+    private final List<SyncFrame> frames;
     private final Session s;
 
-    public TransportSyncTask(ArrayList<SyncFrame> frames) {
+    public TransportSyncTask(List<SyncFrame> frames) {
         this.frames = frames;
         this.s = Session.getDntmSession();
     }

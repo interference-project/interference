@@ -34,6 +34,7 @@ import java.io.Serializable;
 public class TransportCallback implements Serializable {
     public static final int SUCCESS = 0;
     public static final int FAILURE = 1;
+    private final static long serialVersionUID = 1010992982563811125L;
 
     private final int nodeId;
     private final String messageUUID;

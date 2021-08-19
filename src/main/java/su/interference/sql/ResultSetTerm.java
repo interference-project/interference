@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -24,10 +24,13 @@
 
 package su.interference.sql;
 
+import java.io.Serializable;
+
 /**
  * @author Yuriy Glotanov
  * @since 1.0
  */
 
-public class ResultSetTerm {
+public class ResultSetTerm implements Serializable {
+    private final static long serialVersionUID = 7302274901293874556L;
 }

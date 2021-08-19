@@ -48,6 +48,8 @@ public class TransportMessage implements Serializable, Delayed {
     private final static Logger logger = LoggerFactory.getLogger(TransportMessage.class);
     private final static Field[] fields = TransportMessage.class.getDeclaredFields();
     private final static SerializerApi sr = new CustomSerializer();
+    private final static long serialVersionUID = 8226547655108763221L;
+
     private final int type;
     private final TransportEvent transportEvent;
     private final TransportCallback transportCallback;

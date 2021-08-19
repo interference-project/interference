@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -76,35 +76,21 @@ public class SQLJoinDispatcher implements Comparable {
         FrameIterator rbi_ = null;
 
         //deprecated
-        this.joinedCC = lbi.getType()== FrameIterator.TYPE_CURSOR?c1:c2;
+        this.joinedCC = lbi.getType() == FrameIterator.TYPE_CURSOR?c1:c2;
 
         if (c1.isIndexOrUnique()||c2.isIndexOrUnique()) {
-            if (merged && ix1 != null && ix2 != null) {
-                if (c1.isUnique()) {
-                    this.join = MERGE;
-                    final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
-                    final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
-                    logger.info("use merge join for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
-                    lbi_ = new SQLIndex(ix1, lt, true, c1, c2, true, nc, MERGE, s);
-                    rbi_ = new SQLIndex(ix2, rt, false, c1, c2, true, nc, MERGE, s);
-                    this.weight = 100;
-                } else {
-                    this.join = RIGHT_MERGE;
-                    final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
-                    final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
-                    logger.info("use right merge join for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
-                    lbi_ = new SQLIndex(ix1, lt, true, c1, c2, true, nc, RIGHT_MERGE, s);
-                    rbi_ = new SQLIndex(ix2, rt, false, c1, c2, true, nc, RIGHT_MERGE, s);
-                    this.weight = 90;
-                }
-            } else if (c1.isUnique() || c2.isUnique()) {
+            if (c1.isUnique() || c2.isUnique()) {
                 this.join = RIGHT_HASH;
                 final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
                 final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
-                final FrameIterator lbi__ = ix1 == null ? lbi : new SQLIndex(ix1, lt, false, c1, c2, true, nc, RIGHT_HASH, s);
-                final FrameIterator rbi__ = ix2 == null ? rbi : new SQLIndex(ix2, rt, false, c1, c2, true, nc, RIGHT_HASH, s);
-                final FrameIterator hbi = c1.isUnique() ? lbi__ : c2.isUnique() ? rbi__ : null;
-                lbi_ = hbi == lbi__ ? rbi__ : lbi__;
+                FrameIterator hbi = null;
+                if (c1.isUnique()) {
+                    lbi_ = ix2 == null ? rbi : new SQLIndex(ix2, rt, true, c1, c2, false, nc, RIGHT_HASH, s);
+                    hbi = ix1 == null ? lbi : new SQLIndex(ix1, lt, false, c1, c2, false, nc, RIGHT_HASH, s);
+                } else if (c2.isUnique()) {
+                    lbi_ = ix1 == null ? lbi : new SQLIndex(ix1, lt, true, c1, c2, false, nc, RIGHT_HASH, s);
+                    hbi = ix2 == null ? rbi : new SQLIndex(ix2, rt, false, c1, c2, false, nc, RIGHT_HASH, s);
+                }
                 final Table lt_ = Instance.getInstance().getTableById(lbi_.getObjectId());
                 final Table rt_ = Instance.getInstance().getTableById(hbi.getObjectId());
                 SQLColumn cmap_ = hbi.getObjectId() == c1.getObjectId() ? c1 : c2;
@@ -112,6 +98,22 @@ public class SQLJoinDispatcher implements Comparable {
                 logger.info("use right hash join for " + lt_.getName() + "." + c1.getColumn().getName() + " * " + rt_.getName() + "." + c2.getColumn().getName());
                 rbi_ = new SQLHashMap(cmap_, ckey_, hbi, rt_, s);
                 this.weight = 60;
+            } else if (c1.isUnique() && merged && ix1 != null && ix2 != null) {
+                this.join = MERGE;
+                final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
+                final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
+                logger.info("use merge join for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
+                lbi_ = new SQLIndex(ix1, lt, true, c1, c2, true, nc, MERGE, s);
+                rbi_ = new SQLIndex(ix2, rt, false, c1, c2, true, nc, MERGE, s);
+                this.weight = 100;
+            } else if (c2.isUnique() && merged && ix1 != null && ix2 != null) {
+                this.join = MERGE;
+                final Table lt = Instance.getInstance().getTableById(rbi.getObjectId());
+                final Table rt = Instance.getInstance().getTableById(lbi.getObjectId());
+                logger.info("use merge join for " + lt.getName() + "." + c2.getColumn().getName() + " * " + rt.getName() + "." + c1.getColumn().getName());
+                lbi_ = new SQLIndex(ix2, lt, true, c2, c1, true, nc, MERGE, s);
+                rbi_ = new SQLIndex(ix1, rt, false, c2, c1, true, nc, MERGE, s);
+                this.weight = 100;
             } else {
                 this.join = RIGHT_INDEX;
                 final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());

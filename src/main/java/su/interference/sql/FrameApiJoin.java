@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -30,7 +30,7 @@ import su.interference.core.Config;
 import su.interference.metrics.Metrics;
 
 import java.io.Serializable;
-import java.util.List;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
@@ -41,6 +41,7 @@ import java.util.concurrent.CountDownLatch;
 
 public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
     private final static Logger logger = LoggerFactory.getLogger(FrameApiJoin.class);
+    private final static long serialVersionUID = 2355717070212234856L;
     private final int nodeId;
     private final transient FrameApi bd1;
     private final transient FrameApi bd2;
@@ -48,8 +49,9 @@ public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
     private final long leftAllocId;
     private final long rightAllocId;
     private final transient CountDownLatch latch = new CountDownLatch(1);
-    private List<Object> result;
+    private BlockingQueue<Object> result;
     private boolean failed;
+    private final boolean terminate;
 
     public FrameApiJoin(int nodeId, SQLCursor cur, FrameApi bd1, FrameApi bd2) {
         this.nodeId = nodeId;
@@ -58,10 +60,21 @@ public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
         this.leftAllocId = bd1.getAllocId();
         this.rightAllocId = bd2 == null ? 0 : bd2 instanceof SQLIndexFrame ? 0 : bd2.getAllocId();
         if (nodeId == Config.getConfig().LOCAL_NODE_ID) {
-            frameJoinTask = cur.buildFrameJoinTask(nodeId, bd1, bd2);
+            this.frameJoinTask = cur.buildFrameJoinTask(nodeId, bd1, bd2);
         } else {
-            frameJoinTask = null;
+            this.frameJoinTask = null;
         }
+        this.terminate = false;
+    }
+
+    public FrameApiJoin() {
+        this.nodeId = 0;
+        this.bd1 = null;
+        this.bd2 = null;
+        this.leftAllocId = 0;
+        this.rightAllocId = 0;
+        this.frameJoinTask = null;
+        this.terminate = true;
     }
 
     public FrameApiJoin call() throws InterruptedException {
@@ -119,15 +132,15 @@ public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
         return bd2;
     }
 
-    public List<Object> getResult() {
+    public BlockingQueue<Object> getResult() {
         return result;
     }
 
-    public void setResult(List<Object> result) {
+    public void setResult(BlockingQueue<Object> result) {
         this.result = result;
     }
 
-    public void setResultWithCountDown(List<Object> result) {
+    public void setResultWithCountDown(BlockingQueue<Object> result) {
         this.result = result;
         latch.countDown();
     }
@@ -139,5 +152,9 @@ public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
     public void setFailed(boolean failed) {
         this.failed = failed;
         latch.countDown();
+    }
+
+    public boolean isTerminate() {
+        return terminate;
     }
 }

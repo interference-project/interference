@@ -52,13 +52,13 @@ public class SQLCursor implements FrameIterator {
     private static ExecutorService streampool = Executors.newCachedThreadPool();
     private static ExecutorService groupspool = Executors.newCachedThreadPool();
     private static ExecutorService rspool = Executors.newCachedThreadPool();
-    private List<FrameApiJoin> ltasks;
-    private List<FrameApiJoin> rtasks;
-    private List<FrameApiJoin> tasks_;
+    private final LinkedBlockingQueue<FrameApiJoin> ltasks;
+    private final LinkedBlockingQueue<FrameApiJoin> rtasks;
+    private final LinkedBlockingQueue<FrameApiJoin> rtasks_;
+    boolean ldone = false;
+    boolean rdone = false;
     private FrameData bdnext;
     private FrameHolder current;
-    private int lptr = 0;
-    private int rptr = 0;
     private boolean sent;
     private Cursor cur;
     private Session s;
@@ -79,6 +79,7 @@ public class SQLCursor implements FrameIterator {
 
     private static Map<Integer, Map<Long, ConcurrentLinkedQueue<FrameApi>>> sfmap = new ConcurrentHashMap<>();
     private static final int BATCH_SIZE = 8;
+    private static final int REMOTE_TASK_SIZE = 1000;
     private final static Logger logger = LoggerFactory.getLogger(SQLCursor.class);
 
     public SQLCursor (int id, FrameIterator lbi, FrameIterator rbi, NestedCondition nc, List<SQLColumn> rscols, boolean ixflag, boolean last, Cursor cur, Session s) throws Exception {
@@ -122,9 +123,9 @@ public class SQLCursor implements FrameIterator {
         }
         current = new FrameHolder(target);
 
-        ltasks = new ArrayList<>();
-        rtasks = new ArrayList<>();
-        tasks_ = new ArrayList<>();
+        ltasks = new LinkedBlockingQueue<>();
+        rtasks = new LinkedBlockingQueue<>();
+        rtasks_ = new LinkedBlockingQueue<>();
 
         //rebuild column set for sqlcursor iterator
         final SQLCursor cursor_ = lbi.getType() == FrameIterator.TYPE_CURSOR ? (SQLCursor) lbi : rbi != null && rbi.getType() == FrameIterator.TYPE_CURSOR ? (SQLCursor) rbi : null;
@@ -150,7 +151,7 @@ public class SQLCursor implements FrameIterator {
             final ValueCondition vc = nc.getIndexVC(lbi, null);
             if (vc != null) {
                 final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
-                this.lbi = new SQLIndex(vc.getConditionColumn().getIndex(), lt, false, vc.getConditionColumn(), vc.getConditionColumn(), true, nc, 0, s);
+                this.lbi = new SQLIndex(vc.getConditionColumn().getIndex(), lt, true, vc.getConditionColumn(), vc.getConditionColumn(), false, nc, 0, s);
                 this.rbi = rbi;
             } else {
                 this.lbi = lbi;
@@ -170,7 +171,7 @@ public class SQLCursor implements FrameIterator {
             this.lbi.setLeftfs(true);
         }
         if (this.lbi instanceof SQLCursor) {
-            logger.info("use full scan for "+lt.getName());
+            logger.info("use full scan for " + lt.getName() +" persistent = "+((SQLCursor) lbi).getTarget().isPersistent());
         }
 
         if (this.rbi != null) {
@@ -179,7 +180,7 @@ public class SQLCursor implements FrameIterator {
                 logger.info("use full scan for "+rt.getName());
             }
             if (this.rbi instanceof SQLCursor) {
-                logger.info("use full scan for "+rt.getName());
+                logger.info("use full scan for " + rt.getName() +" persistent = "+((SQLCursor) lbi).getTarget().isPersistent());
             }
 
         }
@@ -198,67 +199,119 @@ public class SQLCursor implements FrameIterator {
         return new FrameJoinTask(cur, bd1, bd2, target, rscols, nc, id, nodeId, last, lbi.isLeftfs(), hmap, null, s);
     }
 
-    public void build() throws Exception {
+    public void build() {
         final Integer[] ns = Config.getConfig().TEST_DISTRIBUTE_MODE == 0 ? TransportContext.getInstance().getOnlineNodesWithLocal() : TransportContext.getInstance().getNodesWithLocal();
-        int i = 0;
-        boolean isc = this.lbi instanceof SQLCursor || this.rbi instanceof SQLCursor;
-        //int tnode = 0;
+        final boolean isc = this.lbi instanceof SQLCursor || this.rbi instanceof SQLCursor;
+        final SQLCursor c1 = this;
+        final LinkedBlockingQueue<FrameApiJoin> rtasks__ = new LinkedBlockingQueue<>();
 
-        while (lbi.hasNextFrame()) {
-            final FrameApi bd1 = lbi.nextFrame();
+        Runnable build = new Runnable() {
+            @Override
+            public void run() {
+                Thread.currentThread().setName("interference sql cursor build "+Thread.currentThread().getId());
+                int i = 0;
+                try {
+                    while (lbi.hasNextFrame()) {
+                        final FrameApi bd1 = lbi.nextFrame();
 
-            if (bd1 != null) {
-                if (rbi == null) {
-                    if (ns[i] == Config.getConfig().LOCAL_NODE_ID) {
-                        ltasks.add(new FrameApiJoin(ns[i], this, bd1, null));
-                    } else {
-                        rtasks.add(new FrameApiJoin(ns[i], this, bd1, null));
-                    }
-                    i++;
-                    if (i == ns.length) {
-                        i = 0;
-                    }
-                } else {
-                    while (rbi.hasNextFrame()) {
-                        final FrameApi bd2 = rbi.nextFrame();
-                        if (bd2 != null) {
-                            if (rightType == null) {
-                                rightType = bd2.getClass().getSimpleName();
-                            }
-                            if (lbi.noDistribute() || rbi.noDistribute()) {
-                                ltasks.add(new FrameApiJoin(Config.getConfig().LOCAL_NODE_ID, this, bd1, bd2));
-                            } else {
+                        if (bd1 != null) {
+                            if (rbi == null) {
                                 if (ns[i] == Config.getConfig().LOCAL_NODE_ID) {
-                                    ltasks.add(new FrameApiJoin(ns[i], this, bd1, bd2));
+                                    ltasks.put(new FrameApiJoin(ns[i], c1, bd1, null));
                                 } else {
-                                    rtasks.add(new FrameApiJoin(ns[i], this, bd1, bd2));
+                                    rtasks__.put(new FrameApiJoin(ns[i], c1, bd1, null));
+                                }
+                                i++;
+                                if (i == ns.length) {
+                                    i = 0;
+                                }
+                            } else {
+                                while (rbi.hasNextFrame()) {
+                                    final FrameApi bd2 = rbi.nextFrame();
+                                    if (bd2 != null) {
+                                        if (rightType == null) {
+                                            rightType = bd2.getClass().getSimpleName();
+                                        }
+                                        if (lbi.noDistribute() || rbi.noDistribute()) {
+                                            ltasks.put(new FrameApiJoin(Config.getConfig().LOCAL_NODE_ID, c1, bd1, bd2));
+                                        } else {
+                                            if (ns[i] == Config.getConfig().LOCAL_NODE_ID) {
+                                                ltasks.put(new FrameApiJoin(ns[i], c1, bd1, bd2));
+                                            } else {
+                                                rtasks__.put(new FrameApiJoin(ns[i], c1, bd1, bd2));
+                                            }
+                                        }
+                                        i++;
+                                        if (i == ns.length) {
+                                            i = 0;
+                                        }
+                                    }
+                                }
+                                rbi.resetIterator();
+                            }
+                        }
+                    }
+                    ltasks.put(new FrameApiJoin());
+                    rtasks__.put(new FrameApiJoin());
+                } catch (Exception e) {
+                    logger.error("exception occured during cursor build", e);
+                }
+            }
+        };
+        remotepool.submit(build);
+
+        if (!sent) {
+            Runnable send = new Runnable() {
+                @Override
+                public void run() {
+                    Thread.currentThread().setName("interference sql cursor remote send "+Thread.currentThread().getId());
+                    try {
+                        final Map<Integer, Map<String, FrameApiJoin>> joins = new HashMap<>();
+                        for (Integer nodeId : ns) {
+                            if (nodeId != Config.getConfig().LOCAL_NODE_ID) {
+                                joins.put(nodeId, new HashMap<>());
+                            }
+                        }
+
+                        boolean cnue = true;
+                        while (cnue) {
+                            final FrameApiJoin j = rtasks__.take();
+                            if (j.isTerminate()) {
+                                cnue = false;
+                            } else {
+                                if (j.getNodeId() != Config.getConfig().LOCAL_NODE_ID) {
+                                    joins.get(j.getNodeId()).put(j.getKey(), j);
+                                    if (joins.get(j.getNodeId()).size() == REMOTE_TASK_SIZE) {
+                                        final RemoteTask rt = new RemoteTask(cur, j.getNodeId(), joins.get(j.getNodeId()), rightType, target.getTableClass() == null ? null : target.getTableClass().getName());
+                                        remotepool.submit(rt);
+                                        for (Map.Entry<String, FrameApiJoin> entry : joins.get(j.getNodeId()).entrySet()) {
+                                            rtasks.put(entry.getValue());
+                                        }
+                                        joins.put(j.getNodeId(), new HashMap<>());
+                                    }
                                 }
                             }
-                            i++;
-                            if (i == ns.length) {
-                                i = 0;
+                        }
+
+                        for (Integer nodeId : ns) {
+                            if (nodeId != Config.getConfig().LOCAL_NODE_ID) {
+                                if (joins.get(nodeId).size() > 0) {
+                                    final RemoteTask rt = new RemoteTask(cur, nodeId, joins.get(nodeId), rightType, target.getTableClass() == null ? null : target.getTableClass().getName());
+                                    remotepool.submit(rt);
+                                    for (Map.Entry<String, FrameApiJoin> entry : joins.get(nodeId).entrySet()) {
+                                        rtasks.put(entry.getValue());
+                                    }
+                                }
                             }
                         }
+                        rtasks.put(new FrameApiJoin());
+                    } catch (Exception e) {
+                        logger.error("exception occured during remote send of tasks", e);
                     }
-                    rbi.resetIterator();
+                    sent = true;
                 }
-            }
-        }
-        logger.info("SQL cursor is build: ltasks/rtasks amount = "+ltasks.size()+"/" + rtasks.size() + ", use NC check = " + last);
-        if (!sent) {
-            for (Integer nodeId : ns) {
-                if (nodeId != Config.getConfig().LOCAL_NODE_ID) {
-                    final Map<String, FrameApiJoin> joins = new HashMap<>();
-                    for (FrameApiJoin j : rtasks) {
-                        if (j.getNodeId() == nodeId) {
-                            joins.put(j.getKey(), j);
-                        }
-                    }
-                    final RemoteTask rt = new RemoteTask(cur, nodeId, joins, rightType, target.getTableClass() == null ? null : target.getTableClass().getName());
-                    remotepool.submit(rt);
-                }
-            }
-            sent = true;
+            };
+            remotepool.submit(send);
         }
     }
 
@@ -302,13 +355,20 @@ public class SQLCursor implements FrameIterator {
                     if (flist.size() > 0) {
                         final ContainerFrame cf = new ContainerFrame(lbi.getObjectId(), flist);
                         final FrameJoinTask task = new FrameJoinTask(cur, cf, null, target, ((StreamQueue) target).getRscols(), nc, id, Config.getConfig().LOCAL_NODE_ID, last, lbi.isLeftfs(), null, null, s);
-                        final Future<List<Object>> ft = exec.submit(task);
+                        final Future<BlockingQueue<Object>> ft = exec.submit(task);
+                        final BlockingQueue<Object> q = ft.get();
+                        boolean cnue =  true;
 
-                        if (cur.getSqlStmt().isGroupedResult()) {
-                            q_in.addAll(ft.get());
-                        } else {
-                            for (Object o : ft.get()) {
-                                target.persist(o, s);
+                        while (cnue) {
+                            final Object o = q.take();
+                            if (o instanceof ResultSetTerm) {
+                                cnue = false;
+                            } else {
+                                if (cur.getSqlStmt().isGroupedResult()) {
+                                    q_in.add(o);
+                                } else {
+                                    target.persist(o, s);
+                                }
                             }
                         }
                     }
@@ -317,13 +377,20 @@ public class SQLCursor implements FrameIterator {
                         FrameApi f = q.poll();
                         if (f != null) {
                             final FrameJoinTask task = new FrameJoinTask(cur, f, null, target, ((StreamQueue) target).getRscols(), nc, id, Config.getConfig().LOCAL_NODE_ID, last, lbi.isLeftfs(), null, null, s);
-                            final Future<List<Object>> ft = exec.submit(task);
+                            final Future<BlockingQueue<Object>> ft = exec.submit(task);
+                            final BlockingQueue<Object> q = ft.get();
+                            boolean cnue =  true;
 
-                            if (cur.getSqlStmt().isGroupedResult()) {
-                                q_in.addAll(ft.get());
-                            } else {
-                                for (Object o : ft.get()) {
-                                    target.persist(o, s);
+                            while (cnue) {
+                                final Object o = q.take();
+                                if (o instanceof ResultSetTerm) {
+                                    cnue = false;
+                                } else {
+                                    if (cur.getSqlStmt().isGroupedResult()) {
+                                        q_in.add(o);
+                                    } else {
+                                        target.persist(o, s);
+                                    }
                                 }
                             }
                         }
@@ -368,7 +435,7 @@ public class SQLCursor implements FrameIterator {
     }
 */
 
-    public Future<List<Object>> execute(FrameApi bd1, FrameApi bd2, FrameApiJoin j) {
+    public Future<BlockingQueue<Object>> execute(FrameApi bd1, FrameApi bd2, FrameApiJoin j) {
         final FrameJoinTask task = new FrameJoinTask(cur, bd1, bd2, target, rscols, nc, id, Config.getConfig().LOCAL_NODE_ID, last, lbi.isLeftfs(), hmap, j, s);
         return exec.submit(task);
     }
@@ -378,94 +445,123 @@ public class SQLCursor implements FrameIterator {
     }
 
     private synchronized FrameData nextFrame2() throws InternalException {
-        boolean ldone = lptr >= ltasks.size();
-        boolean rdone = rptr >= rtasks.size();
         boolean done = ldone && rdone;
+        boolean prcrj = true;
         FrameData ret = current.getFrame(ldone && rdone);
 
-        while (!done && ret==null) {
-            final ArrayList<Future<FrameApiJoin>> flist = new ArrayList<>();
-            final ArrayList<Future<FrameApiJoin>> flist2 = new ArrayList<>();
-            try {
-                for (int i=0; i < BATCH_SIZE; i++) {
-                    if (ldone) {
-                        if (!rdone) {
-                            if ((rptr + i) < rtasks.size()) {
-                                final FrameApiJoin j = rtasks.get(rptr + i);
-                                flist2.add(exec2.submit(j));
-                            }
-                        }
-                    } else {
-                        if ((lptr + i) < ltasks.size()) {
-                            final FrameApiJoin j = ltasks.get(lptr + i);
-                            flist.add(exec.submit(j));
+        if (ret != null) {
+            return ret;
+        }
+
+        try {
+
+            while (!done) {
+                final ArrayList<Future<FrameApiJoin>> flist = new ArrayList<>();
+                final ArrayList<Future<FrameApiJoin>> flist2 = new ArrayList<>();
+
+                for (int i = 0; i < BATCH_SIZE; i++) {
+                    if (!ldone) {
+                        final FrameApiJoin j = ltasks.take();
+                        if (j.isTerminate()) {
+                            ldone = true;
+                        } else {
+                            flist.add(exec2.submit(j));
                         }
                     }
                 }
-                if (ldone) {
+
+                for (int i = 0; i < BATCH_SIZE; i++) {
                     if (!rdone) {
-                        for (Future<FrameApiJoin> f : flist2) {
-                            try {
-                                final FrameApiJoin j = f.get();
-                                if (j.isFailed()) {
-                                    FrameApiJoin j_ = new FrameApiJoin(Config.getConfig().LOCAL_NODE_ID, this, j.getBd1(), j.getBd2());
-                                    tasks_.add(j_);
-                                } else {
-                                    for (Object o : j.getResult()) {
-                                        target.persist(o, s);
-                                    }
-                                }
-                            } catch (Exception e) {
-                                if (e instanceof ExecutionException) {
-                                    e.getCause().printStackTrace();
-                                } else {
-                                    e.printStackTrace();
-                                }
-                            }
+                        final FrameApiJoin j = rtasks.take();
+                        if (j.isTerminate()) {
+                            rdone = true;
+                        } else {
+                            flist2.add(exec2.submit(j));
                         }
                     }
-                } else {
-                    for (Future<FrameApiJoin> f : flist) {
-                        try {
-                            final FrameApiJoin j = f.get();
-                            for (Object o : j.getResult()) {
+                }
+
+//                for (int i=0; i < BATCH_SIZE; i++) {
+                if (!prcrj) {
+                    final FrameApiJoin j = rtasks_.take();
+                    if (j.isTerminate()) {
+                        prcrj = true;
+                    } else {
+                        flist.add(exec2.submit(j));
+                    }
+                }
+//                }
+
+                for (Future<FrameApiJoin> f : flist) {
+                    try {
+                        final FrameApiJoin j = f.get();
+                        final BlockingQueue<Object> q = j.getResult();
+                        boolean cnue = true;
+                        while (cnue) {
+                            final Object o = q.take();
+                            if (o instanceof ResultSetTerm) {
+                                cnue = false;
+                            } else {
                                 target.persist(o, s);
                             }
-                        } catch (Exception e) {
-                            if (e instanceof ExecutionException) {
-                                e.getCause().printStackTrace();
-                            } else {
-                                e.printStackTrace();
-                            }
+                        }
+                    } catch (Exception e) {
+                        if (e instanceof ExecutionException) {
+                            e.getCause().printStackTrace();
+                        } else {
+                            e.printStackTrace();
                         }
                     }
                 }
-                if (ldone) {
-                    if (!rdone) {
-                        rptr = rptr + BATCH_SIZE;
+
+                for (Future<FrameApiJoin> f : flist2) {
+                    try {
+                        final FrameApiJoin j = f.get();
+                        if (j.isFailed()) {
+                            FrameApiJoin j_ = new FrameApiJoin(Config.getConfig().LOCAL_NODE_ID, this, j.getBd1(), j.getBd2());
+                            rtasks_.put(j_);
+                            prcrj = false;
+                        } else {
+                            final BlockingQueue<Object> q = j.getResult();
+                            boolean cnue = true;
+                            while (cnue) {
+                                final Object o = q.take();
+                                if (o instanceof ResultSetTerm) {
+                                    cnue = false;
+                                } else {
+                                    target.persist(o, s);
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        if (e instanceof ExecutionException) {
+                            e.getCause().printStackTrace();
+                        } else {
+                            e.printStackTrace();
+                        }
                     }
-                } else {
-                    lptr = lptr + BATCH_SIZE;
                 }
 
-                ldone = lptr >= ltasks.size();
-                rdone = rptr >= rtasks.size();
-
-                if (ldone && rdone && tasks_.size() > 0) {
-                    ldone = false;
-                    ltasks = tasks_;
-                    tasks_ = new ArrayList<>();
-                    lptr = 0;
+                done = ldone && rdone && prcrj;
+                if (rdone && !prcrj) {
+                    rtasks_.put(new FrameApiJoin());
                 }
-
-                done = ldone && rdone;
-                ret = current.getFrame(ldone && rdone);
-            } catch (Exception e) {
-                e.printStackTrace();
             }
 
-           logger.debug("SQL cursor "+cur.getCursorId()+" next frame returned frame "+(ret==null?"null":ret.getFrameId()));
+            ret = current.getFrame(ldone && rdone);
+
+            if (ret != null) {
+                logger.debug("SQL cursor " + cur.getCursorId() + " returned next frame " + ret.getFrameId());
+            }
+
+            if (!target.isPersistent()) {
+                target.persist(new ResultSetTerm(), s);
+                logger.info("non-persistent cursor terminated");
+            }
+        } catch (Exception e) {
+            logger.error("exception occured during cursor processing ", e);
         }
+
         return ret;
     }
 
@@ -514,7 +610,7 @@ public class SQLCursor implements FrameIterator {
 
                         ((ResultSetImpl)target).release();
 
-                        if (!((ResultSetImpl)target).isPersistent()) {
+                        if (!target.isPersistent()) {
                             target.persist(new ResultSetTerm(), s);
                         }
                     } catch (Exception e) {
@@ -526,6 +622,10 @@ public class SQLCursor implements FrameIterator {
         }
         flush = true;
         return target;
+    }
+
+    public boolean isFlush() {
+        return flush;
     }
 
     public int getId() {

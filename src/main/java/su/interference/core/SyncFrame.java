@@ -55,6 +55,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
     private final boolean allowR;
     private final boolean proc;
     private final boolean started;
+    private final boolean distributed;
     private final Map<Long, Long> imap;
     private final Map<Long, Transaction> rtran;
     private final Map<Long, List<Long>> uframes;
@@ -73,6 +74,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
         final FrameData bd = Instance.getInstance().getFrameById(frame.getPtr());
         allowR = frame.isLocal() ? !t.isNoTran() || t.getName().equals("su.interference.persistent.UndoChunk") : false;
         this.proc = bd == null ? false : proc;
+        distributed = t.isDistributed();
 
         if (bd == null && allowR) {
             final FreeFrame fframe = Instance.getInstance().getFreeFrameById(frame.getPtr());
@@ -241,6 +243,10 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
 
     public Map<Long, List<Long>> getUFrames() {
         return uframes;
+    }
+
+    public boolean isDistributed() {
+        return distributed;
     }
 
     public boolean equals (SyncFrame bl) {

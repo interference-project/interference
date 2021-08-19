@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -71,6 +71,8 @@ public class Node implements Serializable {
     public static final int NODE_STATE_IDLE = Instance.SYSTEM_STATE_IDLE;
     @Transient
     public static final int NODE_STATE_NA = Instance.SYSTEM_STATE_NA;
+    @Transient
+    private static final long serialVersionUID = 7283510956882274321L;
 
     @Column
     @Id
@@ -119,8 +121,6 @@ public class Node implements Serializable {
     private int exists;
     @Transient
     public static final int CLASS_ID = 13;
-    @Transient
-    private final static long serialVersionUID = 8712349857239985123L;
 
     public static int getCLASS_ID() {
         return CLASS_ID;

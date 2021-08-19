@@ -22,27 +22,13 @@
 
  */
 
-package su.interference.core;
-
-import su.interference.api.GenericResult;
-
-import java.io.Serializable;
-import java.util.Map;
+package su.interference.persistent;
 
 /**
  * @author Yuriy Glotanov
  * @since 1.0
  */
 
-public class GenericObject implements Serializable, GenericResult {
-    private final static long serialVersionUID = 4330809121118587364L;
-    private final Map<String, Object> vmap;
-
-    protected GenericObject(Map<String, Object> vmap) {
-       this.vmap = vmap;
-   }
-
-    public Object getValueByName(String name) {
-       return vmap.get(name);
-   }
+public interface OnDelete {
+    void onDelete() throws Exception;
 }

@@ -54,7 +54,7 @@ import javax.persistence.*;
 @Entity
 @SystemEntity
 @DisableSync
-public class Session {
+public class Session implements OnDelete {
     @Transient
     public static final int ROOT_USER_ID = 1;
 
@@ -329,11 +329,15 @@ public class Session {
 
     public Object find (String c, long id) throws Exception {
         final Table t = Instance.getInstance().getTableByName(c);
+        t.getFindMeter().start();
         if (t != null) {
             this.startStatement();
             final DataChunk dc = t.getChunkById(id, this);
-            return dc == null ? null : ((EntityContainer) dc.getStandaloneEntity()).getEntity(this);
+            final Object res = dc == null ? null : ((EntityContainer) dc.getStandaloneEntity()).getEntity(this);
+            t.getFindMeter().stop();
+            return res;
         }
+        t.getFindMeter().stop();
         return null;
     }
 
@@ -433,9 +437,20 @@ public class Session {
     }
 
     public DataChunk persist (Object o, LLT llt) throws Exception {
-        final Table t = Instance.getInstance().getTableByName(o.getClass().getName());
+        final String cname = o.getClass().getName();
+        final Table t = Instance.getInstance().getTableByName(cname);
+        if (!t.isNoTran()) {
+            t.getPersistMeter().start();
+        }
         if (t != null) {
-            return t.persist(o, this, llt);
+            final DataChunk dc = t.persist(o, this, llt);
+            if (!t.isNoTran()) {
+                t.getPersistMeter().stop();
+            }
+            return dc;
+        }
+        if (!t.isNoTran()) {
+            t.getPersistMeter().stop();
         }
         return null;
     }
@@ -574,6 +589,13 @@ public class Session {
                 f[i].set(this, dcs[x]);
                 x++;
             }
+        }
+    }
+
+    public void onDelete() throws Exception {
+        List<Transaction> trans = Instance.getInstance().getTransactionsBySid(this.sid);
+        for (Transaction tran : trans) {
+            this.delete(tran);
         }
     }
 

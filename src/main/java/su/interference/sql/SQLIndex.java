@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -25,7 +25,6 @@
 package su.interference.sql;
 
 import su.interference.core.Instance;
-import su.interference.core.ValueSet;
 import su.interference.exception.InternalException;
 import su.interference.persistent.FrameData;
 import su.interference.persistent.Session;
@@ -33,7 +32,6 @@ import su.interference.persistent.Table;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -44,7 +42,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 1.0
  */
 
-public class SQLIndex implements FrameIterator, Finder {
+public class SQLIndex implements FrameIterator {
     private final Table t;
     private final Session s;
     private final int join;
@@ -59,6 +57,7 @@ public class SQLIndex implements FrameIterator, Finder {
     private final AtomicBoolean terminate;
     private final ValueCondition vc;
     private SQLIndexFrame mframe;
+    private SQLIndexFrame rframe;
 
     public SQLIndex(Table t, Table parent, boolean left, SQLColumn lkey, SQLColumn rkey, boolean merged, NestedCondition nc, int join, Session s) throws InternalException, IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         if (!t.isIndex()) throw new InternalException();
@@ -71,40 +70,43 @@ public class SQLIndex implements FrameIterator, Finder {
         this.left = left;
         this.unique = left?lkey.isUnique():rkey.isUnique();
         this.merged = merged;
-        this.frames = join == SQLJoinDispatcher.MERGE ? null : left ? t.getFrames(s) : null;
+        this.frames = join == SQLJoinDispatcher.MERGE ? null : join == SQLJoinDispatcher.RIGHT_INDEX ? null : left == false ? null : t.getFrames(s, t.getTableClass().getSimpleName());
         this.returned = new AtomicBoolean(false);
         this.terminate = new AtomicBoolean(false);
         this.vc = nc.getIndexVC(this, t);
     }
 
-    public List<Object> get(Object key, Session s) throws Exception {
-        List<Object> res = new ArrayList<>();
-        if (!left&&unique) {
-            res.add(t.getObjectByKey(new ValueSet(key), s));
-            return res;
-        } else if (!left) {
-            res.addAll(t.getObjectsByKey(new ValueSet(key), s));
-            return res;
-        }
-        return null;
-    }
-
     //may returns null
     public FrameApi nextFrame() throws Exception {
-        if (!left || join == SQLJoinDispatcher.MERGE) {
+        if (join == SQLJoinDispatcher.MERGE) {
             if (!returned.get()) {
                 returned.compareAndSet(false, true);
                 if (merged) {
                     synchronized (this) {
                         if (mframe == null) {
-                            mframe = new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join);
+                            mframe = new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, s);
                         }
                         return mframe;
                     }
                 } else {
-                    return new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join);
+                    return new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, s);
                 }
             }
+        } else if (join == SQLJoinDispatcher.RIGHT_INDEX) {
+            terminate.compareAndSet(false, true);
+            if (rframe == null) {
+                rframe = new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, s);
+            }
+            return rframe;
+        } else if (join == SQLJoinDispatcher.RIGHT_HASH && !left) {
+            terminate.compareAndSet(false, true);
+            if (rframe == null) {
+                rframe = new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, s);
+            }
+            return rframe;
+        } else if ((join == 0 || left) && vc != null && (vc.getCondition() == Condition.C_EQUAL || vc.getCondition() == Condition.C_IN)) {
+            terminate.compareAndSet(false, true);
+            return new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, s);
         } else {
             if (hasNextFrame()) {
                 final FrameData bd = frames.take();
@@ -112,27 +114,20 @@ public class SQLIndex implements FrameIterator, Finder {
                     terminate.compareAndSet(false, true);
                     return null;
                 }
-                return new SQLIndexFrame(t, parent, bd, lkey, rkey, vc, left, unique, merged, join);
+                return new SQLIndexFrame(t, parent, bd, lkey, rkey, vc, left, unique, merged, join, s);
             }
         }
         return null;
     }
 
-    public FrameApi getFrameByAllocId(long allocId) {
+    public FrameApi getFrameByAllocId(long allocId) throws Exception {
         final FrameData bd = Instance.getInstance().getFrameByAllocId(allocId);
-        return new SQLIndexFrame(t, parent, bd, lkey, rkey, vc, left, unique, merged, join);
+        return new SQLIndexFrame(t, parent, bd, lkey, rkey, vc, left, unique, merged, join, s);
     }
 
     public void resetIterator() {
-        if (left) {
-/* optional (possibly will be need)
-            try {
-                frames = t.getFrames(s);
-                terminate.compareAndSet(true, false);
-            } catch (Exception e) {
-                throw new RuntimeException();
-            }
-*/
+        if (terminate.get()) {
+            terminate.compareAndSet(true, false);
         }
         if (returned.get()) {
             returned.compareAndSet(true, false);
@@ -140,7 +135,7 @@ public class SQLIndex implements FrameIterator, Finder {
     }
 
     public boolean hasNextFrame() {
-        if (!left || join == SQLJoinDispatcher.MERGE) {
+        if (join == SQLJoinDispatcher.MERGE) {
             return !returned.get();
         } else {
             return !terminate.get();

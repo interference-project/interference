@@ -22,27 +22,60 @@
 
  */
 
-package su.interference.core;
+package su.interference.persistent;
 
-import su.interference.api.GenericResult;
+import su.interference.core.DisableSync;
+import su.interference.core.IndexColumn;
+import su.interference.core.MapColumn;
+import su.interference.core.SystemEntity;
+import su.interference.mgmt.MgmtColumn;
 
-import java.io.Serializable;
-import java.util.Map;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Transient;
 
 /**
  * @author Yuriy Glotanov
  * @since 1.0
  */
 
-public class GenericObject implements Serializable, GenericResult {
-    private final static long serialVersionUID = 4330809121118587364L;
-    private final Map<String, Object> vmap;
+@Entity
+@SystemEntity
+@DisableSync
+public class EventSubscriber {
 
-    protected GenericObject(Map<String, Object> vmap) {
-       this.vmap = vmap;
-   }
+    @Id
+    @Column
+    @MapColumn
+    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    private String entityId;
+    @Column
+    @IndexColumn
+    @MgmtColumn(width=20, show=true, form=false, edit=false)
+    private String subscriberId;
 
-    public Object getValueByName(String name) {
-       return vmap.get(name);
-   }
+    @Transient
+    public static final int CLASS_ID = 16;
+
+    public static int getCLASS_ID() {
+        return CLASS_ID;
+    }
+
+    public EventSubscriber() {
+
+    }
+
+    public EventSubscriber(String entityId, String subscriberId) {
+        this.entityId = entityId;
+        this.subscriberId = subscriberId;
+    }
+
+    public String getEntityId() {
+        return entityId;
+    }
+
+    public String getSubscriberId() {
+        return subscriberId;
+    }
 }

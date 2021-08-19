@@ -60,13 +60,14 @@ public class Transaction implements Serializable {
 
     @Id
     @Column
-    @IndexColumn
+    @MapColumn
     @GeneratedValue
     @DistributedId
     @MgmtColumn(width=10, show=true, form=false, edit=false)
     private long transId;
     @Column
     @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @IndexColumn
     private long sid;
     @Column
     @MgmtColumn(width=10, show=true, form=false, edit=false)

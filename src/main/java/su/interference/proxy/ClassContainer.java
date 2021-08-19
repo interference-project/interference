@@ -36,6 +36,7 @@ public class ClassContainer implements Serializable {
     private final String name;
     private final String prefix;
     private final String simpleName;
+    private final static long serialVersionUID = 3939261107543234865L;
 
     public ClassContainer(String source, String name, String prefix, String simpleName) {
         this.source = source;

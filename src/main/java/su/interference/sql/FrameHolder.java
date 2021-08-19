@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -46,15 +46,14 @@ public class FrameHolder {
     @SuppressWarnings("unchecked")
     public FrameHolder(ResultSet rs) {
         final Table t = rs instanceof ResultSetImpl ? ((ResultSetImpl)rs).getTarget() : null;
+        persistent = rs.isPersistent();
         if (t != null && t instanceof Table) {
             cframes = new AtomicReference[((Table)t).getLbs().length];
             for (int i = 0; i< ((Table)t).getLbs().length; i++) {
-                cframes[i] = new AtomicReference<FrameData>();
+                cframes[i] = new AtomicReference<>();
                 cframes[i].set(((Table)t).getLbs()[i].getBd());
             }
-            persistent = true;
         } else {
-            persistent = false;
             cframes = null;
         }
     }
