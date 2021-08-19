@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -33,7 +33,6 @@ import su.interference.exception.InternalException;
 import su.interference.persistent.Session;
 import su.interference.persistent.Table;
 
-import java.net.MalformedURLException;
 import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -48,7 +47,7 @@ public class ResultSetImpl implements ResultSet {
     private final Table target;
     private final boolean persistent;
     private final LinkedBlockingQueue q = new LinkedBlockingQueue(Config.getConfig().RETRIEVE_QUEUE_SIZE);
-    private boolean started;
+    private boolean started = true;
     private CountDownLatch latch;
     private final SQLCursor sqlc;
     private Queue<Chunk> q_;
@@ -66,7 +65,6 @@ public class ResultSetImpl implements ResultSet {
         } else {
             final boolean success = q.offer(o);
             if (!success) {
-                latch.countDown();
                 q.put(o);
             }
         }
@@ -74,24 +72,25 @@ public class ResultSetImpl implements ResultSet {
     }
 
     public Object poll(Session s) throws Exception {
-        if (!started) {
-            if (sqlc != null) {
-                sqlc.flushTarget();
+        if (persistent) {
+            if (sqlc != null && latch == null) {
                 latch = new CountDownLatch(1);
+                sqlc.flushTarget();
             }
             if (latch != null) {
                 latch.await();
             }
-            started = true;
-        }
-        if (persistent) {
             return target.poll(s);
         } else {
-            final Object o = q.take();
-            if (o instanceof ResultSetTerm) {
-                started = false;
+            if (sqlc != null && !sqlc.isFlush()) {
+                sqlc.flushTarget();
             }
             if (started) {
+                final Object o = q.take();
+                if (o instanceof ResultSetTerm) {
+                    started = false;
+                    return null;
+                }
                 return o;
             } else {
                 return null;
@@ -100,17 +99,14 @@ public class ResultSetImpl implements ResultSet {
     }
 
     public Chunk cpoll(Session s) throws Exception {
-        if (!started) {
-            if (sqlc != null) {
-                sqlc.flushTarget();
+        if (persistent) {
+            if (sqlc != null && latch == null) {
                 latch = new CountDownLatch(1);
+                sqlc.flushTarget();
             }
             if (latch != null) {
                 latch.await();
             }
-            started = true;
-        }
-        if (persistent) {
             return target.cpoll(s);
         } else {
             return null;
@@ -135,15 +131,15 @@ public class ResultSetImpl implements ResultSet {
         return target.getObjectId();
     }
 
-    public boolean isIndex() throws ClassNotFoundException, MalformedURLException {
+    public boolean isIndex() {
         return target.isIndex();
     }
 
-    public Class getTableClass() throws ClassNotFoundException, MalformedURLException {
+    public Class getTableClass() {
         return target.getTableClass();
     }
 
-    public java.lang.reflect.Field[] getFields() throws ClassNotFoundException, InternalException, MalformedURLException {
+    public java.lang.reflect.Field[] getFields() throws InternalException {
         return target.getFields();
     }
 

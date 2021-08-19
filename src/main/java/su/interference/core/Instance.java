@@ -135,6 +135,7 @@ public class Instance implements Interference {
 
     public static boolean initParams (String[] params) {
         final Config cfg = Config.getConfig();
+
 /*
         try {
             new HTTPServer(cfg.MMPORT);
@@ -145,6 +146,7 @@ public class Instance implements Interference {
             return false;
         }
 */
+
         return true;
     }
 
@@ -625,7 +627,7 @@ public class Instance implements Interference {
 
     public ArrayList<DataFile> getDataFilesByType (int id) {
         final Table t = getTableByName("su.interference.persistent.DataFile");
-        final ArrayList<DataFile> r = new ArrayList<DataFile>();
+        final ArrayList<DataFile> r = new ArrayList<>();
         for (Object o : t.getIndexFieldByColumn("type").getIndex().getObjectsByKey(id)) {
             r.add((DataFile)((DataChunk)o).getEntity());
         }
@@ -649,11 +651,20 @@ public class Instance implements Interference {
     public synchronized Transaction getTransactionById (long transId) {
         if (transId == 0) { return null; }
         Table t = getTableByName("su.interference.persistent.Transaction");
-        DataChunk dc = ((DataChunk)t.getIndexFieldByColumn("transId").getIndex().getObjectByKey(transId));
+        DataChunk dc = ((DataChunk)t.getMapFieldByColumn("transId").getMap().get(transId));
         if (dc==null) {
             return null;
         }
         return (Transaction)dc.getEntity();
+    }
+
+    public List<Transaction> getTransactionsBySid (long id) {
+        final Table t = getTableByName("su.interference.persistent.Transaction");
+        final ArrayList<Transaction> r = new ArrayList<>();
+        for (Object o : t.getIndexFieldByColumn("sid").getIndex().getObjectsByKey(id)) {
+            r.add((Transaction)((DataChunk)o).getEntity());
+        }
+        return r;
     }
 
     public FreeFrame getFreeFrameById (long id) {
@@ -722,6 +733,17 @@ public class Instance implements Interference {
         return res;
     }
 
+    public String getEventSubscriberByEntityId (String id) {
+        final Table t = getTableByName("su.interference.persistent.EventSubscriber");
+        final MapField ixf = t.getMapFieldByColumn("entityId");
+        final Map ixl = ixf.getMap();
+        final DataChunk dc = (DataChunk)ixl.get(id);
+        if (dc != null) {
+            return ((EventSubscriber) dc.getEntity()).getSubscriberId();
+        }
+        return null;
+    }
+
     //used in unlock table mechanism
     @Deprecated
     public synchronized ArrayList<TransFrame> getTransFrameByObjectId (int objectId) {
@@ -752,7 +774,7 @@ public class Instance implements Interference {
     }
 
     public ArrayList<RetrieveLock> getRetrieveLocksByObjectId(int obj) {
-        final ArrayList<RetrieveLock> r = new ArrayList<RetrieveLock>();
+        final ArrayList<RetrieveLock> r = new ArrayList<>();
         final Table t = getTableByName("su.interference.persistent.RetrieveLock");
         for (Object o : t.getIndexFieldByColumn("objectId").getIndex().getObjectsByKey(obj)) {
             final RetrieveLock rl = (RetrieveLock)((DataChunk)o).getEntity();
@@ -763,9 +785,9 @@ public class Instance implements Interference {
 
     public synchronized List<Transaction> getTransactions() {
         final Table t = getTableByName("su.interference.persistent.Transaction");
-        final ArrayList<Transaction> res = new ArrayList<Transaction>();
-        for (Object o : t.getIndexFieldByColumn("transId").getIndex().getContent()) {
-            res.add((Transaction)((DataChunk)o).getEntity());
+        final ArrayList<Transaction> res = new ArrayList<>();
+        for (Object o : t.getMapFieldByColumn("transId").getMap().entrySet()) {
+            res.add((Transaction)((DataChunk)((Map.Entry)o).getValue()).getEntity());
         }
         return res;
     }

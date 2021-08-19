@@ -109,10 +109,11 @@ public class TransportServer {
                                         transportContext.onMessage((TransportMessage) transportMessage, inetAddress);
                                     } catch (EOFException eof) {
                                         running = false;
-                                        logger.warn("event server will be restarted due to " + eof.getMessage());
+                                        logger.warn("event server will be restarted due to " + eof);
                                     } catch (Exception e) {
                                         running = false;
-                                        logger.warn("event server will be restarted due to " + e.getMessage());
+                                        logger.warn("event server will be restarted due to " + e);
+                                        logger.error("exception occured during message process ", e);
                                     }
                                 }
                             }

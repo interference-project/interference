@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -26,10 +26,7 @@ package su.interference.sql;
 
 import su.interference.core.Chunk;
 import su.interference.core.DataChunk;
-import su.interference.exception.InternalException;
 import su.interference.persistent.Session;
-
-import java.net.MalformedURLException;
 
 /**
  * @author Yuriy Glotanov
@@ -41,9 +38,10 @@ public interface ResultSet {
     Object poll(Session s) throws Exception;
     Chunk cpoll(Session s) throws Exception;
     int getObjectId();
-    boolean isIndex() throws ClassNotFoundException, MalformedURLException;
-    Class getTableClass() throws ClassNotFoundException, MalformedURLException;
-    java.lang.reflect.Field[] getFields() throws ClassNotFoundException, InternalException, MalformedURLException;
+    boolean isIndex();
+    Class getTableClass();
+    java.lang.reflect.Field[] getFields();
     void deallocate(Session s) throws Exception;
+    boolean isPersistent();
 }
 

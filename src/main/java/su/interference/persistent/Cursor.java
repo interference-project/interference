@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -57,6 +57,8 @@ public class Cursor implements Serializable {
     public static final int STATE_RUNNING   = 3;
     @Transient
     public static final int STATE_COMPLETED = 4;
+    @Transient
+    private final static long serialVersionUID = 1411072056394993210L;
 
     @Column
     @Id

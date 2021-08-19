@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -46,7 +46,7 @@ public class ValueSet implements Comparable {
     }
 
     public int compareTo (Object obj) {
-        return compare(obj, vs.length);
+        return compare(obj, ((ValueSet) obj).getValueSet().length);
     }
 
     //used in partial compare datachunks in sql group algorithm
@@ -55,12 +55,12 @@ public class ValueSet implements Comparable {
     public int compare (Object obj, int thr) {
         final ValueSet j = (ValueSet)obj;
 
-        for (int i=0; i<vs.length; i++) {
-            final int ct = ((Comparable)this.vs[i]).compareTo(j.getValueSet()[i]);
+        for (int i = 0; i < vs.length; i++) {
+            final int ct = ((Comparable) this.vs[i]).compareTo(j.getValueSet()[i]);
             if (ct != 0) {
                 return ct;
             }
-            if (i==thr-1) {
+            if (i == thr - 1) {
                 break;
             }
         }

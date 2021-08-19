@@ -26,6 +26,7 @@ package su.interference.core;
 
 import java.util.concurrent.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,8 +118,11 @@ public class SyncQueue implements Runnable, ManagedProcess {
             for (FreeFrame fb : fframes) {
                 s.persist(fb);
             }
+
             //todo async process must depends from stop() method
-            pool2.submit(new TransportSyncTask(frames));
+
+            final List<SyncFrame> dframes = frames.stream().filter(p -> p.isDistributed()).collect(Collectors.toList());
+            pool2.submit(new TransportSyncTask(dframes));
 
             running = false;
             return true;

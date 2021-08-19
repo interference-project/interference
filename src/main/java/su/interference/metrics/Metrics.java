@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -55,7 +55,7 @@ public class Metrics {
         }
     }
 
-    public static void register(int type, String name) throws Exception {
+    public static Meter register(int type, String name) throws Exception {
         if (type == COUNTER) { metrics.put(name, new Counter(name)); }
         if (type == HISTOGRAM) { metrics.put(name, new Histogram(name)); }
         if (type == TIMER) { metrics.put(name, new Timer(name)); }
@@ -64,6 +64,7 @@ public class Metrics {
 
         ObjectName obj = new ObjectName("su.interference:type="+name+metrics.get(name).getClass().getSimpleName());
         mbs.registerMBean(metrics.get(name), obj);
+        return metrics.get(name);
     }
 
     public static Meter get(String name) {

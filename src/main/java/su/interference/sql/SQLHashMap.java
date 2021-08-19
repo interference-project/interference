@@ -24,14 +24,10 @@
 
 package su.interference.sql;
 
-import su.interference.core.IndexChunk;
 import su.interference.exception.InternalException;
 import su.interference.persistent.Session;
 import su.interference.persistent.Table;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -46,7 +42,6 @@ public class SQLHashMap implements FrameIterator {
     private final SQLColumn cmap;
     private final SQLColumn ckey;
     private final FrameIterator rbi;
-    private final AtomicBoolean complete;
     private final AtomicBoolean returned;
     private final Table t;
     private final Class c;
@@ -57,41 +52,17 @@ public class SQLHashMap implements FrameIterator {
         this.cmap = cmap;
         this.ckey = ckey;
         this.rbi = rbi;
-        this.complete = new AtomicBoolean(false);
         this.returned = new AtomicBoolean(false);
         this.t = t;
         this.c = t.getTableClass();
         this.s = s;
     }
 
-    @SuppressWarnings("unchecked")
-    public Comparable getKeyValue(Class c, Object o, SQLColumn sqlc, Session s) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
-        Method y = c.getMethod("get"+sqlc.getColumn().getName().substring(0,1).toUpperCase()+sqlc.getColumn().getName().substring(1,sqlc.getColumn().getName().length()), null);
-        return (Comparable)y.invoke(o, null);
-    }
-
     public FrameApi nextFrame() throws Exception {
         if (!returned.get()) {
             synchronized (this) {
                 if (hframe == null) {
-                    if (!complete.get()) {
-                        while (rbi.hasNextFrame()) {
-                            FrameApi bd = rbi.nextFrame();
-                            if (bd != null) {
-                                ArrayList<Object> drs = bd.getFrameEntities(s);
-                                for (Object o : drs) {
-                                    if (bd.getImpl() == FrameApi.IMPL_INDEX) {
-                                        final IndexChunk ib1 = (IndexChunk) o;
-                                        o = ib1.getDataChunk().getEntity(s);
-                                    }
-
-                                    hmap.put(getKeyValue(c, o, cmap, s), o);
-                                }
-                            }
-                        }
-                        complete.compareAndSet(false, true);
-                    }
-                    hframe = new SQLHashMapFrame(hmap, cmap, ckey, t);
+                    hframe = new SQLHashMapFrame(rbi, cmap, ckey, t, c, s);
                 }
                 returned.compareAndSet(false, true);
                 return hframe;

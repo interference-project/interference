@@ -82,11 +82,7 @@ public class SQLEvent extends TransportEventImpl {
                     FrameApi b = null;
                     FrameApi b_ = null;
                     if (c.getLbi() instanceof SQLIndex) {
-                        if (d != null && d.getJoin() == SQLJoinDispatcher.RIGHT_MERGE) {
-                            b = ((SQLIndex) c.getLbi()).getFrameByAllocId(j.getLeftAllocId());
-                        } else {
-                            b = c.getLbi().nextFrame();
-                        }
+                        b = ((SQLIndex) c.getLbi()).getFrameByAllocId(j.getLeftAllocId());
                     }
                     if (j.getRightAllocId() == 0 && c.getRbi() != null && (rightType.equals("SQLHashMapFrame") || rightType.equals("SQLIndexFrame"))) {
                         c.getRbi().resetIterator();

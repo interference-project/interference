@@ -35,6 +35,7 @@ import java.util.List;
  */
 
 public class EventResult implements Serializable {
+    private final static long serialVersionUID = 3376632100784532102L;
     private final int result;
     private final Object resultObject;
     private final long slaveCursorid;

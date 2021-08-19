@@ -92,7 +92,7 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
                 final long frameAmount = f.getDataObject().getFrameAmount();
                 if (f.getDataFile().isData() && cleanupDataEnabled()) {
                     f.decreasePriority();
-                    if (f.isSynced() && f.getObjectId() > 999 && frameAmount > Config.getConfig().CLEANUP_PROTECTION_THR) {
+                    if (f.isSynced() && f.getObjectId() > 999 && frameAmount > getThr()) {
                         if (f.clearFrame()) {
                             d++;
                         }
@@ -107,7 +107,7 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
                     if (f.isSynced() && f.getFrameType() == IndexFrame.INDEX_FRAME_NODE) {
                         xn++;
                     }
-                    if (f.isSynced() && f.getFrameType() != IndexFrame.INDEX_FRAME_NODE && !f.isRbck() && frameAmount > Config.getConfig().IX_CLEANUP_PROTECTION_THR) {
+                    if (f.isSynced() && f.getFrameType() != IndexFrame.INDEX_FRAME_NODE && !f.isRbck() && frameAmount > getIxThr()) {
                         if (f.clearFrame()) {
                             x++;
                         }
@@ -117,7 +117,7 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
                     }
                 }
                 if (f.getDataFile().isTemp() && cleanupTempEnabled()) {
-                    if (f.isSynced() && f.getFrameType() != IndexFrame.INDEX_FRAME_NODE && frameAmount > Config.getConfig().CLEANUP_PROTECTION_THR) {
+                    if (f.isSynced() && f.getFrameType() != IndexFrame.INDEX_FRAME_NODE && frameAmount > getThr()) {
                         if (f.clearFrame()) {
                             i++;
                         }
@@ -127,7 +127,7 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
                     }
                 }
                 if (f.getDataFile().isUndo() && cleanupUndoEnabled()) {
-                    if (f.isSynced() && frameAmount > Config.getConfig().CLEANUP_PROTECTION_THR) {
+                    if (f.isSynced() && frameAmount > getThr()) {
                         if (f.clearFrame()) {
                             u++;
                         }
@@ -184,5 +184,13 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
         // todo return allocpc > Config.getConfig().HEAP_USE_THR_TEMP;
         // todo cleanup affects temp indices, disable until fix is released
         return false;
+    }
+
+    private int getThr() {
+        return Config.getConfig().CLEANUP_PROTECTION_THR/(Config.getConfig().FRAMESIZE/4096);
+    }
+
+    private int getIxThr() {
+        return Config.getConfig().IX_CLEANUP_PROTECTION_THR/(Config.getConfig().FRAMESIZE/4096);
     }
 }

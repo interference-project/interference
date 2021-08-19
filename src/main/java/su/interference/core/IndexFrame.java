@@ -24,6 +24,8 @@
 
 package su.interference.core;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import su.interference.exception.*;
 import su.interference.persistent.*;
 import su.interference.serialize.ByteString;
@@ -36,22 +38,32 @@ import java.util.*;
  */
 
 public class IndexFrame extends Frame {
+    private final static Logger logger = LoggerFactory.getLogger(IndexFrame.class);
     private boolean sorted = false;
+    private final boolean terminate;
     public static final int INDEX_FRAME_NODE = 2;
     public static final int INDEX_FRAME_LEAF = 1;
     public static final int INITIALIZE_DURING_CONSTRUCT = 1;
 
     public IndexFrame(int file, long pointer, int size, int objectId, Table t) throws InternalException {
         super(file, pointer, size, t);
+        this.terminate = false;
     }
 
     public IndexFrame(FrameData bd, int frameType, Table t) throws InternalException {
         super(bd, t);
         this.setType(frameType);
+        this.terminate = false;
+    }
+
+    public IndexFrame() {
+        super(0, 0, 0, null);
+        this.terminate = true;
     }
 
     public IndexFrame(int file, long pointer, int size, FrameData bd, Table t, Class c, List<FrameData> uframes) throws Exception {
         super(null, file, pointer, size, bd, t, c);
+        this.terminate = false;
 
         Map<Integer, UndoChunk> ucs = new HashMap<>();
         for (FrameData uframe : uframes) {
@@ -97,6 +109,7 @@ public class IndexFrame extends Frame {
     public IndexFrame(byte[] b, int file, long pointer, Map<Long, Long> imap, Map<Long, Long> hmap, Table t) {
         super(b, file, pointer, t);
         int ptr = FRAME_HEADER_SIZE;
+        this.terminate = false;
 
         final ByteString bs = new ByteString(this.b);
         while (ptr<this.b.length) {
@@ -107,8 +120,9 @@ public class IndexFrame extends Frame {
                     if (h.getFramePtr() > 0) { //IOT does not contains frameptr
                         final long allocId = imap.get(h.getFramePtr());
                         final long bptr = hmap.get(allocId) != null ? hmap.get(allocId) : Instance.getInstance().getFrameByAllocId(allocId).getFrameId();
-                        h.getFramePtrRowId().setFileId((int) bptr % 4096);
-                        h.getFramePtrRowId().setFramePointer(bptr - (bptr % 4096));
+                        final long fbptr = bptr%4096;
+                        h.getFramePtrRowId().setFileId((int) fbptr);
+                        h.getFramePtrRowId().setFramePointer(bptr - fbptr);
                     }
                     final DataChunk dc = new DataChunk(bs.substring(ptr, ptr+INDEX_HEADER_SIZE+h.getLen()), this.getFile(), this.getPointer(), INDEX_HEADER_SIZE, this.getDataObject(), this.getEntityClass());
                     dc.setHeader(h);
@@ -402,11 +416,16 @@ public class IndexFrame extends Frame {
     }
 
     public HashMap<Long, Long> getAllocateMap() {
-        final HashMap<Long, Long> imap = new HashMap<Long, Long>();
+        final HashMap<Long, Long> imap = new HashMap<>();
         for (Chunk c : data.getChunks()) {
             if (c.getHeader().getFramePtr() > 0) {  //IOT does not contains frameptr
-                final long allocId = Instance.getInstance().getFrameById(c.getHeader().getFramePtr()).getAllocId();
-                imap.put(c.getHeader().getFramePtr(), allocId);
+                final FrameData bd = Instance.getInstance().getFrameById(c.getHeader().getFramePtr());
+                if (bd != null) {
+                    final long allocId = bd.getAllocId();
+                    imap.put(c.getHeader().getFramePtr(), allocId);
+                } else {
+                    logger.error("getAllocaleMap found null data frame for frame id " + c.getHeader().getFramePtr());
+                }
             }
         }
         return imap;
@@ -460,5 +479,9 @@ public class IndexFrame extends Frame {
         final long lcF = lcId%4096;
         this.setRes05((int)lcF);
         this.setRes07(lcId - lcF);
+    }
+
+    public boolean isTerminate() {
+        return terminate;
     }
 }

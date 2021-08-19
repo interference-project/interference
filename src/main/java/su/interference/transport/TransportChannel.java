@@ -150,6 +150,7 @@ public class TransportChannel {
                                         e_.printStackTrace();
                                     }
                                     logger.error("channel id = " + channelId + " stopped by connection failure");
+                                    logger.error("failure cause: ", e);
                                 }
                             }
                         } catch (IOException e) {
