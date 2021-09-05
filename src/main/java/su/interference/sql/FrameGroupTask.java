@@ -33,6 +33,7 @@ import su.interference.persistent.Table;
 import su.interference.core.GenericResultImpl;
 
 import java.util.Queue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * @author Yuriy Glotanov
@@ -43,17 +44,20 @@ public class FrameGroupTask implements Runnable {
 
     private final static Logger logger = LoggerFactory.getLogger(FrameGroupTask.class);
     private final Cursor cur;
-    private final Queue<Object> q;
+    private final LinkedBlockingQueue<Object> q = new LinkedBlockingQueue<>();
     private final ResultSet target;
     private final Table gtable;
     private final Session s;
 
-    public FrameGroupTask(Cursor cur, Queue<Object> q, ResultSet target, Table gtable, Session s) {
+    public FrameGroupTask(Cursor cur, ResultSet target, Table gtable, Session s) {
         this.cur = cur;
-        this.q = q;
         this.target = target;
         this.gtable = gtable;
         this.s = s;
+    }
+
+    public void put(Object o) throws InterruptedException {
+        q.put(o);
     }
 
     @Override
@@ -67,17 +71,13 @@ public class FrameGroupTask implements Runnable {
                     cur.getSqlStmt().getCols().getGroupColumns());
 
             while (((StreamQueue) target).isRunning()) {
-                GenericResultImpl o = (GenericResultImpl) q.poll();
+                GenericResultImpl o = (GenericResultImpl) q.take();
 
                 if (o != null) {
                     final DataChunk gdc = sqlg.add(o.getDataChunk(s), gtable, s);
                     if (gdc != null) {
                         Object oo = gdc.getEntity(s);
                         target.persist(oo, s);
-                    }
-
-                    if (q.peek() == null) {
-                        Thread.sleep(100);
                     }
                 }
             }

@@ -33,6 +33,8 @@ import su.interference.persistent.Session;
 import su.interference.persistent.Table;
 
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * @author Yuriy Glotanov
@@ -40,6 +42,7 @@ import java.util.*;
  */
 
 public class SQLIndexFrame implements FrameApi, Finder {
+    private static final ExecutorService rqpool = Executors.newCachedThreadPool();
     private final Table t;
     private final Table parent;
     private final FrameData bd;
@@ -48,13 +51,14 @@ public class SQLIndexFrame implements FrameApi, Finder {
     private final boolean left;
     private final boolean unique;
     private final boolean merged;
+    private final boolean leading;
     private final boolean vccheck;
     private final int join;
     private RetrieveQueue rqueue;
     private final ValueCondition vc;
     private final Map<ValueSet, Object> vcmap;
 
-    public SQLIndexFrame(Table t, Table parent, FrameData bd, SQLColumn lkey, SQLColumn rkey, ValueCondition vc, boolean left, boolean unique, boolean merged, int join, Session s)
+    public SQLIndexFrame(Table t, Table parent, FrameData bd, SQLColumn lkey, SQLColumn rkey, ValueCondition vc, boolean left, boolean unique, boolean merged, int join, boolean leading, Session s)
             throws Exception {
         if (!t.isIndex()) {
             throw new InternalException();
@@ -68,6 +72,7 @@ public class SQLIndexFrame implements FrameApi, Finder {
         this.vc = vc;
         this.unique = unique;
         this.merged = merged;
+        this.leading = leading;
         this.join = join;
         this.vcmap = new HashMap<>();
         if (vc != null && (vc.getCondition() == Condition.C_EQUAL || vc.getCondition() == Condition.C_IN)) {
@@ -141,9 +146,10 @@ public class SQLIndexFrame implements FrameApi, Finder {
     }
 
     public Object poll(Session s) {
-        if (!left || join == SQLJoinDispatcher.MERGE) {
+        if (!left || join == SQLJoinDispatcher.MERGE || leading) {
             if (rqueue == null) {
-                rqueue = s.getContentQueue(t);
+                rqueue = t.getContentQueue(s);
+                rqpool.submit(rqueue.getR());
             }
             return rqueue.poll(s);
         } else {
@@ -171,4 +177,7 @@ public class SQLIndexFrame implements FrameApi, Finder {
         return merged;
     }
 
+    public boolean isLeading() {
+        return leading;
+    }
 }

@@ -31,6 +31,8 @@ import su.interference.metrics.Metrics;
 import su.interference.persistent.*;
 import su.interference.api.GenericResult;
 
+import java.lang.reflect.Field;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.ArrayList;
@@ -54,7 +56,7 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
     private final LinkedBlockingQueue<Object> q;
     private final int sqlcid;
     private final boolean last;
-    private final static ConcurrentHashMap<String, Class> cache = new ConcurrentHashMap<String, Class>();
+    private final static ConcurrentHashMap<String, Class> cache = new ConcurrentHashMap<>();
     private final FrameApiJoin j;
     private final SQLJoinDispatcher hmap;
 
@@ -77,6 +79,9 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
         this.last = last;
         this.j = j;
         this.hmap = hmap;
+        if (j != null) {
+            j.setResult(q);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -84,6 +89,9 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
         final Thread thread = Thread.currentThread();
         thread.setName("interference-sql-join-task-" + thread.getId());
         final Class r = target instanceof ResultSetImpl ? ((ResultSetImpl)target).getTableClass() : target instanceof StreamQueue ? ((StreamQueue) target).getRstable().getSc() : null;
+        final boolean rs_ = !Arrays.asList(r.getInterfaces()).contains(EntityContainer.class);
+        final Class c_ = rs_ ? r : r.getSuperclass();
+        final Field[] fs = c_.getDeclaredFields();
         final int t1 = bd1.getObjectId();
         final int t2 = bd2==null?0:bd2.getObjectId();
         final Class c1 = Instance.getInstance().getTableById(t1).getTableClass();
@@ -119,7 +127,7 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
                                 if (hmap.skipCheckNC()) {
                                     q.put(j);
                                 } else {
-                                    if (nc.checkNC(j, sqlcid, last, s)) {
+                                    if (nc.checkNC(j, fs, sqlcid, last, s)) {
                                         q.put(j);
                                     }
                                 }
@@ -142,70 +150,145 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
                 }
             }
         } else {
-            final ArrayList<Object> drs1 = bd1.getFrameEntities(s);
-            final ArrayList<Object> drs2 = bd2 == null ? null : bd2.getImpl() == FrameApi.IMPL_HASH ? null : bd2.getImpl() == FrameApi.IMPL_INDEX ? null : bd2.getFrameEntities(s);
-
-            for (Object o1 : drs1) {
-                if (bd1.getImpl() == FrameApi.IMPL_INDEX) {
-                    final IndexChunk ib1 = (IndexChunk) o1;
-                    o1 = ib1.getDataChunk().getEntity(s);
-                }
-                if (drs2 == null) {
-                    //HashFrame returns null drs
-                    if (bd2 != null && bd2.getImpl() == FrameApi.IMPL_HASH) {
-                        final Comparable key = getHashKeyValue(c1, o1, ((SQLHashMapFrame) bd2).getCkey(), s);
-                        final List<Object> o2 = ((SQLHashMapFrame) bd2).get(key, s);
-                        if (o2 != null) {
-                            if (!(o2.get(0) == null && last)) {
-                                Object j = joinDataRecords(r, c1, c2, t1, t2, o1, o2.get(0), cols, c1rs, s);
-                                if (hmap.skipCheckNC()) {
-                                    q.put(j);
+            if (bd1 instanceof SQLIndexFrame && ((SQLIndexFrame) bd1).isLeading()) {
+                final ArrayList<Object> drs2 = bd2 == null ? null : bd2.getImpl() == FrameApi.IMPL_HASH ? null : bd2.getImpl() == FrameApi.IMPL_INDEX ? null : bd2.getFrameEntities(s);
+                boolean cnue = true;
+                while (cnue) {
+                    Object o1 = ((SQLIndexFrame) bd1).poll(s);
+                    if (o1 == null) {
+                        cnue = false;
+                    } else {
+                        if (bd1.getImpl() == FrameApi.IMPL_INDEX) {
+                            final IndexChunk ib1 = (IndexChunk) o1;
+                            o1 = ib1.getDataChunk().getEntity(s);
+                        }
+                        if (drs2 == null) {
+                            //HashFrame returns null drs
+                            if (bd2 != null && bd2.getImpl() == FrameApi.IMPL_HASH) {
+                                final Comparable key = getHashKeyValue(c1, o1, ((SQLHashMapFrame) bd2).getCkey(), s);
+                                final List<Object> o2 = ((SQLHashMapFrame) bd2).get(key, s);
+                                if (o2 != null) {
+                                    if (!(o2.get(0) == null && last)) {
+                                        Object j = joinDataRecords(r, c1, c2, t1, t2, o1, o2.get(0), cols, c1rs, s);
+                                        if (hmap.skipCheckNC()) {
+                                            q.put(j);
+                                        } else {
+                                            if (nc.checkNC(j, fs, sqlcid, last, s)) {
+                                                q.put(j);
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if (bd2 != null && bd2.getImpl() == FrameApi.IMPL_INDEX) {
+                                final Comparable key = getHashKeyValue(c1, o1, ((SQLIndexFrame) bd2).getLkey(), s);
+                                final List<Object> o2 = ((SQLIndexFrame) bd2).get(key, s);
+                                //todo may cause wrong (cutted) resultsets in non-last cursors for (OR) conditions - see hashmap impl above
+                                if (o2 != null) {
+                                    for (Object o2_ : o2) {
+                                        final IndexChunk ib = (IndexChunk) ((DataChunk) o2_).getEntity(s);
+                                        final Object oo2 = ib.getDataChunk().getEntity(s);
+                                        final Object j = joinDataRecords(r, c1, c2, t1, t2, o1, oo2, cols, c1rs, s);
+                                        if (hmap.skipCheckNC()) {
+                                            q.put(j);
+                                        } else {
+                                            if (nc.checkNC(j, fs, sqlcid, last, s)) {
+                                                q.put(j);
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                // one table loop
+                                // workaround for StreamQueue - always returns initial EntityContainer
+                                if (r == null || target instanceof StreamQueue) {
+                                    //todo need to cast o1 to RS type
+                                    if (nc.checkNC(o1, fs, sqlcid, last, s)) {
+                                        q.put(o1); //target table is null -> result class is null -> returns generic entities
+                                    }
                                 } else {
-                                    if (nc.checkNC(j, sqlcid, last, s)) {
+                                    Object j = joinDataRecords(r, c1, c2, t1, t2, o1, null, cols, c1rs, s);
+                                    if (nc.checkNC(j, fs, sqlcid, last, s)) {
                                         q.put(j);
                                     }
                                 }
                             }
-                        }
-                    } else if (bd2 != null && bd2.getImpl() == FrameApi.IMPL_INDEX) {
-                        final Comparable key = getHashKeyValue(c1, o1, ((SQLIndexFrame) bd2).getLkey(), s);
-                        final List<Object> o2 = ((SQLIndexFrame) bd2).get(key, s);
-                        //todo may cause wrong (cutted) resultsets in non-last cursors for (OR) conditions - see hashmap impl above
-                        if (o2 != null) {
-                            for (Object o2_ : o2) {
-                                final IndexChunk ib = (IndexChunk) ((DataChunk) o2_).getEntity(s);
-                                final Object oo2 = ib.getDataChunk().getEntity(s);
-                                final Object j = joinDataRecords(r, c1, c2, t1, t2, o1, oo2, cols, c1rs, s);
-                                if (hmap.skipCheckNC()) {
+                        } else {
+                            //nested loop
+                            for (Object o2 : drs2) {
+                                Object j = joinDataRecords(r, c1, c2, t1, t2, o1, o2, cols, c1rs, s);
+                                if (nc.checkNC(j, fs, sqlcid, last, s)) {
                                     q.put(j);
-                                } else {
-                                    if (nc.checkNC(j, sqlcid, last, s)) {
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                final ArrayList<Object> drs1 = bd1.getFrameEntities(s);
+                final ArrayList<Object> drs2 = bd2 == null ? null : bd2.getImpl() == FrameApi.IMPL_HASH ? null : bd2.getImpl() == FrameApi.IMPL_INDEX ? null : bd2.getFrameEntities(s);
+
+                for (Object o1 : drs1) {
+                    if (bd1.getImpl() == FrameApi.IMPL_INDEX) {
+                        final IndexChunk ib1 = (IndexChunk) o1;
+                        o1 = ib1.getDataChunk().getEntity(s);
+                    }
+                    if (drs2 == null) {
+                        //HashFrame returns null drs
+                        if (bd2 != null && bd2.getImpl() == FrameApi.IMPL_HASH) {
+                            final Comparable key = getHashKeyValue(c1, o1, ((SQLHashMapFrame) bd2).getCkey(), s);
+                            final List<Object> o2 = ((SQLHashMapFrame) bd2).get(key, s);
+                            if (o2 != null) {
+                                if (!(o2.get(0) == null && last)) {
+                                    Object j = joinDataRecords(r, c1, c2, t1, t2, o1, o2.get(0), cols, c1rs, s);
+                                    if (hmap.skipCheckNC()) {
                                         q.put(j);
+                                    } else {
+                                        if (nc.checkNC(j, fs, sqlcid, last, s)) {
+                                            q.put(j);
+                                        }
                                     }
+                                }
+                            }
+                        } else if (bd2 != null && bd2.getImpl() == FrameApi.IMPL_INDEX) {
+                            final Comparable key = getHashKeyValue(c1, o1, ((SQLIndexFrame) bd2).getLkey(), s);
+                            final List<Object> o2 = ((SQLIndexFrame) bd2).get(key, s);
+                            //todo may cause wrong (cutted) resultsets in non-last cursors for (OR) conditions - see hashmap impl above
+                            if (o2 != null) {
+                                for (Object o2_ : o2) {
+                                    final IndexChunk ib = (IndexChunk) ((DataChunk) o2_).getEntity(s);
+                                    final Object oo2 = ib.getDataChunk().getEntity(s);
+                                    final Object j = joinDataRecords(r, c1, c2, t1, t2, o1, oo2, cols, c1rs, s);
+                                    if (hmap.skipCheckNC()) {
+                                        q.put(j);
+                                    } else {
+                                        if (nc.checkNC(j, fs, sqlcid, last, s)) {
+                                            q.put(j);
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // one table loop
+                            // workaround for StreamQueue - always returns initial EntityContainer
+                            if (r == null || target instanceof StreamQueue) {
+                                //todo need to cast o1 to RS type
+                                if (nc.checkNC(o1, fs, sqlcid, last, s)) {
+                                    q.put(o1); //target table is null -> result class is null -> returns generic entities
+                                }
+                            } else {
+                                Object j = joinDataRecords(r, c1, c2, t1, t2, o1, null, cols, c1rs, s);
+                                if (nc.checkNC(j, fs, sqlcid, last, s)) {
+                                    q.put(j);
                                 }
                             }
                         }
                     } else {
-                        // one table loop
-                        // workaround for StreamQueue - always returns initial EntityContainer
-                        if (r == null || target instanceof StreamQueue) {
-                            //todo need to cast o1 to RS type
-                            if (nc.checkNC(o1, sqlcid, last, s)) {
-                                q.put(o1); //target table is null -> result class is null -> returns generic entities
-                            }
-                        } else {
-                            Object j = joinDataRecords(r, c1, c2, t1, t2, o1, null, cols, c1rs, s);
-                            if (nc.checkNC(j, sqlcid, last, s)) {
+                        //nested loop
+                        for (Object o2 : drs2) {
+                            Object j = joinDataRecords(r, c1, c2, t1, t2, o1, o2, cols, c1rs, s);
+                            if (nc.checkNC(j, fs, sqlcid, last, s)) {
                                 q.put(j);
                             }
-                        }
-                    }
-                } else {
-                    //nested loop
-                    for (Object o2 : drs2) {
-                        Object j = joinDataRecords(r, c1, c2, t1, t2, o1, o2, cols, c1rs, s);
-                        if (nc.checkNC(j, sqlcid, last, s)) {
-                            q.put(j);
                         }
                     }
                 }
@@ -213,9 +296,6 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
         }
         Metrics.get("recordLCount").put(q.size());
         q.put(new ResultSetTerm());
-        if (j != null) {
-            j.setResult(q);
-        }
         return q;
     }
 
@@ -269,4 +349,7 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
         return sqlc.isCursor() ? (Comparable) y.invoke(o, null) : (Comparable) y.invoke(o, null);
     }
 
+    public LinkedBlockingQueue<Object> getQ() {
+        return q;
+    }
 }

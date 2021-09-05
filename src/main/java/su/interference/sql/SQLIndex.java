@@ -30,8 +30,6 @@ import su.interference.persistent.FrameData;
 import su.interference.persistent.Session;
 import su.interference.persistent.Table;
 
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -52,6 +50,7 @@ public class SQLIndex implements FrameIterator {
     private final boolean left;
     private final boolean unique;
     private final boolean merged;
+    private final boolean leading;
     private final LinkedBlockingQueue<FrameData> frames;
     private final AtomicBoolean returned;
     private final AtomicBoolean terminate;
@@ -59,7 +58,11 @@ public class SQLIndex implements FrameIterator {
     private SQLIndexFrame mframe;
     private SQLIndexFrame rframe;
 
-    public SQLIndex(Table t, Table parent, boolean left, SQLColumn lkey, SQLColumn rkey, boolean merged, NestedCondition nc, int join, Session s) throws InternalException, IOException, ClassNotFoundException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    public SQLIndex(Table t, Table parent, boolean left, SQLColumn lkey, SQLColumn rkey, boolean merged, NestedCondition nc, int join, Session s) throws Exception {
+        this(t, parent, left, lkey, rkey, merged, nc, join, false, s);
+    }
+
+    public SQLIndex(Table t, Table parent, boolean left, SQLColumn lkey, SQLColumn rkey, boolean merged, NestedCondition nc, int join, boolean leading, Session s) throws Exception {
         if (!t.isIndex()) throw new InternalException();
         this.t = t;
         this.s = s;
@@ -68,9 +71,10 @@ public class SQLIndex implements FrameIterator {
         this.rkey = rkey;
         this.parent = parent;
         this.left = left;
-        this.unique = left?lkey.isUnique():rkey.isUnique();
+        this.unique = parent.getIndexDescriptByObjectId(t.getObjectId()).isUnique();
         this.merged = merged;
-        this.frames = join == SQLJoinDispatcher.MERGE ? null : join == SQLJoinDispatcher.RIGHT_INDEX ? null : left == false ? null : t.getFrames(s, t.getTableClass().getSimpleName());
+        this.leading = leading;
+        this.frames = join == SQLJoinDispatcher.MERGE ? null : join == SQLJoinDispatcher.RIGHT_INDEX ? null : left == false ? null : leading ? null : t.getFrames(s, t.getTableClass().getSimpleName());
         this.returned = new AtomicBoolean(false);
         this.terminate = new AtomicBoolean(false);
         this.vc = nc.getIndexVC(this, t);
@@ -78,35 +82,38 @@ public class SQLIndex implements FrameIterator {
 
     //may returns null
     public FrameApi nextFrame() throws Exception {
-        if (join == SQLJoinDispatcher.MERGE) {
+    if (this.leading) {
+        terminate.compareAndSet(false, true);
+        return new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, leading, s);
+    } else if (join == SQLJoinDispatcher.MERGE) {
             if (!returned.get()) {
                 returned.compareAndSet(false, true);
                 if (merged) {
                     synchronized (this) {
                         if (mframe == null) {
-                            mframe = new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, s);
+                            mframe = new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, leading, s);
                         }
                         return mframe;
                     }
                 } else {
-                    return new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, s);
+                    return new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, leading, s);
                 }
             }
         } else if (join == SQLJoinDispatcher.RIGHT_INDEX) {
             terminate.compareAndSet(false, true);
             if (rframe == null) {
-                rframe = new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, s);
+                rframe = new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, leading, s);
             }
             return rframe;
         } else if (join == SQLJoinDispatcher.RIGHT_HASH && !left) {
             terminate.compareAndSet(false, true);
             if (rframe == null) {
-                rframe = new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, s);
+                rframe = new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, leading, s);
             }
             return rframe;
         } else if ((join == 0 || left) && vc != null && (vc.getCondition() == Condition.C_EQUAL || vc.getCondition() == Condition.C_IN)) {
             terminate.compareAndSet(false, true);
-            return new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, s);
+            return new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, leading, s);
         } else {
             if (hasNextFrame()) {
                 final FrameData bd = frames.take();
@@ -114,7 +121,7 @@ public class SQLIndex implements FrameIterator {
                     terminate.compareAndSet(false, true);
                     return null;
                 }
-                return new SQLIndexFrame(t, parent, bd, lkey, rkey, vc, left, unique, merged, join, s);
+                return new SQLIndexFrame(t, parent, bd, lkey, rkey, vc, left, unique, merged, join, leading, s);
             }
         }
         return null;
@@ -122,7 +129,7 @@ public class SQLIndex implements FrameIterator {
 
     public FrameApi getFrameByAllocId(long allocId) throws Exception {
         final FrameData bd = Instance.getInstance().getFrameByAllocId(allocId);
-        return new SQLIndexFrame(t, parent, bd, lkey, rkey, vc, left, unique, merged, join, s);
+        return new SQLIndexFrame(t, parent, bd, lkey, rkey, vc, left, unique, merged, join, leading, s);
     }
 
     public void resetIterator() {
@@ -154,6 +161,10 @@ public class SQLIndex implements FrameIterator {
         return parent.getObjectId();
     }
 
+    public int getIndexObjectId() {
+        return t.getObjectId();
+    }
+
     public List<Integer> getObjectIds() {
         return Arrays.asList(new Integer[]{parent.getObjectId()});
     }
@@ -170,7 +181,7 @@ public class SQLIndex implements FrameIterator {
 
     @Override
     public boolean noDistribute() {
-        return this.vc != null || this.join == SQLJoinDispatcher.MERGE;
+        return this.vc != null || this.join == SQLJoinDispatcher.MERGE || this.leading;
     }
 
 }

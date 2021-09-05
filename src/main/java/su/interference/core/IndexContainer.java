@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -24,7 +24,11 @@
 
 package su.interference.core;
 
+import su.interference.persistent.FrameData;
+import su.interference.persistent.Session;
+
 import java.util.List;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * @author Yuriy Glotanov
@@ -32,43 +36,68 @@ import java.util.List;
  */
 
 public class IndexContainer {
-    private final List<IndexFrame> frameList;
-    private int fptr;
-    private int cptr;
+    private final LinkedBlockingQueue<FrameData> frameQueue;
+    private final Session s;
+    private volatile int cptr;
+    private volatile List<Chunk> current;
+    private volatile boolean started;
+    private volatile boolean terminated;
 
-    public IndexContainer(List<IndexFrame> frameList) {
-        this.frameList = frameList;
-        fptr = 0;
+    public IndexContainer(LinkedBlockingQueue<FrameData> frameQueue, Session s) {
+        this.frameQueue = frameQueue;
+        this.s = s;
         cptr = 0;
     }
 
-    public void reset() {
-        fptr = 0;
-        cptr = 0;
-    }
-
-    public Chunk next() {
-        if (frameList.size() == fptr) {
+    public Chunk next() throws Exception {
+        if (terminated) {
             return null;
         }
+
         cptr++;
-        if (frameList.get(fptr).data.size() == cptr) {
-            fptr++;
+
+        if (current != null && current.size() == cptr) {
+            FrameData current_ = frameQueue.take();
             cptr = 0;
+            if (current_.getObjectId() == 0 && current_.getFrameId() == 0) {
+                terminated = true;
+                return null;
+            }
+            IndexFrame current__ = current_.getIndexFrame();
+            current__.sort();
+            current = current__.getFrameChunks(s);
         }
-        if (frameList.size() == fptr) {
-            return null;
-        }
-        return frameList.get(fptr).data.get(cptr);
+
+        return current.get(cptr);
     }
 
-    public Chunk get() {
-        if (frameList.size() == 0 || frameList.size() == fptr) {
+    public Chunk get() throws Exception {
+        if (terminated) {
             return null;
         }
-        if (frameList.get(fptr).data.size() == 0) {
+
+        if (!started) {
+            FrameData current_ = frameQueue.take();
+            started = true;
+
+            if (current_.getObjectId() == 0 && current_.getFrameId() == 0) {
+                terminated = true;
+                return null;
+            }
+
+            IndexFrame current__ = current_.getIndexFrame();
+            current__.sort();
+            current = current__.getFrameChunks(s);
+        }
+
+        if (current.size() == 0) {
             return null;
         }
-        return frameList.get(fptr).data.get(cptr);
+
+        return current.get(cptr);
+    }
+
+    public LinkedBlockingQueue<FrameData> getFrameQueue() {
+        return frameQueue;
     }
 }

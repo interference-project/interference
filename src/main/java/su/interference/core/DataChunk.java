@@ -180,6 +180,18 @@ public class DataChunk implements Chunk {
         return new GenericObject(vmap);
     }
 
+    @Override
+    public String toString() {
+        final ValueSet vs = getDcs();
+        final Field[] cs = t.getFields();
+        final Map<String, Object> vmap = new HashMap();
+        String s = "";
+        for (int i=0; i<cs.length; i++) {
+            s = s + cs[i].getName() + "=" + vs.getValueSet()[i] + " ";
+        }
+        return s;
+    }
+
     public UndoChunk getUndoChunk() {
         if (header==null) {
             return null;

@@ -47,6 +47,7 @@ public class IndexDescript {
     private final String[] columns;
     private final Field[] fields;
     private final boolean unique;
+    private boolean accepted;
 
     public IndexDescript(Table t, String name, String columns, boolean unique) throws InternalException {
         this.t = t;
@@ -78,6 +79,16 @@ public class IndexDescript {
         this.unique = unique;
     }
 
+    public IndexDescript(IndexDescript indexDescript) {
+        this.t = indexDescript.t;
+        this.index = indexDescript.index;
+        this.name = indexDescript.name;
+        this.className = indexDescript.className;
+        this.columns = indexDescript.columns;
+        this.fields = indexDescript.fields;
+        this.unique = indexDescript.unique;
+    }
+
     public String getName() {
         return name;
     }
@@ -100,5 +111,13 @@ public class IndexDescript {
 
     public boolean isUnique() {
         return unique;
+    }
+
+    public boolean isAccepted() {
+        return accepted;
+    }
+
+    public void accept() {
+        this.accepted = true;
     }
 }

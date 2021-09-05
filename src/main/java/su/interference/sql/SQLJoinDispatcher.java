@@ -26,13 +26,10 @@ package su.interference.sql;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import su.interference.core.IndexDescript;
 import su.interference.core.Instance;
-import su.interference.exception.InternalException;
 import su.interference.persistent.Session;
 import su.interference.persistent.Table;
-
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 
 /**
  * @author Yuriy Glotanov
@@ -61,8 +58,7 @@ public class SQLJoinDispatcher implements Comparable {
     public final static int RIGHT_INDEX = 4;
     public final static int NESTED_LOOPS = 10;
 
-    public SQLJoinDispatcher(FrameIterator lbi, FrameIterator rbi, SQLColumn c1, SQLColumn c2, boolean skip, NestedCondition nc, Session s)
-            throws IOException, ClassNotFoundException, InternalException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    public SQLJoinDispatcher(FrameIterator lbi, FrameIterator rbi, SQLColumn c1, SQLColumn c2, boolean skip, NestedCondition nc, IndexDescript leadingIndex, Session s) throws Exception {
 
         //depends on join columns is unique or index, standard iterators (Table, Cursor) must replace by additional
         //iterators - HashMap and Index. HashMap may be only RBI, Index may be LBI in case if both indexes exists
@@ -79,7 +75,33 @@ public class SQLJoinDispatcher implements Comparable {
         this.joinedCC = lbi.getType() == FrameIterator.TYPE_CURSOR?c1:c2;
 
         if (c1.isIndexOrUnique()||c2.isIndexOrUnique()) {
-            if (c1.isUnique() || c2.isUnique()) {
+            if (c1.isUnique() && merged && ix1 != null && ix2 != null) {
+                this.join = MERGE;
+                final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
+                final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
+                logger.info("use merge join for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
+                lbi_ = new SQLIndex(ix1, lt, true, c1, c2, true, nc, MERGE, s);
+                rbi_ = new SQLIndex(ix2, rt, false, c1, c2, true, nc, MERGE, s);
+                if (leadingIndex != null) {
+                    if (ix1.getObjectId() == leadingIndex.getIndex().getObjectId()) {
+                        leadingIndex.accept();
+                    }
+                }
+                this.weight = 100;
+            } else if (c2.isUnique() && merged && ix1 != null && ix2 != null) {
+                this.join = MERGE;
+                final Table lt = Instance.getInstance().getTableById(rbi.getObjectId());
+                final Table rt = Instance.getInstance().getTableById(lbi.getObjectId());
+                logger.info("use merge join for " + lt.getName() + "." + c2.getColumn().getName() + " * " + rt.getName() + "." + c1.getColumn().getName());
+                lbi_ = new SQLIndex(ix2, lt, true, c2, c1, true, nc, MERGE, s);
+                rbi_ = new SQLIndex(ix1, rt, false, c2, c1, true, nc, MERGE, s);
+                if (leadingIndex != null) {
+                    if (ix2.getObjectId() == leadingIndex.getIndex().getObjectId()) {
+                        leadingIndex.accept();
+                    }
+                }
+                this.weight = 100;
+            } else if (c1.isUnique() || c2.isUnique()) {
                 this.join = RIGHT_HASH;
                 final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
                 final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
@@ -97,34 +119,32 @@ public class SQLJoinDispatcher implements Comparable {
                 SQLColumn ckey_ = hbi.getObjectId() == c1.getObjectId() ? c2 : c1;
                 logger.info("use right hash join for " + lt_.getName() + "." + c1.getColumn().getName() + " * " + rt_.getName() + "." + c2.getColumn().getName());
                 rbi_ = new SQLHashMap(cmap_, ckey_, hbi, rt_, s);
+                if (lbi_ instanceof SQLIndex) {
+                    if (leadingIndex != null) {
+                        if (((SQLIndex) lbi_).getIndexObjectId() == leadingIndex.getIndex().getObjectId()) {
+                            leadingIndex.accept();
+                        }
+                    }
+                }
                 this.weight = 60;
-            } else if (c1.isUnique() && merged && ix1 != null && ix2 != null) {
-                this.join = MERGE;
-                final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
-                final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
-                logger.info("use merge join for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
-                lbi_ = new SQLIndex(ix1, lt, true, c1, c2, true, nc, MERGE, s);
-                rbi_ = new SQLIndex(ix2, rt, false, c1, c2, true, nc, MERGE, s);
-                this.weight = 100;
-            } else if (c2.isUnique() && merged && ix1 != null && ix2 != null) {
-                this.join = MERGE;
-                final Table lt = Instance.getInstance().getTableById(rbi.getObjectId());
-                final Table rt = Instance.getInstance().getTableById(lbi.getObjectId());
-                logger.info("use merge join for " + lt.getName() + "." + c2.getColumn().getName() + " * " + rt.getName() + "." + c1.getColumn().getName());
-                lbi_ = new SQLIndex(ix2, lt, true, c2, c1, true, nc, MERGE, s);
-                rbi_ = new SQLIndex(ix1, rt, false, c2, c1, true, nc, MERGE, s);
-                this.weight = 100;
             } else {
                 this.join = RIGHT_INDEX;
                 final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
                 final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
                 logger.info("use index scan for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
                 if (ix1 != null) {
-                    lbi_ = rbi;
+                    lbi_ = ix2 == null ? rbi : new SQLIndex(ix1, lt, true, c1, c2, false, nc, RIGHT_INDEX, s);
                     rbi_ = new SQLIndex(ix1, lt, false, c2, c1, false, nc, RIGHT_INDEX, s);
                 } else if (ix2 != null) {
                     lbi_ = lbi;
                     rbi_ = new SQLIndex(ix2, rt, false, c1, c2, false, nc, RIGHT_INDEX, s);
+                }
+                if (lbi_ instanceof SQLIndex) {
+                    if (leadingIndex != null) {
+                        if (((SQLIndex) lbi_).getIndexObjectId() == leadingIndex.getIndex().getObjectId()) {
+                            leadingIndex.accept();
+                        }
+                    }
                 }
                 this.weight = 30;
             }

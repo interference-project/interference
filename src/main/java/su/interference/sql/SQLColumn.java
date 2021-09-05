@@ -30,7 +30,6 @@ import su.interference.exception.InternalException;
 
 import javax.persistence.Id;
 import java.lang.reflect.Method;
-import java.net.MalformedURLException;
 import java.lang.reflect.Field;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -117,11 +116,11 @@ public class SQLColumn implements Comparable {
     }
 
     //returns index table if exists and current column name use as primary column in index (use for join)
-    public Table getIndex() throws InternalException, MalformedURLException, ClassNotFoundException {
+    public Table getIndex() throws InternalException {
         return table.getFirstIndexByColumnName(column.getName());
     }
 
-    public boolean isUnique() throws MalformedURLException, ClassNotFoundException, InternalException {
+    public boolean isUnique() throws InternalException {
         if (useUC) {
             Id a1 = (Id) column.getAnnotation(Id.class);
             IndexDescript ids = table.getIndexDescriptByColumnName(column.getName());
@@ -131,7 +130,7 @@ public class SQLColumn implements Comparable {
         return false;
     }
 
-    public boolean isIndexOrUnique() throws MalformedURLException, ClassNotFoundException, InternalException {
+    public boolean isIndexOrUnique() throws InternalException {
         return (getIndex()!=null)||isUnique();
     }
 

@@ -25,10 +25,7 @@
 package su.interference.persistent;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -278,7 +275,7 @@ public class Table implements ResultSet {
         return this.name;
     }
 
-    public LinkedBlockingQueue<FrameData> getFrames(Session s, String caller) {
+    public LinkedBlockingQueue<FrameData> getFrames(Session s, String caller) throws Exception {
         if (this.isIndex()) {
             //get ordered frame sequence
             return this.getLeafFrames(s, caller);
@@ -326,6 +323,13 @@ public class Table implements ResultSet {
         };
         framepool.submit(r);
         return q;
+    }
+
+    //todo increase performance and optimize / getObjectsByKey -> q -> size
+    public long getFramesAmount() {
+        final IndexList ixl = Instance.getInstance().getFrameDataTable().getIndexFieldByColumn("objectId").getIndex();
+        final List<Object> frames = ixl.getObjectsByKey(this.objectId);
+        return frames.size();
     }
 
     //used in Session.registerTable
@@ -401,7 +405,7 @@ public class Table implements ResultSet {
     public IndexDescript[] getIndexNames() throws InternalException {
         final Class c = this.getTableClass();
         final Annotation[] ca = c.getAnnotations();
-        final ArrayList<IndexDescript> r = new ArrayList<IndexDescript>();
+        final ArrayList<IndexDescript> r = new ArrayList<>();
         for (int i=0; i<ca.length; i++) {
             final Annotation a = ca[i];
             //for old javax.persistence versions
@@ -445,6 +449,33 @@ public class Table implements ResultSet {
         return null;
     }
 
+    public IndexDescript getIndexDescriptByObjectId(int objectId) throws InternalException {
+        final Class c = this.getTableClass();
+        final Annotation[] ca = c.getAnnotations();
+        for (int i=0; i<ca.length; i++) {
+            final Annotation a = ca[i];
+            //for old javax.persistence versions
+            if (a.annotationType().getName().equals("javax.persistence.Index")) {
+                final Index ix = (Index)a;
+                final IndexDescript id = new IndexDescript(this, this.simpleName + "$" + ix.name(), ix.columnList(), ix.unique());
+                if (id.getIndex().getObjectId() == objectId) {
+                    return id;
+                }
+            }
+            if (a.annotationType().getName().equals("javax.persistence.Table")) {
+                final javax.persistence.Table ta = (javax.persistence.Table) a;
+                for (Index ix : ta.indexes()) {
+                    final IndexDescript id = new IndexDescript(this, this.simpleName + "$" + ix.name(), ix.columnList(), ix.unique());
+                    if (id.getIndex().getObjectId() == objectId) {
+                        return id;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    //used in column.getIndex()
     public Table getFirstIndexByColumnName(String name) throws InternalException {
         final Class c = this.getTableClass();
         final Annotation[] ca = c.getAnnotations();
@@ -1501,7 +1532,7 @@ public class Table implements ResultSet {
         }
     }
 
-    protected RetrieveQueue getContentQueue(Session s) {
+    public RetrieveQueue getContentQueue(Session s) {
         try {
             if (this.isIndex()) {
                 return getIndexContentQueue(s);
@@ -1509,7 +1540,7 @@ public class Table implements ResultSet {
                 return getTableContentQueue(s);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("exception occured during retrieve queue", e);
         }
         return null;
     }
@@ -1563,7 +1594,7 @@ public class Table implements ResultSet {
         final ManagedCallable<Boolean> r = new ManagedCallable<Boolean>() {
             @Override
             public Boolean call() throws Exception {
-                Thread.currentThread().setName("interference-retrieve-index-queue-thread-"+Thread.currentThread().getId());
+                Thread.currentThread().setName("interference-retrieve-index-queue-thread-" + Thread.currentThread().getId());
                 synchronized (t) {
                     List<Long> startframes = new ArrayList<>();
                     startframes.add(t.fileStart + t.frameStart);
@@ -1573,8 +1604,6 @@ public class Table implements ResultSet {
 
                     Map<Long, IndexContainer> mmap = new HashMap<>();
                     for (long start : startframes) {
-                        List<IndexFrame> levelNodes = new ArrayList<>();
-                        boolean cnue = true;
                         final FrameData bd = Instance.getInstance().getFrameById(start);
                         if (bd == null) {
                             throw new InternalException();
@@ -1583,34 +1612,30 @@ public class Table implements ResultSet {
                         if (bd.getFrameId() != bd.getAllocId() && bd.getStarted() == 0) {
                             throw new InternalException();
                         }
-                        IndexFrame el = bd.getIndexFrame();
-                        el.sort();
-                        levelNodes.add(el);
+
+                        //todo stopped -> getLocalLeafFrames
+                        final LinkedBlockingQueue<FrameData> q_ = getLocalLeafFrames(new LinkedBlockingQueue<>(1000), start, t.getTableClass().getSimpleName(), true, s);
+                        mmap.put(start, new IndexContainer(q_, s));
+                    }
+
+/* todo single-tree processing (without merge)
+                    for (Map.Entry<Long, IndexContainer> entry : mmap.entrySet()) {
+                        BlockingQueue<FrameData> bq = entry.getValue().getFrameQueue();
+                        boolean cnue = true;
                         while (cnue) {
-                            ArrayList<IndexFrame> inNodes = new ArrayList<>();
-                            for (int k = 0; k < levelNodes.size(); k++) {
-                                levelNodes.get(k).sort();
-                                if (levelNodes.get(k).getType() == 1) {
-                                    mmap.put(start, new IndexContainer(levelNodes));
-                                    cnue = false;
-                                } else {
-                                    for (int i = 0; i < levelNodes.get(k).getFrameChunks(s).size(); i++) {
-                                        inNodes.add(Instance.getInstance().getFrameById(levelNodes.get(k).getFrameChunks(s).get(i).getHeader().getFramePtr()).getIndexFrame());
-                                    }
-                                    if (k == levelNodes.size() - 1) {
-                                        final long lcId = levelNodes.get(k).getLcId();
-                                        if (lcId > 0) {
-                                            inNodes.add(Instance.getInstance().getFrameById(lcId).getIndexFrame());
-                                        }
-                                    }
-                                }
-                            }
-                            levelNodes = inNodes;
-                            if (stopped.get()) {
+                            FrameData fd = bq.take();
+                            if (fd.getObjectId() == 0 && fd.getFrameId() == 0) {
                                 cnue = false;
+                                q.put(tc);
+                            }
+                            IndexFrame ixf = fd.getIndexFrame();
+                            ixf.sort();
+                            for (Chunk c : ixf.getFrameChunks(s)) {
+                                q.put(c);
                             }
                         }
                     }
+*/
                     boolean done = false;
                     IndexContainer ic = null;
                     try {
@@ -2020,7 +2045,8 @@ public class Table implements ResultSet {
         return res;
     }
 
-    private synchronized LinkedBlockingQueue<FrameData> getLeafFrames (Session s, String caller) throws InternalException, EmptyFrameHeaderFound {
+    //todo warning: queue returns not-ordered index frames for multi-tree indices
+    private synchronized LinkedBlockingQueue<FrameData> getLeafFrames (Session s, String caller) {
         final LinkedBlockingQueue<FrameData> q = new LinkedBlockingQueue<>(1000);
         final ArrayList<Long> startfs = new ArrayList<>();
         startfs.add(this.fileStart+this.frameStart);
@@ -2030,15 +2056,57 @@ public class Table implements ResultSet {
         Runnable r = new Runnable() {
             @Override
             public void run() {
-                Thread.currentThread().setName("interference-retrieve-index-frames-"+caller+"-"+Thread.currentThread().getId());
+                Thread.currentThread().setName("interference-retrieve-overall-index-frames-"+caller+"-"+Thread.currentThread().getId());
                 try {
-                    for (Long start : startfs) {
-                        getLocalLeafFrames(q, start, s);
+                    for (int a = 0; a < startfs.size(); a++) {
+                        ArrayList<IndexFrame> levelNodes = new ArrayList<>();
+                        boolean cnue = true;
+                        final FrameData bd = Instance.getInstance().getFrameById(startfs.get(a));
+                        //frame must be local or remote chain started (RCS)
+                        if (bd.getFrameId() != bd.getAllocId() && bd.getStarted() == 0) {
+                            logger.error("wrong start index frame exists");
+                        }
+                        IndexFrame el = bd.getIndexFrame();
+                        el.sort();
+                        levelNodes.add(el);
+                        while (cnue) {
+                            ArrayList<IndexFrame> inNodes = new ArrayList<>();
+                            IndexFrame ixf = null;
+                            for (int k = 0; k < levelNodes.size(); k++) {
+                                if (levelNodes.get(k).getType() == 1) {
+                                    cnue = false;
+                                    q.put(Instance.getInstance().getFrameById(levelNodes.get(k).getPtr()));
+                                } else {
+                                    levelNodes.get(k).sort();
+                                    for (int i = 0; i < levelNodes.get(k).getFrameChunks(s).size(); i++) {
+                                        ixf = Instance.getInstance().getFrameById(levelNodes.get(k).getFrameChunks(s).get(i).getHeader().getFramePtr()).getIndexFrame();
+                                        if (ixf.getType() == 1) {
+                                            q.put(Instance.getInstance().getFrameById(ixf.getPtr()));
+                                        } else {
+                                            inNodes.add(ixf);
+                                        }
+                                    }
+                                    if (k == levelNodes.size() - 1) {
+                                        final long lcId = levelNodes.get(k).getLcId();
+                                        if (lcId > 0) {
+                                            inNodes.add(Instance.getInstance().getFrameById(lcId).getIndexFrame());
+                                        }
+                                    }
+                                }
+                            }
+                            if (ixf != null && ixf.getType() == 1 && inNodes.size() == 0) {
+                                final long lcId = ixf.getLcId();
+                                if (lcId > 0) {
+                                    q.put(Instance.getInstance().getFrameById(lcId));
+                                    cnue = false;
+                                }
+                            }
+                            levelNodes = inNodes;
+                        }
                     }
-                    //terminate
                     q.put(new FrameData());
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    logger.error("exception occured during index retrieve process", e);
                 }
             }
         };
@@ -2047,51 +2115,65 @@ public class Table implements ResultSet {
     }
 
     // todo which possibility of refactor IndexFrame -> FrameData to decrease heap load
-    private synchronized LinkedBlockingQueue<FrameData> getLocalLeafFrames (LinkedBlockingQueue<FrameData> q, long start, Session s) throws Exception {
-        ArrayList<IndexFrame> levelNodes = new ArrayList<>();
-        boolean cnue = true;
-        FrameData bd = Instance.getInstance().getFrameById(start);
-        //frame must be local or remote chain started (RCS)
-        if (bd.getFrameId() != bd.getAllocId() && bd.getStarted() == 0) {
-            return q;
-        }
-        IndexFrame el = bd.getIndexFrame();
-        el.sort();
-        levelNodes.add(el);
-        while (cnue) {
-            ArrayList<IndexFrame> inNodes = new ArrayList<>();
-            IndexFrame ixf = null;
-            for (int k = 0; k < levelNodes.size(); k++) {
-                //levelNodes.get(k).sort();
-                if (levelNodes.get(k).getType() == 1) {
-                    cnue = false;
-                    q.put(Instance.getInstance().getFrameById(levelNodes.get(k).getPtr()));
-                } else {
-                    for (int i = 0; i < levelNodes.get(k).getFrameChunks(s).size(); i++) {
-                        ixf = Instance.getInstance().getFrameById(levelNodes.get(k).getFrameChunks(s).get(i).getHeader().getFramePtr()).getIndexFrame();
-                        if (ixf.getType() == 1) {
-                            q.put(Instance.getInstance().getFrameById(ixf.getPtr()));
-                        } else {
-                            inNodes.add(ixf);
+    private synchronized LinkedBlockingQueue<FrameData> getLocalLeafFrames (LinkedBlockingQueue<FrameData> q, long start, String caller, boolean terminate, Session s) {
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                Thread.currentThread().setName("interference-retrieve-index-frames-"+caller+"-"+Thread.currentThread().getId());
+                ArrayList<IndexFrame> levelNodes = new ArrayList<>();
+                boolean cnue = true;
+                final FrameData bd = Instance.getInstance().getFrameById(start);
+                //frame must be local or remote chain started (RCS)
+                if (bd.getFrameId() != bd.getAllocId() && bd.getStarted() == 0) {
+                    logger.error("wrong start index frame exists");
+                }
+                try {
+                    IndexFrame el = bd.getIndexFrame();
+                    el.sort();
+                    levelNodes.add(el);
+                    while (cnue) {
+                        ArrayList<IndexFrame> inNodes = new ArrayList<>();
+                        IndexFrame ixf = null;
+                        for (int k = 0; k < levelNodes.size(); k++) {
+                            if (levelNodes.get(k).getType() == 1) {
+                                cnue = false;
+                                q.put(Instance.getInstance().getFrameById(levelNodes.get(k).getPtr()));
+                            } else {
+                                levelNodes.get(k).sort();
+                                for (int i = 0; i < levelNodes.get(k).getFrameChunks(s).size(); i++) {
+                                    ixf = Instance.getInstance().getFrameById(levelNodes.get(k).getFrameChunks(s).get(i).getHeader().getFramePtr()).getIndexFrame();
+                                    if (ixf.getType() == 1) {
+                                        q.put(Instance.getInstance().getFrameById(ixf.getPtr()));
+                                    } else {
+                                        inNodes.add(ixf);
+                                    }
+                                }
+                                if (k == levelNodes.size() - 1) {
+                                    final long lcId = levelNodes.get(k).getLcId();
+                                    if (lcId > 0) {
+                                        inNodes.add(Instance.getInstance().getFrameById(lcId).getIndexFrame());
+                                    }
+                                }
+                            }
                         }
-                    }
-                    if (k == levelNodes.size() - 1) {
-                        final long lcId = levelNodes.get(k).getLcId();
-                        if (lcId > 0) {
-                            inNodes.add(Instance.getInstance().getFrameById(lcId).getIndexFrame());
+                        if (ixf != null && ixf.getType() == 1 && inNodes.size() == 0) {
+                            final long lcId = ixf.getLcId();
+                            if (lcId > 0) {
+                                q.put(Instance.getInstance().getFrameById(lcId));
+                                cnue = false;
+                            }
                         }
+                        levelNodes = inNodes;
                     }
+                    if (terminate) {
+                        q.put(new FrameData());
+                    }
+                } catch (Exception e) {
+                    logger.error("exception occured during index retrieve process", e);
                 }
             }
-            if (ixf != null && ixf.getType() == 1 && inNodes.size() == 0) {
-                final long lcId = ixf.getLcId();
-                if (lcId > 0) {
-                    q.put(Instance.getInstance().getFrameById(lcId));
-                    cnue = false;
-                }
-            }
-            levelNodes = inNodes;
-        }
+        };
+        framepool.submit(r);
         return q;
     }
 
@@ -2360,4 +2442,7 @@ public class Table implements ResultSet {
         return true;
     }
 
+    public void clearPersistent() {
+        //unused
+    }
 }
