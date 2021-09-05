@@ -26,13 +26,11 @@ package su.interference.sql;
 
 import su.interference.core.Chunk;
 import su.interference.core.DataChunk;
-import su.interference.exception.InternalException;
 import su.interference.persistent.Session;
 import su.interference.persistent.Table;
 
-import java.net.MalformedURLException;
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * @author Yuriy Glotanov
@@ -40,11 +38,10 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 
 public class StreamQueue implements ResultSet {
-    //private final PriorityBlockingQueue<Comparable> q = new PriorityBlockingQueue();
     private final List<SQLColumn> rscols;
     private final Table rstable;
     @SuppressWarnings("unchecked")
-    private final ConcurrentLinkedQueue<Object> q = new ConcurrentLinkedQueue();
+    private final LinkedBlockingQueue<Object> q = new LinkedBlockingQueue<>(10000);
     private final Session s;
     private SQLColumn windowColumn;
     private int windowInterval;
@@ -86,12 +83,20 @@ public class StreamQueue implements ResultSet {
     }
 
     public DataChunk persist(Object o, Session s) throws Exception {
-        q.add(o);
+        q.put(o);
         return null;
     }
 
-    public Object poll(Session s) {
-        return q.poll();
+    public Object poll(Session s) throws InterruptedException {
+        if (!running) {
+            return null;
+        }
+        final Object o = q.take();
+        if (o instanceof ResultSetTerm) {
+            running = false;
+            return null;
+        }
+        return o;
     }
 
     public Chunk cpoll(Session s) {
@@ -117,8 +122,13 @@ public class StreamQueue implements ResultSet {
     public void deallocate(Session s) throws Exception {
         //todo
     }
+
     public boolean isPersistent() {
         return false;
+    }
+
+    public void clearPersistent() {
+        //unused
     }
 
 }

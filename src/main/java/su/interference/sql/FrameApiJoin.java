@@ -60,7 +60,7 @@ public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
         this.leftAllocId = bd1.getAllocId();
         this.rightAllocId = bd2 == null ? 0 : bd2 instanceof SQLIndexFrame ? 0 : bd2.getAllocId();
         if (nodeId == Config.getConfig().LOCAL_NODE_ID) {
-            this.frameJoinTask = cur.buildFrameJoinTask(nodeId, bd1, bd2);
+            this.frameJoinTask = cur.buildFrameJoinTask(nodeId, bd1, bd2, this);
         } else {
             this.frameJoinTask = null;
         }

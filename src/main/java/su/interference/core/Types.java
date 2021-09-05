@@ -64,76 +64,68 @@ public class Types {
                 && (t2.equals(p_float) || t2.equals(t_float) || t2.equals(p_double) || t2.equals(t_double));
     }
 
-    public static synchronized int getTypeLength(String type, int l) {
-        if (type.equals(p_byte)) {
-            return 1;
-        } else if (type.equals(p_char)) {
-            return 2;
-        } else if (type.equals(p_int)) {
-            return 4;
-        } else if (type.equals(p_long)) {
-            return 8;
-        } else if (type.equals(p_float)) {
-            return 4;
-        } else if (type.equals(p_double)) {
-            return 8;
-        } else if (type.equals(t_byte)) {
-            return 2;
-        } else if (type.equals(t_int)) {
-            return 5;
-        } else if (type.equals(c_int)) {
-            return 5;
-        } else if (type.equals(t_long)) {
-            return 9;
-        } else if (type.equals(c_long)) {
-            return 9;
-        } else if (type.equals(t_float)) {
-            return 5;
-        } else if (type.equals(t_double)) {
-            return 9;
-        } else if (type.equals(t_date)) {
-            return 9;
+    public static int getTypeLength(String type) {
+        switch (type) {
+            case p_byte:
+                return 1;
+            case p_char:
+            case t_byte:
+                return 2;
+            case p_int:
+            case p_float:
+                return 4;
+            case p_long:
+            case p_double:
+                return 8;
+            case t_int:
+            case c_int:
+            case t_float:
+                return 5;
+            case t_long:
+            case c_long:
+            case t_double:
+            case t_date:
+              return 9;
+            default:
+              return 0;
         }
-        return 0;
     }
 
-    public static synchronized int getLength (Field f) {
+    public static int getLength (Field f) {
         String type = f.getType().getName();
-        return getTypeLength(type, 0);
+        return getTypeLength(type);
     }
 
-    public static synchronized boolean isVarType (String type) {
-        return getTypeLength(type, 0) == 0;
+    public static boolean isVarType (String type) {
+        return getTypeLength(type) == 0;
     }
 
-    public static synchronized boolean isVarType (Field f) {
-        String type = f.getType().getName();
-        return isVarType(type);
+    public static boolean isVarType (Field f) {
+        return isVarType(f.getType().getName());
     }
 
-    public static synchronized boolean isObjType (Field f) {
+    public static boolean isObjType (Field f) {
         return f.getType().getName().equals("java.lang.Object") || f.getType().getName().equals("su.interference.transport.TransportMessage") ||
                 f.getType().getName().equals("su.interference.transport.TransportEvent") || f.getType().getName().equals("su.interference.transport.TransportCallback") ||
                 f.getType().getName().equals("su.interference.transport.TransportCallback") || f.getType().getName().equals("su.interference.transport.EventResult") ||
                 f.getType().getName().equals("su.interference.sql.FrameApiJoin");
     }
 
-    public static synchronized boolean isPrimitiveType (String type) {
-        if (type.equals("byte")) {
-            return true;
-        } else if (type.equals("char")) {
-            return true;
-        } else if (type.equals("int")) {
-            return true;
-        } else if (type.equals("long")) {
-            return true;
-        } else if (type.equals("float")) {
-            return true;
-        } else return type.equals("double");
+    public static boolean isPrimitiveType (String type) {
+        switch (type) {
+            case p_byte:
+            case p_char:
+            case p_int:
+            case p_long:
+            case p_float:
+            case p_double:
+                return true;
+            default:
+                return false;
+        }
     }
 
-    public static synchronized boolean isPrimitiveType (Field f) {
-        String type = f.getType().getName();
-        return isPrimitiveType(type);
+    public static boolean isPrimitiveType (Field f) {
+        return isPrimitiveType(f.getType().getName());
     }
 }

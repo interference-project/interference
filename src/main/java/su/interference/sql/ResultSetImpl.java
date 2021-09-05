@@ -45,7 +45,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class ResultSetImpl implements ResultSet {
     private final static Logger logger = LoggerFactory.getLogger(ResultSetImpl.class);
     private final Table target;
-    private final boolean persistent;
+    private boolean persistent;
     private final LinkedBlockingQueue q = new LinkedBlockingQueue(Config.getConfig().RETRIEVE_QUEUE_SIZE);
     private boolean started = true;
     private CountDownLatch latch;
@@ -119,6 +119,10 @@ public class ResultSetImpl implements ResultSet {
 
     public boolean isPersistent() {
         return persistent;
+    }
+
+    public void clearPersistent() {
+        this.persistent = false;
     }
 
     public void release() {

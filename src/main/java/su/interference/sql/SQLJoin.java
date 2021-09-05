@@ -48,6 +48,7 @@ public class SQLJoin {
     private final List<SQLColumn> ocs;
     private final List<SQLColumn> gcs;
     private final List<SQLColumn> fcs;
+    private final IndexDescript oid;
     private ResultSet gtemp;
 
     public SQLJoin (ArrayList<SQLTable> tables, CList columns, NestedCondition nc, Cursor cur, Session s) throws Exception {
@@ -58,13 +59,23 @@ public class SQLJoin {
         this.ocs = this.columns.getOrderColumns();
         this.gcs = this.columns.getGroupColumns();
         this.fcs = this.columns.getFResultColumns();
-
+        this.oid = this.columns.getOneTableOrderByColumnsIndex();
         rscols = this.columns.getColumns();
         preparedCursors = new ArrayList<>();
         FrameIterator t1 = null;
         FrameIterator t2 = null;
         SQLTable tt1 = null;
         SQLTable tt2 = null;
+
+        // todo update tables sequence order in cursor chain
+        if (oid != null) {
+            for (SQLTable sqlt : this.tables) {
+                if (sqlt.getTable().getObjectId() == oid.getT().getObjectId()) {
+                    sqlt.setIndexOrdered(true);
+                }
+            }
+            Collections.sort(this.tables);
+        }
 
         if (gcs.size()>0) {
             rscols = this.getIOTCList(gcs, this.columns.getColumns());
@@ -82,7 +93,7 @@ public class SQLJoin {
                 tt1 = sqlt;
                 if (this.tables.size()==1) {
                     //todo last = true always?
-                    SQLCursor sqlcur = new SQLCursor(1, t1, null, nc, rscols, ixflag, true, this.cur, s);
+                    SQLCursor sqlcur = new SQLCursor(1, t1, null, nc, rscols, ixflag, true, this.cur, i == 0 ? oid : null, s);
                     preparedCursors.add(sqlcur);
                     this.targetId = sqlcur.getTarget().getObjectId();
                 }
@@ -93,7 +104,7 @@ public class SQLJoin {
             tt2 = sqlt;
             // ixflag cleans inside SQLCursor if !last
             // todo ? generate index by extJoinedColumn?
-            SQLCursor sqlcur = new SQLCursor(i, t1, t2, nc, rscols, ixflag, i==this.tables.size()-1, this.cur, s);
+            SQLCursor sqlcur = new SQLCursor(i, t1, t2, nc, rscols, ixflag, i == this.tables.size() - 1, this.cur, i == 1 ? oid : null, s);
             if (preparedCursors.size()>0) {
                 preparedCursors.get(preparedCursors.size()-1).setExtJoinedCC(sqlcur.getJoinedCC());
             }
@@ -141,7 +152,7 @@ public class SQLJoin {
         //group processing
 
         if (this.cur.getType()==Cursor.MASTER_TYPE) {
-            if (gcs.size()>0||fcs.size()>0) {
+            if (gcs.size() > 0 || fcs.size() > 0) {
                 boolean ixflag = ocs.size() > 0;
 
                 //todo getall

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -24,6 +24,7 @@
 
 package su.interference.sql;
 
+import su.interference.core.IndexDescript;
 import su.interference.persistent.Table;
 import su.interference.sqlexception.InvalidWindowByPart;
 import su.interference.sqlexception.MissingTablesDescription;
@@ -197,7 +198,7 @@ public class CList {
     }
 
     public List<Field> getResultColumns() {
-        final List<Field> res = new ArrayList<Field>();
+        final List<Field> res = new ArrayList<>();
         for (SQLColumn sqlc : this.columns) {
             if (sqlc.isResult()) {
                 res.add(sqlc.getColumn());
@@ -207,7 +208,7 @@ public class CList {
     }
 
     public List<SQLColumn> getFResultColumns() {
-        final List<SQLColumn> res = new ArrayList<SQLColumn>();
+        final List<SQLColumn> res = new ArrayList<>();
         for (SQLColumn sqlc : this.columns) {
             if (sqlc.isResult()&&sqlc.getFtype()>0) {
                 res.add(sqlc);
@@ -217,7 +218,7 @@ public class CList {
     }
 
     public List<SQLColumn> getNoFResultColumns() {
-        final List<SQLColumn> res = new ArrayList<SQLColumn>();
+        final List<SQLColumn> res = new ArrayList<>();
         for (SQLColumn sqlc : this.columns) {
             if (sqlc.isResult()&&sqlc.getFtype()==0) {
                 res.add(sqlc);
@@ -227,7 +228,7 @@ public class CList {
     }
 
     public List<SQLColumn> getOrderColumns() {
-        final List<SQLColumn> res = new ArrayList<SQLColumn>();
+        final List<SQLColumn> res = new ArrayList<>();
         for (SQLColumn sqlc : this.columns) {
             if (sqlc.isOrder()) {
                 res.add(sqlc);
@@ -238,7 +239,7 @@ public class CList {
     }
 
     public List<SQLColumn> getGroupColumns() {
-        final List<SQLColumn> res = new ArrayList<SQLColumn>();
+        final List<SQLColumn> res = new ArrayList<>();
         for (SQLColumn sqlc : this.columns) {
             if (sqlc.isGroup()) {
                 res.add(sqlc);
@@ -256,5 +257,45 @@ public class CList {
         }
         return null;
     }
+
+    public IndexDescript getOneTableOrderByColumnsIndex() {
+        final List<SQLColumn> res = new ArrayList<>();
+        Table t = null;
+        for (SQLColumn sqlc : this.columns) {
+            if (sqlc.isOrder()) {
+                if (t == null) {
+                    t = sqlc.getTable();
+                    res.add(sqlc);
+                } else {
+                    if (t.getObjectId() == sqlc.getObjectId()) {
+                        res.add(sqlc);
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
+        Collections.sort(res, new ColumnOrderComparator());
+        if (t != null) {
+            for (IndexDescript indexDescript : t.getIndexNames()) {
+                if (res.size() == indexDescript.getFields().length) {
+                    Boolean exist = true;
+                    for (int i = 0; i < indexDescript.getFields().length; i++) {
+                        if (!res.get(i).getColumn().getName().equals(indexDescript.getFields()[i].getName())) {
+                            exist = false;
+                        }
+                    }
+                    if (exist) {
+                        return new IndexDescript(indexDescript);
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+
 
 }

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -25,6 +25,7 @@
 package su.interference.sql;
 
 import su.interference.core.EntityContainer;
+import su.interference.core.IndexDescript;
 import su.interference.persistent.Session;
 import su.interference.persistent.Table;
 import su.interference.sqlexception.*;
@@ -56,9 +57,8 @@ public class NestedCondition extends Condition {
     private int type;        // 1 - AND, 2 - OR
     private boolean empty;
 
-    public boolean checkNC (Object o, int sqlcid, boolean last, Session s) throws UnsupportedEncodingException, InternalException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
+    public boolean checkNC (Object o, Field[] fs, int sqlcid, boolean last, Session s) throws UnsupportedEncodingException, InternalException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
         final Class cl = o.getClass();
-        final Class cl_ = Arrays.asList(o.getClass().getInterfaces()).contains(EntityContainer.class) ? o.getClass().getSuperclass() : o.getClass();
         final boolean rs_ = !Arrays.asList(o.getClass().getInterfaces()).contains(EntityContainer.class);
         boolean res = false;
         if (empty) {
@@ -71,12 +71,12 @@ public class NestedCondition extends Condition {
             boolean cres = false;
             if (c.getClass().getName().equals("su.interference.sql.NestedCondition")) {
                 final NestedCondition nc = (NestedCondition)c;
-                cres = nc.checkNC(o, sqlcid, last, s);
+                cres = nc.checkNC(o, fs, sqlcid, last, s);
             }
             if (c.getClass().getName().equals("su.interference.sql.JoinCondition")) {
                 JoinCondition jc = (JoinCondition)c;
                 if ((jc.getId()==sqlcid)||(jc.getId()==0&&last)) {
-                    cres = sqlEquals(cl, cl_, o, jc, rs_, s);
+                    cres = sqlEquals(cl, fs, o, jc, rs_, s);
                 } else {
                     cres = true;
                 }
@@ -84,7 +84,7 @@ public class NestedCondition extends Condition {
             if (c.getClass().getName().equals("su.interference.sql.ValueCondition")) {
                 final ValueCondition vc = (ValueCondition)c;
                 if ((vc.getId()==sqlcid)||(vc.getId()==0&&last)) {
-                    cres = sqlEquals(cl, cl_, o, vc, rs_, s);
+                    cres = sqlEquals(cl, fs, o, vc, rs_, s);
                 } else {
                     cres = true;
                 }
@@ -99,11 +99,11 @@ public class NestedCondition extends Condition {
         return res;
     }
 
-    private boolean sqlEquals (Class c, Class c_, Object o, ValueCondition vc, boolean rs_, Session s) throws UnsupportedEncodingException, InternalException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
+    private boolean sqlEquals (Class c, Field[] fs, Object o, ValueCondition vc, boolean rs_, Session s) throws UnsupportedEncodingException, InternalException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
         boolean res = false;
 
-        for (int j=0; j<c_.getDeclaredFields().length; j++) {
-            final Field f = c_.getDeclaredFields()[j];
+        for (int j = 0; j < fs.length; j++) {
+            final Field f = fs[j];
             if (f.getName().equals(vc.getConditionColumn().getAlias())) {
                 res = sqlEquals(c, o, f, null, vc.getValues(), vc.getCondition(), rs_, s);
             }
@@ -112,13 +112,14 @@ public class NestedCondition extends Condition {
         return res;
     }
 
-    private boolean sqlEquals (Class c, Class c_, Object o, JoinCondition jc, boolean rs_, Session s) throws InternalException, UnsupportedEncodingException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
+    private boolean sqlEquals (Class c, Field[] fs, Object o, JoinCondition jc, boolean rs_, Session s) throws InternalException, UnsupportedEncodingException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
         boolean res = false;
 
         Field lf = null;
         Field rf = null;
-        for (int j=0; j<c_.getDeclaredFields().length; j++) {
-            Field f = c_.getDeclaredFields()[j];
+
+        for (int j = 0; j < fs.length; j++) {
+            Field f = fs[j];
             if (f.getName().equals(jc.getConditionColumn().getAlias())) {
                 lf = f;
             }
@@ -594,7 +595,7 @@ public class NestedCondition extends Condition {
         return res;
     }
 
-    public SQLJoinDispatcher getJoinDispatcher(FrameIterator lbi, FrameIterator rbi, List<SQLColumn> rscols, Session s) throws IOException, ClassNotFoundException, InternalException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    public SQLJoinDispatcher getJoinDispatcher(FrameIterator lbi, FrameIterator rbi, List<SQLColumn> rscols, IndexDescript leadingIndex, Session s) throws Exception {
         ArrayList<Condition> cs = this.conditions;
         int ctype = this.type;
         //in cursor we can not guaranteed uniqueness of base unique field
@@ -617,9 +618,9 @@ public class NestedCondition extends Condition {
                     final SQLColumn ccr = getSQLColumnByAlias(rscols, jc.getConditionColumnRight().getAlias());
                     //if (jc.getConditionColumn().isIndexOrUnique()||jc.getConditionColumnRight().isIndexOrUnique()) {
                         if (lbi.getObjectIds().contains(jc.getConditionColumn().getObjectId()) && rbi.getObjectIds().contains(jc.getConditionColumnRight().getObjectId())) {
-                            jlist.add(new SQLJoinDispatcher(lbi, rbi, cc, ccr, getSkipCheck(jc), this, s));
+                            jlist.add(new SQLJoinDispatcher(lbi, rbi, cc, ccr, getSkipCheck(jc), this, leadingIndex, s));
                         } else if (lbi.getObjectIds().contains(jc.getConditionColumnRight().getObjectId()) && rbi.getObjectIds().contains(jc.getConditionColumn().getObjectId())) {
-                            jlist.add(new SQLJoinDispatcher(rbi, lbi, cc, ccr, getSkipCheck(jc), this, s));
+                            jlist.add(new SQLJoinDispatcher(rbi, lbi, cc, ccr, getSkipCheck(jc), this, leadingIndex, s));
                         }
                     //}
                 }

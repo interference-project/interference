@@ -30,12 +30,10 @@ import su.interference.persistent.Table;
 import su.interference.persistent.FrameData;
 import su.interference.core.Instance;
 import su.interference.sqlexception.InvalidTableDescription;
-import su.interference.sqlexception.MissingTableInSerializableMode;
 
 import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.net.MalformedURLException;
 
 /**
  * @author Yuriy Glotanov
@@ -51,8 +49,9 @@ public class SQLTable implements Comparable, FrameIterator {
     private volatile LinkedBlockingQueue<FrameData> frames;
     private final AtomicBoolean terminate;
     private boolean leftfs;
+    private boolean indexOrdered;
 
-    public SQLTable (String table, String alias) throws InvalidTableDescription, MissingTableInSerializableMode {
+    public SQLTable (String table, String alias) throws InvalidTableDescription {
         this.alias = alias;
         String[] tblss = table.trim().split("\\.");
         if (tblss.length==1) { //without schema prefix - use user default schema
@@ -72,7 +71,7 @@ public class SQLTable implements Comparable, FrameIterator {
         return FrameIterator.TYPE_TABLE;
     }
 
-    public boolean isIndex() throws MalformedURLException, ClassNotFoundException { return table.isIndex(); }
+    public boolean isIndex() { return table.isIndex(); }
 
     public int getObjectId() {
         return table.getObjectId();
@@ -87,7 +86,7 @@ public class SQLTable implements Comparable, FrameIterator {
     //DESC sorting on FrameAmount
     public int compareTo(Object obj) {
         SQLTable t = (SQLTable)obj;
-        if (this.getTable().getFrameAmount() > t.getTable().getFrameAmount()) {
+        if (this.indexOrdered || this.getTable().getFrameAmount() > t.getTable().getFrameAmount()) {
             return -1;
         } else if (this.getTable().getFrameAmount() < t.getTable().getFrameAmount()) {
             return 1;
@@ -154,4 +153,11 @@ public class SQLTable implements Comparable, FrameIterator {
         return false;
     }
 
+    public boolean isIndexOrdered() {
+        return indexOrdered;
+    }
+
+    public void setIndexOrdered(boolean indexOrdered) {
+        this.indexOrdered = indexOrdered;
+    }
 }

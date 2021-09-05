@@ -42,6 +42,8 @@ import java.util.Date;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static su.interference.core.Types.*;
+
 /**
  * @author Yuriy Glotanov
  * @since 1.0
@@ -77,21 +79,21 @@ public class CustomSerializer implements SerializerApi {
     public byte[] serialize (String t, Object fo) throws IllegalAccessException, UnsupportedEncodingException, ClassNotFoundException, InternalException, InstantiationException {
         if (!Types.isPrimitiveType(t)) {
             switch (t) {
-                case ("java.lang.Integer"):
+                case (t_int):
                     return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromInt(fo==null?0:(Integer)fo));
-                case ("java.lang.Long"):
+                case (t_long):
                     return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromLong(fo==null?0:(Long)fo));
-                case ("java.util.concurrent.atomic.AtomicInteger"):
+                case (c_int):
                     return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromInt(fo==null?0:((AtomicInteger)fo).get()));
-                case ("java.util.concurrent.atomic.AtomicLong"):
+                case (c_long):
                     return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromLong(fo==null?0:((AtomicLong)fo).get()));
-                case ("java.lang.Float"):
+                case (t_float):
                     return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromFloat(fo==null?0:(Float)fo));
-                case ("java.lang.Double"):
+                case (t_double):
                     return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromDouble(fo==null?0:(Double)fo));
-                case ("java.util.Date"):
+                case (t_date):
                     return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromDate((Date)fo));
-                case ("java.lang.String"):
+                case (t_string):
                     return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromString((String)fo));
                 case ("java.util.ArrayList"):
                     return append(fo==null?new byte[]{0}:new byte[]{1},getBytesFromArrayList((ArrayList)fo));
@@ -120,19 +122,19 @@ public class CustomSerializer implements SerializerApi {
             }
         } else {
             switch (t) {
-                case ("byte"):
+                case (p_byte):
                     byte[] res = new byte[1];
                     res[0] = (Byte) fo;
                     return res;
-                case ("char"):
+                case (p_char):
                     return getBytesFromChar((Character) fo);
-                case ("int"):
+                case (p_int):
                     return getBytesFromInt((Integer) fo);
-                case ("long"):
+                case (p_long):
                     return getBytesFromLong((Long) fo);
-                case ("float"):
+                case (p_float):
                     return getBytesFromFloat((Float) fo);
-                case ("double"):
+                case (p_double):
                     return getBytesFromDouble((Double) fo);
             }
         }
@@ -143,16 +145,16 @@ public class CustomSerializer implements SerializerApi {
     public int length (String t, Object fo) throws IllegalAccessException, UnsupportedEncodingException, ClassNotFoundException, InternalException, InstantiationException {
         if (!Types.isPrimitiveType(t)) {
             switch (t) {
-                case ("java.lang.Integer"):
-                case ("java.util.concurrent.atomic.AtomicInteger"):
-                case ("java.lang.Float"):
+                case (t_int):
+                case (c_int):
+                case (t_float):
                     return 5;
-                case ("java.lang.Long"):
-                case ("java.util.concurrent.atomic.AtomicLong"):
-                case ("java.lang.Double"):
-                case ("java.util.Date"):
+                case (t_long):
+                case (c_long):
+                case (t_double):
+                case (t_date):
                     return 9;
-                case ("java.lang.String"):
+                case (t_string):
                     return getBytesFromString((String)fo).length + 1;
                 case ("java.util.ArrayList"):
                     return getBytesFromArrayList((ArrayList)fo).length + 1;
@@ -165,15 +167,15 @@ public class CustomSerializer implements SerializerApi {
             }
         } else {
             switch (t) {
-                case ("byte"):
+                case (p_byte):
                     return 1;
-                case ("char"):
+                case (p_char):
                     return getBytesFromChar((Character) fo).length;
-                case ("int"):
-                case ("float"):
+                case (p_int):
+                case (p_float):
                     return 4;
-                case ("long"):
-                case ("double"):
+                case (p_long):
+                case (p_double):
                     return 8;
             }
         }
@@ -199,23 +201,23 @@ public class CustomSerializer implements SerializerApi {
                 return null;
             }
             switch (t) {
-                case ("java.lang.Integer"):
+                case (t_int):
                     return new Integer(getIntFromBytes(substring(b, 1, b.length)));
-                case ("java.lang.Long"):
+                case (t_long):
                     return new Long(getLongFromBytes(substring(b, 1, b.length)));
-                case ("java.util.concurrent.atomic.AtomicInteger"):
+                case (c_int):
                     return new AtomicInteger(getIntFromBytes(substring(b, 1, b.length)));
-                case ("java.util.concurrent.atomic.AtomicLong"):
+                case (c_long):
                     return new AtomicLong(getLongFromBytes(substring(b, 1, b.length)));
-                case ("java.lang.Float"):
+                case (t_float):
                     return new Float(getFloatFromBytes(substring(b, 1, b.length)));
-                case ("java.lang.Double"):
+                case (t_double):
                     return new Double(getDoubleFromBytes(substring(b, 1, b.length)));
-                case ("java.lang.Byte"):
+                case (t_byte):
                     return new Byte(b[1]);
-                case ("java.util.Date"):
+                case (t_date):
                     return getDateFromBytes(substring(b, 1, b.length));
-                case ("java.lang.String"):
+                case (t_string):
                     return getStringFromBytes(substring(b, 1, b.length));
                 case ("java.util.ArrayList"):
                     return getArrayListFromBytes(substring(b, 1, b.length), g);
@@ -247,17 +249,17 @@ public class CustomSerializer implements SerializerApi {
             }
         } else {
             switch (t) {
-                case ("byte"):
+                case (p_byte):
                     return b[0];
-                case ("int"):
+                case (p_int):
                     return getIntFromBytes(b);
-                case ("long"):
+                case (p_long):
                     return getLongFromBytes(b);
-                case ("float"):
+                case (p_float):
                     return getFloatFromBytes(b);
-                case ("double"):
+                case (p_double):
                     return getDoubleFromBytes(b);
-                case ("char"):
+                case (p_char):
                     return getCharFromBytes(b);
             }
         }
@@ -271,33 +273,33 @@ public class CustomSerializer implements SerializerApi {
                 return null;
             }
             switch (t) {
-                case ("java.lang.Integer"):
+                case (t_int):
                     return Integer.parseInt(v);
-                case ("java.lang.Long"):
+                case (t_long):
                     return Long.parseLong(v);
-                case ("java.util.concurrent.atomic.AtomicInteger"):
+                case (c_int):
                     return new AtomicInteger(Integer.parseInt(v));
-                case ("java.util.concurrent.atomic.AtomicLong"):
+                case (c_long):
                     return new AtomicLong(Long.parseLong(v));
-                case ("java.lang.Float"):
+                case (t_float):
                     return Float.parseFloat(v);
-                case ("java.lang.Double"):
+                case (t_double):
                     return Double.parseDouble(v);
-                case ("java.util.Date"):
+                case (t_date):
                     SimpleDateFormat df = new SimpleDateFormat(this.external ? Config.getConfig().DATEFORMAT : Instance.getInstance() == null ? Config.getConfig().DATEFORMAT : Instance.getInstance().getDateFormat());
                     return df.parse(v);
-                case ("java.lang.String"):
+                case (t_string):
                     return v;
             }
         } else {
             switch (t) {
-                case ("int"):
+                case (p_int):
                     return Integer.parseInt(v);
-                case ("long"):
+                case (p_long):
                     return Long.parseLong(v);
-                case ("float"):
+                case (p_float):
                     return Float.parseFloat(v);
-                case ("double"):
+                case (p_double):
                     return Double.parseDouble(v);
             }
         }
@@ -414,7 +416,7 @@ public class CustomSerializer implements SerializerApi {
                     int s = 0;
                     boolean cnue = true;
                     while (cnue) {
-                        byte[] data = substring(b, s+v, s+v+(Types.isVarType(et)?getIntFromBytes(substring(b,s,s+v)):Types.getTypeLength(et,0)));
+                        byte[] data = substring(b, s+v, s+v+(Types.isVarType(et)?getIntFromBytes(substring(b,s,s+v)):Types.getTypeLength(et)));
                         s = s + data.length + v;
                         r.add(deserialize(data, et, et, null));
                         if (s>=b.length) { cnue=false; }
@@ -495,13 +497,13 @@ public class CustomSerializer implements SerializerApi {
         if (t.equals("[B")) {
             return (byte[])o;
         }
-        if (t.equals("java.lang.Integer")) {
+        if (t.equals(t_int)) {
             return getBytesFromInt((int)o);
         }
-        if (t.equals("java.lang.Long")) {
+        if (t.equals(t_long)) {
             return getBytesFromLong((long)o);
         }
-        if (t.equals("java.lang.String")) {
+        if (t.equals(t_string)) {
             return ((String) o).getBytes("UTF-8");
         }
         final Field[] fields = o.getClass().getDeclaredFields();

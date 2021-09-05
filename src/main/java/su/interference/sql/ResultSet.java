@@ -43,5 +43,6 @@ public interface ResultSet {
     java.lang.reflect.Field[] getFields();
     void deallocate(Session s) throws Exception;
     boolean isPersistent();
+    void clearPersistent();
 }
 
