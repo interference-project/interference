@@ -115,27 +115,43 @@ public class SQLHashMapFrame implements FrameApi, Finder {
         return ckey;
     }
 
+    @Override
     public long getFrameId() {
         return 0;
     }
 
+    @Override
     public long getFrameOrder() {
         return 0;
     }
 
+    @Override
     public long getAllocId() {
         return 0;
     }
 
+    @Override
     public int getObjectId() {
         return t.getObjectId();
     }
 
+    @Override
     public ArrayList<Chunk> getFrameChunks(Session s) {
         return null;
     }
 
+    @Override
     public ArrayList<Object> getFrameEntities(Session s) {
+        return null;
+    }
+
+    @Override
+    public boolean isProcess() {
+        return false;
+    }
+
+    @Override
+    public Class getEventProcessor() {
         return null;
     }
 }

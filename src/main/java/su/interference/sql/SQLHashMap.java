@@ -110,4 +110,13 @@ public class SQLHashMap implements FrameIterator {
         return false;
     }
 
+    @Override
+    public boolean isProcess() {
+        return false;
+    }
+
+    @Override
+    public Class getEventProcessor() {
+        return null;
+    }
 }

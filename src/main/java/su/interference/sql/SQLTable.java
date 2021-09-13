@@ -50,8 +50,10 @@ public class SQLTable implements Comparable, FrameIterator {
     private final AtomicBoolean terminate;
     private boolean leftfs;
     private boolean indexOrdered;
+    private final boolean process;
+    private final Class evtprc;
 
-    public SQLTable (String table, String alias) throws InvalidTableDescription {
+    public SQLTable (String table, String alias, boolean process, Class evtprc) throws InvalidTableDescription {
         this.alias = alias;
         String[] tblss = table.trim().split("\\.");
         if (tblss.length==1) { //without schema prefix - use user default schema
@@ -65,6 +67,8 @@ public class SQLTable implements Comparable, FrameIterator {
 
         frames = Instance.getInstance().getTableById(this.table.getObjectId()).getFrames();
         this.terminate = new AtomicBoolean(false);
+        this.process = process;
+        this.evtprc = evtprc;
     }
 
     public int getType() {
@@ -159,5 +163,15 @@ public class SQLTable implements Comparable, FrameIterator {
 
     public void setIndexOrdered(boolean indexOrdered) {
         this.indexOrdered = indexOrdered;
+    }
+
+    @Override
+    public boolean isProcess() {
+        return process;
+    }
+
+    @Override
+    public Class getEventProcessor() {
+        return evtprc;
     }
 }

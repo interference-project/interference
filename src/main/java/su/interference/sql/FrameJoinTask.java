@@ -59,6 +59,10 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
     private final static ConcurrentHashMap<String, Class> cache = new ConcurrentHashMap<>();
     private final FrameApiJoin j;
     private final SQLJoinDispatcher hmap;
+    private final boolean process;
+    private final boolean processleft;
+    private final Table processtbl;
+    private final EventProcessor ep;
 
     static {
         cache.put("int", int.class);
@@ -67,7 +71,9 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
         cache.put("double", double.class);
     }
 
-    public FrameJoinTask(Cursor cur, FrameApi bd1, FrameApi bd2, ResultSet target, List<SQLColumn> cols, NestedCondition nc, int sqlcid, int nodeId, boolean last, boolean leftfs, SQLJoinDispatcher hmap, FrameApiJoin j, Session s) {
+    //todo pbi is process iterator, may lbi or rbi depends of process flag setting
+    //todo из какого итератора брать оъект для процессинга?
+    public FrameJoinTask(Cursor cur, FrameIterator pbi, FrameApi bd1, FrameApi bd2, ResultSet target, List<SQLColumn> cols, NestedCondition nc, int sqlcid, boolean last, SQLJoinDispatcher hmap, FrameApiJoin j, Session s) throws Exception {
         this.bd1 = bd1;
         this.bd2 = bd2;
         this.target = target;
@@ -75,6 +81,10 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
         this.nc = nc;
         this.s = s;
         this.q = new LinkedBlockingQueue<>(Config.getConfig().RETRIEVE_QUEUE_SIZE);
+        this.process = pbi.isProcess();
+        this.processleft = pbi.getObjectId() == bd1.getObjectId();
+        this.processtbl = Instance.getInstance().getTableById(pbi.getObjectId());
+        this.ep = pbi.isProcess() ? (EventProcessor) pbi.getEventProcessor().newInstance() : null;
         this.sqlcid = sqlcid;
         this.last = last;
         this.j = j;
@@ -123,22 +133,13 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
                                 }
                                 final Object oo1 = ib1.getDataChunk() == null ? null : ib1.getDataChunk().getEntity(s);
                                 final Object oo2 = ib2.getDataChunk() == null ? null : ib2.getDataChunk().getEntity(s);
-                                Object j = joinDataRecords(r, c1, c2, t1, t2, oo1, oo2, cols, c1rs, s);
-                                if (hmap.skipCheckNC()) {
-                                    q.put(j);
-                                } else {
-                                    if (nc.checkNC(j, fs, sqlcid, last, s)) {
-                                        q.put(j);
-                                    }
-                                }
-
+                                processRecords(r, c1, c2, t1, t2, oo1, oo2, c1rs, fs);
                                 IndexChunk nc2 = (IndexChunk) ((SQLIndexFrame) bd2).poll(s);
                                 if (nc2 == null) {
                                     ib1 = (IndexChunk) ((SQLIndexFrame) bd1).poll(s);
                                 } else {
                                     ib2 = nc2;
                                 }
-
                             }
                             if (ib1 == null || ib2 == null) {
                                 cnue = false;
@@ -169,14 +170,7 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
                                 final List<Object> o2 = ((SQLHashMapFrame) bd2).get(key, s);
                                 if (o2 != null) {
                                     if (!(o2.get(0) == null && last)) {
-                                        Object j = joinDataRecords(r, c1, c2, t1, t2, o1, o2.get(0), cols, c1rs, s);
-                                        if (hmap.skipCheckNC()) {
-                                            q.put(j);
-                                        } else {
-                                            if (nc.checkNC(j, fs, sqlcid, last, s)) {
-                                                q.put(j);
-                                            }
-                                        }
+                                        processRecords(r, c1, c2, t1, t2, o1, o2.get(0), c1rs, fs);
                                     }
                                 }
                             } else if (bd2 != null && bd2.getImpl() == FrameApi.IMPL_INDEX) {
@@ -187,14 +181,7 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
                                     for (Object o2_ : o2) {
                                         final IndexChunk ib = (IndexChunk) ((DataChunk) o2_).getEntity(s);
                                         final Object oo2 = ib.getDataChunk().getEntity(s);
-                                        final Object j = joinDataRecords(r, c1, c2, t1, t2, o1, oo2, cols, c1rs, s);
-                                        if (hmap.skipCheckNC()) {
-                                            q.put(j);
-                                        } else {
-                                            if (nc.checkNC(j, fs, sqlcid, last, s)) {
-                                                q.put(j);
-                                            }
-                                        }
+                                        processRecords(r, c1, c2, t1, t2, o1, oo2, c1rs, fs);
                                     }
                                 }
                             } else {
@@ -203,12 +190,34 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
                                 if (r == null || target instanceof StreamQueue) {
                                     //todo need to cast o1 to RS type
                                     if (nc.checkNC(o1, fs, sqlcid, last, s)) {
-                                        q.put(o1); //target table is null -> result class is null -> returns generic entities
+                                        if (process) {
+                                            try {
+                                                final boolean processed = ep.process(o1);
+                                                if (processed && ep.delete()) {
+                                                    processtbl.delete(o1, s);
+                                                }
+                                            } catch (Exception e) {
+                                                logger.error("Exception occured during event processing: "+o1, e);
+                                            }
+                                        } else {
+                                            q.put(o1);
+                                        }
                                     }
                                 } else {
                                     Object j = joinDataRecords(r, c1, c2, t1, t2, o1, null, cols, c1rs, s);
                                     if (nc.checkNC(j, fs, sqlcid, last, s)) {
-                                        q.put(j);
+                                        if (process) {
+                                            try {
+                                                final boolean processed = ep.process(o1);
+                                                if (processed && ep.delete()) {
+                                                    processtbl.delete(o1, s);
+                                                }
+                                            } catch (Exception e) {
+                                                logger.error("Exception occured during event processing: "+o1, e);
+                                            }
+                                        } else {
+                                            q.put(j);
+                                        }
                                     }
                                 }
                             }
@@ -217,7 +226,19 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
                             for (Object o2 : drs2) {
                                 Object j = joinDataRecords(r, c1, c2, t1, t2, o1, o2, cols, c1rs, s);
                                 if (nc.checkNC(j, fs, sqlcid, last, s)) {
-                                    q.put(j);
+                                    if (process) {
+                                        final Object o = processleft ? o1 : o2;
+                                        try {
+                                            final boolean processed = ep.process(o);
+                                            if (processed && ep.delete()) {
+                                                processtbl.delete(o, s);
+                                            }
+                                        } catch (Exception e) {
+                                            logger.error("Exception occured during event processing: "+o, e);
+                                        }
+                                    } else {
+                                        q.put(j);
+                                    }
                                 }
                             }
                         }
@@ -239,14 +260,7 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
                             final List<Object> o2 = ((SQLHashMapFrame) bd2).get(key, s);
                             if (o2 != null) {
                                 if (!(o2.get(0) == null && last)) {
-                                    Object j = joinDataRecords(r, c1, c2, t1, t2, o1, o2.get(0), cols, c1rs, s);
-                                    if (hmap.skipCheckNC()) {
-                                        q.put(j);
-                                    } else {
-                                        if (nc.checkNC(j, fs, sqlcid, last, s)) {
-                                            q.put(j);
-                                        }
-                                    }
+                                    processRecords(r, c1, c2, t1, t2, o1, o2.get(0), c1rs, fs);
                                 }
                             }
                         } else if (bd2 != null && bd2.getImpl() == FrameApi.IMPL_INDEX) {
@@ -257,14 +271,7 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
                                 for (Object o2_ : o2) {
                                     final IndexChunk ib = (IndexChunk) ((DataChunk) o2_).getEntity(s);
                                     final Object oo2 = ib.getDataChunk().getEntity(s);
-                                    final Object j = joinDataRecords(r, c1, c2, t1, t2, o1, oo2, cols, c1rs, s);
-                                    if (hmap.skipCheckNC()) {
-                                        q.put(j);
-                                    } else {
-                                        if (nc.checkNC(j, fs, sqlcid, last, s)) {
-                                            q.put(j);
-                                        }
-                                    }
+                                    processRecords(r, c1, c2, t1, t2, o1, oo2, c1rs, fs);
                                 }
                             }
                         } else {
@@ -273,12 +280,34 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
                             if (r == null || target instanceof StreamQueue) {
                                 //todo need to cast o1 to RS type
                                 if (nc.checkNC(o1, fs, sqlcid, last, s)) {
-                                    q.put(o1); //target table is null -> result class is null -> returns generic entities
+                                    if (process) {
+                                        try {
+                                            final boolean processed = ep.process(o1);
+                                            if (processed && ep.delete()) {
+                                                processtbl.delete(o1, s);
+                                            }
+                                        } catch (Exception e) {
+                                            logger.error("Exception occured during event processing: "+o1, e);
+                                        }
+                                    } else {
+                                        q.put(o1);
+                                    }
                                 }
                             } else {
                                 Object j = joinDataRecords(r, c1, c2, t1, t2, o1, null, cols, c1rs, s);
                                 if (nc.checkNC(j, fs, sqlcid, last, s)) {
-                                    q.put(j);
+                                    if (process) {
+                                        try {
+                                            final boolean processed = ep.process(o1);
+                                            if (processed && ep.delete()) {
+                                                processtbl.delete(o1, s);
+                                            }
+                                        } catch (Exception e) {
+                                            logger.error("Exception occured during event processing: "+o1, e);
+                                        }
+                                    } else {
+                                        q.put(j);
+                                    }
                                 }
                             }
                         }
@@ -287,7 +316,19 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
                         for (Object o2 : drs2) {
                             Object j = joinDataRecords(r, c1, c2, t1, t2, o1, o2, cols, c1rs, s);
                             if (nc.checkNC(j, fs, sqlcid, last, s)) {
-                                q.put(j);
+                                if (process) {
+                                    final Object o = processleft ? o1 : o2;
+                                    try {
+                                        final boolean processed = ep.process(o);
+                                        if (processed && ep.delete()) {
+                                            processtbl.delete(o, s);
+                                        }
+                                    } catch (Exception e) {
+                                        logger.error("Exception occured during event processing: "+o, e);
+                                    }
+                                } else {
+                                    q.put(j);
+                                }
                             }
                         }
                     }
@@ -299,8 +340,43 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
         return q;
     }
 
-    private Object joinDataRecords (Class r, Class c1, Class c2, int t1, int t2, Object o1, Object o2, List<SQLColumn> cols, boolean isrs, Session s)
-        throws NoSuchMethodException, IllegalAccessException, InstantiationException, InvocationTargetException, ClassNotFoundException {
+    private void processRecords(Class r, Class c1, Class c2, int t1, int t2, Object o1, Object o2, boolean isrs, Field[] fs) throws Exception {
+        if (hmap.skipCheckNC()) {
+            if (process) {
+                final Object o = processleft ? o1 : o2;
+                try {
+                    final boolean processed = ep.process(o);
+                    if (processed && ep.delete()) {
+                        processtbl.delete(o, s);
+                    }
+                } catch (Exception e) {
+                    logger.error("Exception occured during event processing: "+o, e);
+                }
+            } else {
+                Object j = joinDataRecords(r, c1, c2, t1, t2, o1, o2, cols, isrs, s);
+                q.put(j);
+            }
+        } else {
+            Object j = joinDataRecords(r, c1, c2, t1, t2, o1, o2, cols, isrs, s);
+            if (nc.checkNC(j, fs, sqlcid, last, s)) {
+                if (process) {
+                    final Object o = processleft ? o1 : o2;
+                    try {
+                        final boolean processed = ep.process(o);
+                        if (processed && ep.delete()) {
+                            processtbl.delete(o, s);
+                        }
+                    } catch (Exception e) {
+                        logger.error("Exception occured during event processing: "+o, e);
+                    }
+                } else {
+                    q.put(j);
+                }
+            }
+        }
+    }
+
+    private Object joinDataRecords (Class r, Class c1, Class c2, int t1, int t2, Object o1, Object o2, List<SQLColumn> cols, boolean isrs, Session s) throws Exception {
         final GenericResult ret = (GenericResult)r.newInstance();
         if (isrs) {
             for (SQLColumn sqlc : cols) {

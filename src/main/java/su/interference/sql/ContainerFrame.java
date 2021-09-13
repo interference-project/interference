@@ -49,26 +49,32 @@ public class ContainerFrame implements FrameApi {
         this.frames = frames;
     }
 
+    @Override
     public long getFrameId() {
         return 0;
     }
 
+    @Override
     public long getAllocId() {
         return 0;
     }
 
+    @Override
     public int getObjectId() {
         return objectId;
     }
 
+    @Override
     public int getImpl() {
         return FrameApi.IMPL_CONTAINER;
     }
 
+    @Override
     public ArrayList<Chunk> getFrameChunks(Session s) throws Exception {
         return null;
     }
 
+    @Override
     public ArrayList<Object> getFrameEntities(Session s) throws Exception {
         if (s.isStream()) {
             final ArrayList<Object> res = new ArrayList<>();
@@ -108,8 +114,18 @@ public class ContainerFrame implements FrameApi {
         return null;
     }
 
+    @Override
     public long getFrameOrder() {
         return 0;
     }
 
+    @Override
+    public boolean isProcess() {
+        return false;
+    }
+
+    @Override
+    public Class getEventProcessor() {
+        return null;
+    }
 }

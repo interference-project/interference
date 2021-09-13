@@ -88,10 +88,12 @@ public class SQLIndexFrame implements FrameApi, Finder {
         }
     }
 
+    @Override
     public int getImpl() {
         return FrameApi.IMPL_INDEX;
     }
 
+    @Override
     public List<Object> get(Object key, Session s) throws Exception {
         if (vccheck) {
             return Arrays.asList(vcmap.get(new ValueSet(key)));
@@ -108,26 +110,32 @@ public class SQLIndexFrame implements FrameApi, Finder {
         return res;
     }
 
+    @Override
     public long getFrameId() {
         return bd == null ? 0 : bd.getFrameId();
     }
 
+    @Override
     public long getFrameOrder() {
         return bd == null ? 0 : bd.getFrameOrder();
     }
 
+    @Override
     public long getAllocId() {
         return bd == null ? 0 : bd.getAllocId();
     }
 
+    @Override
     public int getObjectId() {
         return parent.getObjectId();
     }
 
+    @Override
     public ArrayList<Chunk> getFrameChunks(Session s) {
         return null;
     }
 
+    @Override
     public ArrayList<Object> getFrameEntities(Session s) throws Exception {
         //todo need refactor on SQLIndex level - returns one to many frames by value
         synchronized (this) {
@@ -179,5 +187,15 @@ public class SQLIndexFrame implements FrameApi, Finder {
 
     public boolean isLeading() {
         return leading;
+    }
+
+    @Override
+    public boolean isProcess() {
+        return false;
+    }
+
+    @Override
+    public Class getEventProcessor() {
+        return null;
     }
 }

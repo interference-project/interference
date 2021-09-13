@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -41,9 +41,11 @@ import java.util.*;
 
 public class SQLSelect implements SQLStatement {
     private static final String SELECT_CLAUSE = "SELECT";
+    private static final String PROCESS_CLAUSE = "PROCESS";
     private static final String STREAM_CLAUSE = " STREAM ";
     private static final String DISTINCT_CLAUSE = " DISTINCT ";
     private static final String FROM_CLAUSE = " FROM ";
+    private static final String WITHIN_CLAUSE = " WITHIN ";
     private static final String WHERE_CLAUSE = " WHERE ";
     private static final String ORDERBY_CLAUSE = " ORDER BY ";
     private static final String GROUPBY_CLAUSE = " GROUP BY ";
@@ -59,6 +61,7 @@ public class SQLSelect implements SQLStatement {
     private SQLJoin             join;
     private ArrayList<SQLNode>  nodes;
 
+    private boolean process;
     private boolean stream;
     private boolean distinct;
     private boolean entityResult;
@@ -70,7 +73,7 @@ public class SQLSelect implements SQLStatement {
     }
 
     public SQLSelect () {
-        
+
     }
 
     public SQLSelect (String sql, Session s) {
@@ -151,11 +154,15 @@ public class SQLSelect implements SQLStatement {
     @SuppressWarnings("unchecked")
     private final void parseSQL (String s, Cursor cur, Session sn) throws Exception {
 
+        final ClassLoader cl = Thread.currentThread().getContextClassLoader();
         final String sql = s.trim();
         final String SQL = s.toUpperCase().trim();
 
-        if (!SQL.startsWith(SELECT_CLAUSE)) {
+        if (!SQL.startsWith(SELECT_CLAUSE) && !SQL.startsWith(PROCESS_CLAUSE)) {
             throw new InvalidSQLStatement();
+        }
+        if (SQL.startsWith(PROCESS_CLAUSE)) {
+            process = true;
         }
         if (SQL.indexOf(STREAM_CLAUSE) == SELECT_CLAUSE.length()) {
             this.stream = true;
@@ -163,10 +170,13 @@ public class SQLSelect implements SQLStatement {
         if (SQL.indexOf(DISTINCT_CLAUSE) == SELECT_CLAUSE.length()) {
             this.distinct = true;
         }
-        if (SQL.indexOf(FROM_CLAUSE) < SELECT_CLAUSE.length() + 1) {
+        if (!process && SQL.indexOf(FROM_CLAUSE) < SELECT_CLAUSE.length() + 1) {
             throw new MissingFromClause();
         }
-        if (sql.substring(SELECT_CLAUSE.length(), SQL.indexOf(" FROM ")).trim().equals("")) {
+        if (process && SQL.indexOf(WITHIN_CLAUSE) < PROCESS_CLAUSE.length() + 1) {
+            throw new MissingWithinClause();
+        }
+        if (!process && sql.substring(SELECT_CLAUSE.length(), SQL.indexOf(" FROM ")).trim().equals("")) {
             throw new MissingFromClause();
         }
 
@@ -195,11 +205,20 @@ public class SQLSelect implements SQLStatement {
             }
         }
 
-        final int cldsStart = stream ? SELECT_CLAUSE.length() + STREAM_CLAUSE.length() :
+        final int cldsStart = process ? 0 : stream ? SELECT_CLAUSE.length() + STREAM_CLAUSE.length() :
                               distinct ? SELECT_CLAUSE.length() + DISTINCT_CLAUSE.length() :
                               SELECT_CLAUSE.length();
-        final String[] clds = sql.substring(cldsStart, SQL.indexOf(FROM_CLAUSE)).trim().split(",");
-        final String[] tbls = sql.substring(SQL.indexOf(FROM_CLAUSE)+6, baselen).trim().split(",");
+        final String[] clds = process ? new String[]{} : sql.substring(cldsStart, SQL.indexOf(FROM_CLAUSE)).trim().split(",");
+        final String[] tbls = process ? sql.substring(SQL.indexOf(PROCESS_CLAUSE)+7, SQL.indexOf(WITHIN_CLAUSE)).trim().split(",") :
+                                        sql.substring(SQL.indexOf(FROM_CLAUSE)+6, baselen).trim().split(",");
+        final String evtpr_ = process ? sql.substring(SQL.indexOf(WITHIN_CLAUSE)+8, baselen).trim() : null;
+        final Class evtprc = process ? cl.loadClass(evtpr_) : null;
+
+/*
+        if (!evtprc.newInstance() instanceof EventProcessor) {
+
+        }
+*/
 
         final int wpos = SQL.indexOf(WHERE_CLAUSE);
         final int opos = SQL.indexOf(ORDERBY_CLAUSE);
@@ -248,10 +267,10 @@ public class SQLSelect implements SQLStatement {
         for (int i=0; i<tbls.length; i++) {
             String[] tblss = tbls[i].trim().split(" ");
             if (tblss.length==1) { //without alias
-                this.tables.add(new SQLTable(tblss[0],tblss[0]));
+                this.tables.add(new SQLTable(tblss[0], tblss[0], process, evtprc));
             }
             if (tblss.length==2) { //with alias
-                this.tables.add(new SQLTable(tblss[0],tblss[1]));
+                this.tables.add(new SQLTable(tblss[0], tblss[1], process, evtprc));
             }
         }
 

@@ -1358,7 +1358,12 @@ public class Table implements ResultSet {
 
     }
 
-    protected void delete (final Object o, final Session s, LLT extllt, boolean ignoreTransaction) throws Exception {
+    //event process action - ignore nolocal frame constraint
+    public synchronized void delete (final Object o, final Session s) throws Exception {
+        this.delete(o, s, null, false, true);
+    }
+
+    protected void delete (final Object o, final Session s, LLT extllt, boolean ignoreTransaction, boolean ignoreNoLocal) throws Exception {
         final boolean noTran = ignoreTransaction ? true : isNoTran();
         if (!noTran) {
             if (s.getTransaction() == null || !s.getTransaction().started || s.getTransaction().getMTran() == 0) {
@@ -1379,6 +1384,15 @@ public class Table implements ResultSet {
         }
         final int len = dc.getBytesAmount();
         final FrameData bd = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId()+dc.getHeader().getRowID().getFramePointer());
+
+        if (!bd.getFrame().isLocal()) {
+            if (ignoreNoLocal) {
+                //todo
+                throw new CannotAccessToForeignRecord();
+            } else {
+                throw new CannotAccessToForeignRecord();
+            }
+        }
 
         DataChunk udc = null;
 

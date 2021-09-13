@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -90,7 +90,8 @@ public class TransCleanUp implements Runnable, ManagedProcess {
                                     //deallocate undo frame
                                     final FrameData ub = Instance.getInstance().getFrameById(tf.getUframeId());
                                     //store frame params as free
-                                    if (!hasfb) {
+                                    //todo undo space may not be not deallocated - check ub for not null
+                                    if (!hasfb && ub != null) {
                                         final FreeFrame fb = new FreeFrame(0, tf.getUframeId(), ub.getSize());
                                         session.persist(fb); //insert
                                         session.delete(ub);

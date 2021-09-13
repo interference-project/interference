@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -25,11 +25,8 @@
 package su.interference.sql;
 
 import su.interference.core.Chunk;
-import su.interference.exception.InternalException;
 import su.interference.persistent.Session;
 
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 
 /**
@@ -50,5 +47,7 @@ public interface FrameApi {
     long getFrameOrder();
     ArrayList<Chunk> getFrameChunks(Session s) throws Exception;
     ArrayList<Object> getFrameEntities(Session s) throws Exception;
+    boolean isProcess();
+    Class getEventProcessor();
 
 }
