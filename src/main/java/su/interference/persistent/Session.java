@@ -469,7 +469,7 @@ public class Session implements OnDelete {
     public void delete (Object o, LLT llt) throws Exception {
         final Table t = Instance.getInstance().getTableByName(o.getClass().getName());
         if (t != null) {
-            t.delete(o, this, llt, false);
+            t.delete(o, this, llt, false, false);
         }
         o = null;
     }
@@ -478,7 +478,7 @@ public class Session implements OnDelete {
         if (o instanceof EntityContainer) {
             final Table t = Instance.getInstance().getTableByName(o.getClass().getName());
             if (t != null) {
-                t.delete(o, this, llt, true);
+                t.delete(o, this, llt, true, false);
             }
         } else {
             throw new RuntimeException("Can't purge non-entity object");

@@ -27,6 +27,7 @@ package su.interference.transport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.core.Instance;
+import su.interference.persistent.FrameData;
 import su.interference.persistent.Session;
 import su.interference.persistent.Transaction;
 
@@ -42,24 +43,28 @@ public class CommandEvent extends TransportEventImpl implements PersistentEvent 
     public static final int INITTRAN = 1;
     public static final int COMMIT = 2;
     public static final int ROLLBACK = 3;
+    public static final int LOCK = 4;
+    public static final int UNLOCK = 5;
     public static final int MAX_COMMAND = 10;
     private final int command;
+    private final int nodeId;
     private final long id;
 
-    public CommandEvent(int command, long id, int channelId) {
+    public CommandEvent(int command, int nodeId, long id, int channelId) {
         super(channelId);
         this.command = command;
+        this.nodeId = nodeId;
         this.id = id;
     }
 
     @Override
     public EventResult process() {
         final Session s = Session.getSession();
-        final Transaction t = Instance.getInstance().getTransactionById(id);
         if (command == INITTRAN) {
             updateTransaction(this.id, s);
         }
         if (command == COMMIT) {
+            final Transaction t = Instance.getInstance().getTransactionById(id);
             if (t != null) {
                 t.commit(s, true);
             } else {
@@ -67,11 +72,20 @@ public class CommandEvent extends TransportEventImpl implements PersistentEvent 
             }
         }
         if (command == ROLLBACK) {
+            final Transaction t = Instance.getInstance().getTransactionById(id);
             if (t != null) {
                 t.rollback(s, true);
             } else {
                 return new EventResult(TransportCallback.FAILURE, null, 0, null, new RuntimeException("transaction in null"), null);
             }
+        }
+        if (command == LOCK) {
+            final FrameData bd = Instance.getInstance().getFrameById(id);
+            bd.lock(this.nodeId);
+        }
+        if (command == UNLOCK) {
+            final FrameData bd = Instance.getInstance().getFrameById(id);
+            bd.unlock(this.nodeId);
         }
         return new EventResult(TransportCallback.SUCCESS, null, 0, null, null, null);
     }

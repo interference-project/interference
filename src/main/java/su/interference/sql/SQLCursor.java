@@ -71,6 +71,7 @@ public class SQLCursor implements FrameIterator {
     private final SQLJoinDispatcher hmap;
     private final FrameIterator lbi;
     private final FrameIterator rbi;
+    private final FrameIterator pbi;
     private final List<Integer> objectIds;
     private String rightType;
     private boolean leftFS;
@@ -78,6 +79,8 @@ public class SQLCursor implements FrameIterator {
     private final SQLColumn joinedCC;
     private SQLColumn extJoinedCC;
     private final IndexDescript leadingIndex;
+    private final boolean process;
+    private final Class evtprc;
 
     private static Map<Integer, Map<Long, ConcurrentLinkedQueue<FrameApi>>> sfmap = new ConcurrentHashMap<>();
     private static final int BATCH_SIZE = 8;
@@ -96,6 +99,8 @@ public class SQLCursor implements FrameIterator {
         this.nc = nc;
         this.last = last;
         this.leadingIndex = leadingIndex;
+        this.process = lbi.isProcess();
+        this.evtprc = lbi.getEventProcessor();
 
         //ordered sets should be persistent
         this.peristent = cur.getSqlStmt().isEntityResult() ? false : ixflag || !last;
@@ -196,8 +201,8 @@ public class SQLCursor implements FrameIterator {
             if (this.rbi instanceof SQLCursor) {
                 logger.info("use full scan for " + rt.getName() +" persistent = "+((SQLCursor) lbi).getTarget().isPersistent());
             }
-
         }
+        this.pbi = this.rbi != null && this.rbi.isProcess() ? this.rbi : this.lbi;
     }
 
     public int getType() {
@@ -209,8 +214,8 @@ public class SQLCursor implements FrameIterator {
         return target.getObjectId();
     }
 
-    protected FrameJoinTask buildFrameJoinTask(int nodeId, FrameApi bd1, FrameApi bd2, FrameApiJoin j) {
-        return new FrameJoinTask(cur, bd1, bd2, target, rscols, nc, id, nodeId, last, lbi.isLeftfs(), hmap, j, s);
+    protected FrameJoinTask buildFrameJoinTask(FrameIterator pbi, FrameApi bd1, FrameApi bd2, FrameApiJoin j) throws Exception {
+        return new FrameJoinTask(cur, pbi, bd1, bd2, target, rscols, nc, id, last, hmap, j, s);
     }
 
     public void build() {
@@ -231,9 +236,9 @@ public class SQLCursor implements FrameIterator {
                         if (bd1 != null) {
                             if (rbi == null) {
                                 if (ns[i] == Config.getConfig().LOCAL_NODE_ID) {
-                                    ltasks.put(new FrameApiJoin(ns[i], c1, bd1, null));
+                                    ltasks.put(new FrameApiJoin(ns[i], c1, lbi, bd1, null));
                                 } else {
-                                    rtasks__.put(new FrameApiJoin(ns[i], c1, bd1, null));
+                                    rtasks__.put(new FrameApiJoin(ns[i], c1, lbi, bd1, null));
                                 }
                                 i++;
                                 if (i == ns.length) {
@@ -247,12 +252,12 @@ public class SQLCursor implements FrameIterator {
                                             rightType = bd2.getClass().getSimpleName();
                                         }
                                         if (lbi.noDistribute() || rbi.noDistribute()) {
-                                            ltasks.put(new FrameApiJoin(Config.getConfig().LOCAL_NODE_ID, c1, bd1, bd2));
+                                            ltasks.put(new FrameApiJoin(Config.getConfig().LOCAL_NODE_ID, c1, pbi, bd1, bd2));
                                         } else {
                                             if (ns[i] == Config.getConfig().LOCAL_NODE_ID) {
-                                                ltasks.put(new FrameApiJoin(ns[i], c1, bd1, bd2));
+                                                ltasks.put(new FrameApiJoin(ns[i], c1, pbi, bd1, bd2));
                                             } else {
-                                                rtasks__.put(new FrameApiJoin(ns[i], c1, bd1, bd2));
+                                                rtasks__.put(new FrameApiJoin(ns[i], c1, pbi, bd1, bd2));
                                             }
                                         }
                                         i++;
@@ -367,7 +372,8 @@ public class SQLCursor implements FrameIterator {
 
                     if (flist.size() > 0) {
                         final ContainerFrame cf = new ContainerFrame(lbi.getObjectId(), flist);
-                        final FrameJoinTask task = new FrameJoinTask(cur, cf, null, target, ((StreamQueue) target).getRscols(), nc, id, Config.getConfig().LOCAL_NODE_ID, last, lbi.isLeftfs(), null, null, s);
+                        final FrameIterator pbi = rbi != null && rbi.isProcess() ? rbi : lbi;
+                        final FrameJoinTask task = new FrameJoinTask(cur, pbi, cf, null, target, ((StreamQueue) target).getRscols(), nc, id, last, null, null, s);
                         exec.submit(task);
 
                         boolean cnue =  true;
@@ -388,7 +394,8 @@ public class SQLCursor implements FrameIterator {
                     while (((StreamQueue) target).isRunning()) {
                         FrameApi f = q.poll();
                         if (f != null) {
-                            final FrameJoinTask task = new FrameJoinTask(cur, f, null, target, ((StreamQueue) target).getRscols(), nc, id, Config.getConfig().LOCAL_NODE_ID, last, lbi.isLeftfs(), null, null, s);
+                            final FrameIterator pbi = rbi != null && rbi.isProcess() ? rbi : lbi;
+                            final FrameJoinTask task = new FrameJoinTask(cur, pbi, f, null, target, ((StreamQueue) target).getRscols(), nc, id, last, null, null, s);
                             exec.submit(task);
 
                             boolean cnue =  true;
@@ -448,8 +455,8 @@ public class SQLCursor implements FrameIterator {
     }
 */
 
-    public Future<BlockingQueue<Object>> execute(FrameApi bd1, FrameApi bd2, FrameApiJoin j) {
-        final FrameJoinTask task = new FrameJoinTask(cur, bd1, bd2, target, rscols, nc, id, Config.getConfig().LOCAL_NODE_ID, last, lbi.isLeftfs(), hmap, j, s);
+    public Future<BlockingQueue<Object>> execute(FrameIterator pbi, FrameApi bd1, FrameApi bd2, FrameApiJoin j) throws Exception {
+        final FrameJoinTask task = new FrameJoinTask(cur, pbi, bd1, bd2, target, rscols, nc, id, last, hmap, j, s);
         return exec.submit(task);
     }
 
@@ -533,7 +540,7 @@ public class SQLCursor implements FrameIterator {
                     try {
                         final FrameApiJoin j = f.get();
                         if (j.isFailed()) {
-                            FrameApiJoin j_ = new FrameApiJoin(Config.getConfig().LOCAL_NODE_ID, this, j.getBd1(), j.getBd2());
+                            FrameApiJoin j_ = new FrameApiJoin(Config.getConfig().LOCAL_NODE_ID, this, pbi, j.getBd1(), j.getBd2());
                             rtasks_.put(j_);
                             prcrj = false;
                         } else {
@@ -586,7 +593,7 @@ public class SQLCursor implements FrameIterator {
     }
 
     public synchronized void resetIterator() {
-        
+
     }
 
     private List<SQLColumn> getIOTCList() {
@@ -700,6 +707,16 @@ public class SQLCursor implements FrameIterator {
     @Override
     public boolean noDistribute() {
         return true;
+    }
+
+    @Override
+    public boolean isProcess() {
+        return process;
+    }
+
+    @Override
+    public Class getEventProcessor() {
+        return evtprc;
     }
 
 }

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -26,8 +26,6 @@ package su.interference.sql;
 
 import su.interference.persistent.Cursor;
 import su.interference.persistent.Session;
-import su.interference.sqlexception.SQLException;
-import su.interference.core.DataSet;
 
 /**
  * @author Yuriy Glotanov
@@ -38,6 +36,9 @@ public class SQLStatementFactory {
 
     public static SQLStatement getInstance(String sql, Session s) {
         if (sql.toUpperCase().trim().startsWith("SELECT")) {
+            return new SQLSelect(sql,s);
+        }
+        if (sql.toUpperCase().trim().startsWith("PROCESS")) {
             return new SQLSelect(sql,s);
         }
 /*
@@ -74,6 +75,9 @@ public class SQLStatementFactory {
 
     public static SQLStatement getInstance(String sql, Cursor c, Session s) {
         if (sql.toUpperCase().trim().startsWith("SELECT")) {
+            return new SQLSelect(sql, c, s);
+        }
+        if (sql.toUpperCase().trim().startsWith("PROCESS")) {
             return new SQLSelect(sql, c, s);
         }
         return null;

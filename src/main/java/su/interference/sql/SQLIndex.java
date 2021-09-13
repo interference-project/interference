@@ -184,4 +184,13 @@ public class SQLIndex implements FrameIterator {
         return this.vc != null || this.join == SQLJoinDispatcher.MERGE || this.leading;
     }
 
+    @Override
+    public boolean isProcess() {
+        return false;
+    }
+
+    @Override
+    public Class getEventProcessor() {
+        return null;
+    }
 }

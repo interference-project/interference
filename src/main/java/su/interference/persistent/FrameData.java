@@ -108,6 +108,8 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @Transient
     private AtomicBoolean synced = new AtomicBoolean(true);
     @Transient
+    private AtomicInteger lock = new AtomicInteger(0);
+    @Transient
     private volatile boolean rbck;
     @Transient
     private volatile Frame frame;
@@ -121,7 +123,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @Transient
     private ValueSet mv;
 
-
+    @Override
     public int getImpl() {
         return FrameApi.IMPL_DATA;
     }
@@ -177,6 +179,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return (IndexFrame) frame;
     }
 
+    @Override
     public ArrayList<Chunk> getFrameChunks(Session s) throws Exception {
         if (getDataObject().isIndex()) {
             final IndexFrame f = getIndexFrame();
@@ -189,6 +192,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         }
     }
 
+    @Override
     public ArrayList<Object> getFrameEntities(Session s) throws Exception {
         final ArrayList<Object> res = new ArrayList<>();
         for (Chunk c : getFrameChunks(s)) {
@@ -233,10 +237,12 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         this.frame = b;
     }
 
+    @Override
     public long getFrameId() {
         return this.ptr+this.file;
     }
 
+    @Override
     public long getAllocId() {
         return this.allocId;
     }
@@ -354,10 +360,12 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         return this.dataFile;
     }
 
+    @Override
     public int getObjectId() {
         return objectId;
     }
 
+    @Override
     public int getFile() {
         return file;
     }
@@ -438,7 +446,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         if (this.frame !=null) {
             if (this.frame.getClass().getName().equals("su.interference.core.DataFrame")) {
                 ((DataFrame)this.frame).setNextFrame(nextFrame);
-            }    
+            }
         }
     }
 
@@ -522,6 +530,18 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         }
     }
 
+    public int getLock() {
+        return lock.get();
+    }
+
+    public void lock(int lock) {
+        this.lock.compareAndSet(0, lock);
+    }
+
+    public void unlock(int lock) {
+        this.lock.compareAndSet(lock, 0);
+    }
+
     public boolean isSynced() {
         return synced.get();
     }
@@ -554,6 +574,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         this.started = started;
     }
 
+    @Override
     public long getFrameOrder() {
         return frameOrder;
     }
@@ -568,5 +589,15 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     public synchronized void setMv(ValueSet mv) {
         this.mv = mv;
+    }
+
+    @Override
+    public boolean isProcess() {
+        return false;
+    }
+
+    @Override
+    public Class getEventProcessor() {
+        return null;
     }
 }

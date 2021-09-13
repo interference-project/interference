@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2019 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -22,33 +22,13 @@
 
  */
 
-package su.interference.sql;
-
-import su.interference.exception.InternalException;
-
-import java.net.MalformedURLException;
-import java.util.List;
+package su.interference.sqlexception;
 
 /**
  * @author Yuriy Glotanov
  * @since 1.0
  */
 
-public interface FrameIterator {
+public class MissingWithinClause extends SQLException {
 
-    public static final int TYPE_TABLE = 1;
-    public static final int TYPE_CURSOR = 2;
-
-    FrameApi nextFrame() throws Exception;
-    boolean hasNextFrame() throws InternalException;
-    void resetIterator();
-    int getType();
-    boolean isIndex() throws MalformedURLException, ClassNotFoundException;
-    int getObjectId();
-    List<Integer> getObjectIds();
-    boolean isLeftfs();
-    void setLeftfs(boolean leftfs);
-    boolean noDistribute();
-    boolean isProcess();
-    Class getEventProcessor();
 }

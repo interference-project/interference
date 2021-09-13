@@ -69,7 +69,7 @@ public class TransportSyncTask implements Runnable {
                     final List<SyncFrame> psb = new ArrayList<>();
                     for (FrameSync bs : lbs) {
                         if (bs.getAllocId() == CommandEvent.INITTRAN || bs.getAllocId() == CommandEvent.COMMIT || bs.getAllocId() == CommandEvent.ROLLBACK) { //command
-                            final CommandEvent command = new CommandEvent((int)bs.getAllocId(), bs.getFrameId(), channel.getChannelId());
+                            final CommandEvent command = new CommandEvent((int)bs.getAllocId(), Config.getConfig().LOCAL_NODE_ID, bs.getFrameId(), channel.getChannelId());
                             TransportContext.getInstance().send(command);
                             final boolean sent = command.getLatch().await(Config.getConfig().REMOTE_SYNC_TIMEOUT, TimeUnit.MILLISECONDS);
                             if (!command.isFail() && sent) {
@@ -154,7 +154,7 @@ public class TransportSyncTask implements Runnable {
     public static synchronized void sendBroadcastCommand(int command, long id, Session s) throws Exception {
         for (Map.Entry<Integer, TransportChannel> entry : HeartBeatProcess.channels.entrySet()) {
             final TransportChannel channel = entry.getValue();
-            final CommandEvent event = new CommandEvent(command, id, channel.getChannelId());
+            final CommandEvent event = new CommandEvent(command, Config.getConfig().LOCAL_NODE_ID, id, channel.getChannelId());
             TransportContext.getInstance().send(event);
             event.getLatch().await();
             if (event.isFail()) {
