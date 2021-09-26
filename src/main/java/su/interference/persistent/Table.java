@@ -44,6 +44,8 @@ import su.interference.metrics.Metrics;
 import su.interference.mgmt.MgmtClassIdColumn;
 import su.interference.mgmt.MgmtColumn;
 import su.interference.sql.ResultSet;
+import su.interference.transport.CommandEvent;
+import su.interference.transport.TransportSyncTask;
 
 import javax.persistence.*;
 
@@ -151,6 +153,8 @@ public class Table implements ResultSet {
     private volatile Meter persistMeter;
     @Transient
     private volatile Meter findMeter;
+    @Transient
+    private AtomicLong lock = new AtomicLong(0);
 
     public Class getSc() {
         return sc;
@@ -294,7 +298,7 @@ public class Table implements ResultSet {
                     //terminate
                     q.put(new FrameData());
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    logger.error("exception occured during frames retrieve", e);
                 }
             }
         };
@@ -317,7 +321,7 @@ public class Table implements ResultSet {
                     //terminate
                     q.put(new FrameData());
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    logger.error("exception occured during frames retrieve", e);
                 }
             }
         };
@@ -577,6 +581,10 @@ public class Table implements ResultSet {
             return a != null;
         }
         return true;
+    }
+
+    public boolean isIndexed() {
+        return this.getIndexNames().length > 0;
     }
 
     public java.lang.reflect.Field getIdField() {
@@ -848,7 +856,7 @@ public class Table implements ResultSet {
                     }
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("exception occured during Table.init", e);
             }
         }
 
@@ -1074,7 +1082,7 @@ public class Table implements ResultSet {
                     s.persist(this, llt);
                     logger.debug("deallocate frame " + bd.getObjectId() + ":" + bd.getFile() + ":" + bd.getPtr() + " " + Thread.currentThread().getName());
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    logger.error("exception occured during usedSpace", e);
                 }
             }
         } else {
@@ -1086,7 +1094,7 @@ public class Table implements ResultSet {
                     bd_.updateChunk(dc, bd, s, llt);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("exception occured during usedSpace", e);
             }
         }
     }
@@ -1386,10 +1394,7 @@ public class Table implements ResultSet {
         final FrameData bd = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId()+dc.getHeader().getRowID().getFramePointer());
 
         if (!bd.getFrame().isLocal()) {
-            if (ignoreNoLocal) {
-                //todo
-                throw new CannotAccessToForeignRecord();
-            } else {
+            if (!ignoreNoLocal) {
                 throw new CannotAccessToForeignRecord();
             }
         }
@@ -1413,11 +1418,11 @@ public class Table implements ResultSet {
             }
 
             if (ignoreTransaction || udc == null) {
-                deleteIndexes(dc, noTran, true, s, llt);
+                deleteIndexes(dc, noTran, true, s, llt, ignoreNoLocal);
                 bd.removeChunk(dc.getHeader().getRowID().getRowPointer(), s, llt);
             } else {
-                deleteIndexes(dc, noTran, false, s, llt);
-                bd.deleteChunk(dc.getHeader().getRowID().getRowPointer(), s, llt);
+                deleteIndexes(dc, noTran, false, s, llt, ignoreNoLocal);
+                bd.deleteChunk(dc.getHeader().getRowID().getRowPointer(), s, llt, ignoreNoLocal);
             }
             removeIndexValue(dc);
 
@@ -1440,7 +1445,7 @@ public class Table implements ResultSet {
         }
     }
 
-    private void deleteIndexes(DataChunk dc, boolean noTran, boolean remove, Session s, LLT llt) throws Exception {
+    private void deleteIndexes(DataChunk dc, boolean noTran, boolean remove, Session s, LLT llt, boolean ignoreNoLocal) throws Exception {
         for (IndexDescript ids : this.getIndexNames()) {
             final DataChunk ic = dc.getIc(ids, s);
             final int iclen = ic.getBytesAmount();
@@ -1449,7 +1454,7 @@ public class Table implements ResultSet {
             if (remove) {
                 ibd.removeChunk(ic.getHeader().getRowID().getRowPointer(), s, llt);
             } else {
-                ibd.deleteChunk(ic.getHeader().getRowID().getRowPointer(), s, llt);
+                ibd.deleteChunk(ic.getHeader().getRowID().getRowPointer(), s, llt, ignoreNoLocal);
             }
             if (noTran) {
                 usedSpace(ibd, ibd.getUsed() - iclen, true, s, llt);
@@ -1517,7 +1522,7 @@ public class Table implements ResultSet {
         try {
             s.persist(new RetrieveLock(this.objectId, s.getTransaction().getTransId())); //insert
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("exception occured during table lock", e);
         }
     }
 
@@ -1542,7 +1547,7 @@ public class Table implements ResultSet {
                 s.delete(rl);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("exception occured during table unlock", e);
         }
     }
 
@@ -1697,7 +1702,7 @@ public class Table implements ResultSet {
             final RetrieveQueue rq = s.getContentQueue(this);
             return rq.poll(s);
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("exception occured during table poll", e);
         }
         return null;
     }
@@ -1707,7 +1712,7 @@ public class Table implements ResultSet {
             final RetrieveQueue rq = s.getContentQueue(this);
             return rq.cpoll();
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("exception occured during table cpoll", e);
         }
         return null;
     }
@@ -2336,6 +2341,42 @@ public class Table implements ResultSet {
             }
             targets = ntargets;
         }
+    }
+
+    public synchronized boolean lock(long transId) {
+        if (this.lock.compareAndSet(0, transId)) {
+            logger.info(this.getName()+" successfully locked");
+            return true;
+        }
+        return false;
+    }
+
+    public synchronized boolean unlock(long transId) {
+        if (this.lock.compareAndSet(transId, 0)) {
+            logger.info(this.getName()+" successfully unlocked");
+            return true;
+        }
+        return false;
+    }
+
+    public synchronized boolean clusterlock(long transId) throws Exception {
+        if (this.lock(transId)) {
+            if (TransportSyncTask.sendNoPersistBroadcastCommand(CommandEvent.LOCK_TABLE, transId, this.objectId)) {
+                return true;
+            }
+            this.unlock(transId);
+        }
+        return false;
+    }
+
+    public synchronized boolean clusterunlock(long transId) throws Exception {
+        if (this.unlock(transId)) {
+            if (TransportSyncTask.sendNoPersistBroadcastCommand(CommandEvent.UNLOCK_TABLE, transId, this.objectId)) {
+                return true;
+            }
+            this.lock(transId);
+        }
+        return false;
     }
 
     public int getObjectId() {

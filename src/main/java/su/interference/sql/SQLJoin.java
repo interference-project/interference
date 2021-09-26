@@ -24,6 +24,8 @@
 
 package su.interference.sql;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import su.interference.metrics.Metrics;
 import su.interference.persistent.*;
 import su.interference.core.*;
@@ -37,6 +39,7 @@ import java.util.*;
 
 public class SQLJoin {
 
+    private final static Logger logger = LoggerFactory.getLogger(SQLJoin.class);
     private final ArrayList<SQLTable> tables;
     private final CList columns;
     private final NestedCondition nc;
@@ -138,6 +141,17 @@ public class SQLJoin {
                     sqlc.stream();
                 } else {
                     sqlc.build();
+                    if (sqlc.isProcess()) {
+                        if (this.tables.size() > 1) {
+                            throw new RuntimeException("PROCESS statement should operate with one table");
+                        }
+                        final ResultSet rs = sqlc.flushTarget();
+                        //wait until all records will be processed
+                        rs.poll(s);
+                        if (!this.tables.get(0).getTable().clusterunlock(s.getTransaction().getTransId())) {
+                            throw new RuntimeException("Unable to unlock "+this.tables.get(0).getTable().getName()+" after processing");
+                        }
+                    }
                 }
             }
 

@@ -74,7 +74,7 @@ public class Transaction implements Serializable {
     private long timeStamp;
     @Column
     @MgmtColumn(width=10, show=true, form=false, edit=false)
-    private int  transType; // 0 - READ COMMITTED, 1 - SERIALIZABLE, 9 - THR
+    private int transType; // 0 - READ COMMITTED, 1 - SERIALIZABLE, 9 - THR
     @Column
     @MgmtColumn(width=10, show=true, form=false, edit=false)
     private long mTran;
@@ -83,13 +83,13 @@ public class Transaction implements Serializable {
     private long cid;
 
     @Transient
-    private final List<TransFrame> tframes = new CopyOnWriteArrayList<>();
+    private final transient List<TransFrame> tframes = new CopyOnWriteArrayList<>();
     @Transient
-    private final Set<Long> rframes = new HashSet<>();
+    private final transient Set<Long> rframes = new HashSet<>();
     @Transient
     private final transient WaitFrame[] lbs;
     @Transient
-    private final AtomicInteger avframeStart = new AtomicInteger(0);
+    private final transient AtomicInteger avframeStart = new AtomicInteger(0);
     @Transient
     private transient SQLJoin join;
     @Transient
@@ -112,6 +112,19 @@ public class Transaction implements Serializable {
             this.lbs[i] = new WaitFrame(null);
         }
         this.timeStamp = new Date().getTime();
+    }
+
+    public Transaction (Transaction tran) {
+        this.lbs = new WaitFrame[Config.getConfig().FILES_AMOUNT];
+        for (int i=0; i<Config.getConfig().FILES_AMOUNT; i++) {
+            this.lbs[i] = new WaitFrame(null);
+        }
+        this.transId = tran.transId;
+        this.sid = tran.sid;
+        this.timeStamp = tran.timeStamp;
+        this.transType = tran.transType;
+        this.mTran = tran.mTran;
+        this.started = tran.started;
     }
 
     //constructor for low-level storage function (initial first-time load table descriptions from datafile)
@@ -211,60 +224,67 @@ public class Transaction implements Serializable {
         final Process lsync = Instance.getInstance().getProcessByName("lsync");
         final SyncQueue syncq = (SyncQueue) lsync.getRunnable();
         if (remote) {
-            if (!isLocal()) {
-                try {
-                    for (Long frameId : rframes) {
-                        Instance.getInstance().getFrameById(frameId).decreaseTcounter(this.transId);
-                    }
-                    this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
-                    this.transType = TRAN_THR;
-                    s.persist(this);
-                    rframes.clear();
-                    syncq.commit();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            } else {
-                logger.warn("remote commit cannot be applied to transaction on init node");
+            if (isLocal()) {
+                logger.warn("remote commit should not be applied to transaction on init node");
             }
         } else {
             if (isLocal()) {
                 sendBroadcastEvents(CommandEvent.COMMIT, s);
-                try {
-                    for (TransFrame tb : tframes) {
-                        if (tb.getUframeId() > 0) { // undo transframe record
-                            final List<RetrieveLock> rls = Instance.getInstance().getRetrieveLocksByObjectId(tb.getObjectId());
-                            if (rls.size() == 0) {
-                                final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
-                                cb.decreaseTcounter(this.transId);
-                            }
-                        } else { //change transframe record
-                            final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
-                            cb.setUsed(cb.getUsed() + tb.getDiff());
-                            cb.decreaseTcounter(this.transId);
-                            if (cb.getUsed() == 0) {
-                                freeFrames(cb, s);
-                            } else {
-                                s.persist(cb); //update new size value to dataframe
-                            }
-                        }
+            } else {
+                logger.warn("commit should not be applied to transaction on remote node");
+            }
+        }
+
+        try {
+            for (Long frameId : rframes) {
+                Instance.getInstance().getFrameById(frameId).decreaseTcounter(this.transId);
+            }
+        } catch (Exception e) {
+            logger.error("exception occured during transaction commit", e);
+        }
+
+        try {
+            for (TransFrame tb : tframes) {
+                if (tb.getUframeId() > 0) { // undo transframe record
+                    final List<RetrieveLock> rls = Instance.getInstance().getRetrieveLocksByObjectId(tb.getObjectId());
+                    if (rls.size() == 0) {
+                        final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
+                        cb.decreaseTcounter(this.transId);
                     }
+                } else { //change transframe record
+                    final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
+                    cb.setUsed(cb.getUsed() + tb.getDiff());
+                    cb.decreaseTcounter(this.transId);
+                    if (cb.getUsed() == 0) {
+                        freeFrames(cb, s);
+                    } else {
+                        s.persist(cb); //update new size value to dataframe
+                    }
+                }
+            }
 
-                    this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
-                    this.transType = TRAN_THR;
-                    s.persist(this);
-                    syncq.commit();
+        } catch (Exception e) {
+            logger.error("exception occured during transaction commit", e);
+        }
 
+        try {
+            this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
+            this.transType = TRAN_THR;
+            s.persist(this);
+            syncq.commit();
+
+            if (!remote) {
+                if (isLocal()) {
                     if (this.join != null) {
                         join.deallocate(s);
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
                 }
-            } else {
-                logger.warn("commit cannot be applied to transaction on remote node");
             }
+        } catch (Exception e) {
+            logger.error("exception occured during transaction commit", e);
         }
+
+        rframes.clear();
         tframes.clear();
         started = false;
         logger.info("Transaction committed");
@@ -274,115 +294,124 @@ public class Transaction implements Serializable {
     public synchronized void rollback (Session s, boolean remote) {
         final ArrayList<FrameData> ubd1 = new ArrayList<>();
         final ArrayList<FrameData> ubd2 = new ArrayList<>();
+
         if (remote) {
+            if (isLocal()) {
+                logger.warn("remote rollback should not be applied to transaction on init node");
+            }
+        } else {
             if (!isLocal()) {
-                try {
-                    for (Long frameId : rframes) {
-                        Instance.getInstance().getFrameById(frameId).decreaseTcounter(this.transId);
-                    }
-                    this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
-                    this.transType = TRAN_THR;
-                    s.persist(this); //update
-                    rframes.clear();
+                logger.warn("rollback should not be applied to transaction on remote node");
+            }
+        }
+
+        try {
+            for (Long frameId : rframes) {
+                Instance.getInstance().getFrameById(frameId).decreaseTcounter(this.transId);
+            }
 /*
                 if (this.join != null) {
                     join.deallocate(s);
                 }
 */
-                } catch (Exception e) {
-                    e.printStackTrace();
+        } catch (Exception e) {
+            logger.error("exception occured during transaction rollback", e);
+        }
+
+        try {
+            Collections.sort(tframes);
+
+            for (TransFrame tb : tframes) {
+                final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
+                if (cb.isIndex()) {
+                    if (!ubd2.contains(cb)) {
+                        ubd2.add(cb);
+                    }
+                } else {
+                    if (!ubd1.contains(cb)) {
+                        ubd1.add(cb);
+                    }
                 }
-            } else {
-                logger.warn("remote rollback cannot be applied to transaction on init node");
             }
-        } else {
-            if (isLocal()) {
-                try {
-                    Collections.sort(tframes);
-
-                    for (TransFrame tb : tframes) {
-                        final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
-                        if (cb.isIndex()) {
-                            if (!ubd2.contains(cb)) {
-                                ubd2.add(cb);
-                            }
-                        } else {
-                            if (!ubd1.contains(cb)) {
-                                ubd1.add(cb);
-                            }
+            for (FrameData ub : ubd2) {
+                final ArrayList<FrameData> ubs = new ArrayList<>();
+                for (TransFrame tb : tframes) {
+                    if (ub.getFrameId() == tb.getCframeId()) {
+                        if (tb.getUframeId() > 0) {
+                            final FrameData ubb = Instance.getInstance().getFrameById(tb.getUframeId());
+                            ubs.add(ubb);
                         }
                     }
-                    for (FrameData ub : ubd2) {
-                        final ArrayList<FrameData> ubs = new ArrayList<>();
-                        for (TransFrame tb : tframes) {
-                            if (ub.getFrameId() == tb.getCframeId()) {
-                                if (tb.getUframeId() > 0) {
-                                    final FrameData ubb = Instance.getInstance().getFrameById(tb.getUframeId());
-                                    ubs.add(ubb);
-                                }
-                            }
-                        }
-
-                        if (ub.isIndex()) {
-                            ub.setRbck(true);
-                            ub.rollbackTransaction(this, ubs, s);
-                        }
-                    }
-                    for (FrameData ub : ubd1) {
-                        final ArrayList<FrameData> ubs = new ArrayList<>();
-                        for (TransFrame tb : tframes) {
-                            if (ub.getFrameId() == tb.getCframeId()) {
-                                if (tb.getUframeId() > 0) {
-                                    final FrameData ubb = Instance.getInstance().getFrameById(tb.getUframeId());
-                                    ubs.add(ubb);
-                                }
-                            }
-                        }
-
-                        if (!ub.isIndex()) {
-                            ub.rollbackTransaction(this, ubs, s);
-                        }
-                    }
-                    for (FrameData ub : ubd2) {
-                        final Frame frame_ = ub.getFrame();
-                        if (frame_ instanceof IndexFrame) {
-                            ub.setRbck(false);
-                            ((IndexFrame) frame_).cleanICEntities();
-                        }
-                    }
-
-                    for (TransFrame tb : tframes) {
-                        if (tb.getUframeId() > 0) { // undo transframe record
-                            final List<RetrieveLock> rls = Instance.getInstance().getRetrieveLocksByObjectId(tb.getObjectId());
-                            if (rls.size() == 0) {
-                                final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
-                                if (cb != null) {
-                                    cb.decreaseTcounter(this.transId);
-                                }
-                            }
-                        } else { //change transframe record
-                            final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
-                            cb.decreaseTcounter(this.transId);
-                            if (cb.getUsed() == 0) {
-                                logger.info("rollback freeing frame " + cb.getFile() + " " + cb.getPtr());
-                                freeFrames(cb, s);
-                            }
-                        }
-                    }
-                    this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
-                    this.transType = TRAN_THR;
-                    s.persist(this); //update
-                    if (this.join != null) {
-                        join.deallocate(s);
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
                 }
+
+                if (ub.isIndex()) {
+                    ub.setRbck(true);
+                    ub.rollbackTransaction(this, ubs, s);
+                }
+            }
+            for (FrameData ub : ubd1) {
+                final ArrayList<FrameData> ubs = new ArrayList<>();
+                for (TransFrame tb : tframes) {
+                    if (ub.getFrameId() == tb.getCframeId()) {
+                        if (tb.getUframeId() > 0) {
+                            final FrameData ubb = Instance.getInstance().getFrameById(tb.getUframeId());
+                            ubs.add(ubb);
+                        }
+                    }
+                }
+
+                if (!ub.isIndex()) {
+                    ub.rollbackTransaction(this, ubs, s);
+                }
+            }
+            for (FrameData ub : ubd2) {
+                final Frame frame_ = ub.getFrame();
+                if (frame_ instanceof IndexFrame) {
+                    ub.setRbck(false);
+                    ((IndexFrame) frame_).cleanICEntities();
+                }
+            }
+
+            for (TransFrame tb : tframes) {
+                if (tb.getUframeId() > 0) { // undo transframe record
+                    final List<RetrieveLock> rls = Instance.getInstance().getRetrieveLocksByObjectId(tb.getObjectId());
+                    if (rls.size() == 0) {
+                        final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
+                        if (cb != null) {
+                            cb.decreaseTcounter(this.transId);
+                        }
+                    }
+                } else { //change transframe record
+                    final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
+                    cb.decreaseTcounter(this.transId);
+                    if (cb.getUsed() == 0) {
+                        logger.info("rollback freeing frame " + cb.getFile() + " " + cb.getPtr());
+                        freeFrames(cb, s);
+                    }
+                }
+            }
+            if (this.join != null) {
+                join.deallocate(s);
+            }
+        } catch (Exception e) {
+            logger.error("exception occured during transaction rollback", e);
+        }
+
+        try {
+            this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
+            this.transType = TRAN_THR;
+            s.persist(this);
+        } catch (Exception e) {
+            logger.error("exception occured during transaction rollback", e);
+        }
+
+        if (!remote) {
+            if (isLocal()) {
                 sendBroadcastEvents(CommandEvent.ROLLBACK, s);
-            } else {
-                logger.warn("rollback cannot be applied to transaction on remote node");
             }
         }
+
+        rframes.clear();
         tframes.clear();
         started = false;
         logger.info("Transaction rolled back");
@@ -419,7 +448,7 @@ public class Transaction implements Serializable {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("exception occured during unlock undo frames", e);
         }
     }
 
@@ -488,7 +517,7 @@ public class Transaction implements Serializable {
             try {
                 s.persist(this, llt); //update
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("exception occured during start transaction", e);
             }
         }
         started = true;
@@ -499,7 +528,7 @@ public class Transaction implements Serializable {
             try {
                 startTransaction(s, null);
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("exception occured during start statement", e);
             }
         }
         if (this.transType==TRAN_READ_COMMITTED) {
@@ -508,7 +537,7 @@ public class Transaction implements Serializable {
                 this.mTran = t.getIncValue(s, null);
                 s.persist(this); //update
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("exception occured during start statement", e);
             }
         }
     }
@@ -519,7 +548,7 @@ public class Transaction implements Serializable {
             try {
                 startTransaction(s, llt);
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("exception occured during start statement", e);
             }
         }
         if (this.transType==TRAN_READ_COMMITTED) {
@@ -527,7 +556,7 @@ public class Transaction implements Serializable {
                 this.mTran = t.getIncValue(s, llt);
                 s.persist(this, llt); //update
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("exception occured during start statement", e);
             }
         }
     }
@@ -541,7 +570,7 @@ public class Transaction implements Serializable {
             try {
                 s.persist(tb, llt); //update
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("exception occured during store frame", e);
             }
             return;
         }
@@ -555,7 +584,7 @@ public class Transaction implements Serializable {
                 this.tframes.add(ntb);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("exception occured during store frame", e);
         }
     }
 
@@ -563,7 +592,7 @@ public class Transaction implements Serializable {
         try {
             TransportSyncTask.sendBroadcastCommand(command, this.transId, s);
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("exception occured during send broadcast events", e);
         }
     }
 

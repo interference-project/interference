@@ -61,7 +61,7 @@ public class SyncFrameEvent extends TransportEventImpl {
         try {
             rframe2(this.sb);
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("exception occured during sync event process", e);
             return new EventResult(TransportCallback.FAILURE, null, 0, null, e, null);
         }
         return new EventResult(TransportCallback.SUCCESS, null, 0, null, null, null);
@@ -153,7 +153,7 @@ public class SyncFrameEvent extends TransportEventImpl {
                     }
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("exception occured during sync event process", e);
             }
         }
 
@@ -215,7 +215,7 @@ public class SyncFrameEvent extends TransportEventImpl {
                     }
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("exception occured during sync event process", e);
             }
         }
 
@@ -251,14 +251,14 @@ public class SyncFrameEvent extends TransportEventImpl {
                     }
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("exception occured during sync event process", e);
             }
         }
 
         for (Map.Entry<Integer, List<SyncFrame>> entry : storemap.entrySet()) {
             final Table t = Instance.getInstance().getTableById(entry.getKey());
             if (this.getCallbackNodeId() == 0) {
-                throw new RuntimeException("wrong callback node id");
+                throw new RuntimeException(TransportContext.WRONG_CALLBACK_NODE_MESSAGE);
             }
             final LLT llt_ = LLT.getLLT();
             t.storeFrames(entry.getValue(), this.getCallbackNodeId(), llt_, s);
@@ -289,11 +289,12 @@ public class SyncFrameEvent extends TransportEventImpl {
 
     private void updateTransactions(Map<Long, Transaction> rtran, Session s) {
         for (Map.Entry<Long, Transaction> entry : rtran.entrySet()) {
-            Transaction tran = Instance.getInstance().getTransactionById(entry.getKey());
-            if (tran==null) {
+            final Transaction tran = Instance.getInstance().getTransactionById(entry.getKey());
+            if (tran == null) {
+                final Transaction tran_ = new Transaction(entry.getValue());
                 try {
-                    s.persist(entry.getValue());
-                } catch(Exception e) {
+                    s.persist(tran_);
+                } catch (Exception e) {
                     logger.error("unable to persist remote transaction", e);
                 }
             }

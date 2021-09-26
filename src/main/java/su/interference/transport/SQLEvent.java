@@ -90,8 +90,7 @@ public class SQLEvent extends TransportEventImpl {
                     }
                     final FrameApi bd1 = c.getLbi() instanceof SQLIndex ? b : Instance.getInstance().getFrameByAllocId(j.getLeftAllocId());
                     final FrameApi bd2 = j.getRightAllocId() == 0 ? b_ : Instance.getInstance().getFrameByAllocId(j.getRightAllocId());
-                    final FrameIterator pbi = c.getRbi() != null && c.getRbi().isProcess() ? c.getRbi() : c.getLbi();
-                    flist.add(c.execute(pbi, bd1, bd2, j));
+                    flist.add(c.execute(c.getPbi(), bd1, bd2, j));
                     res.add(j);
                 }
                 boolean cnue = true;

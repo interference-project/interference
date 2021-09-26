@@ -24,7 +24,10 @@
 
 package su.interference.core;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import su.interference.persistent.Session;
+
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
@@ -33,6 +36,7 @@ import java.util.concurrent.LinkedBlockingQueue;
  */
 
 public class RetrieveQueue {
+    private final static Logger logger = LoggerFactory.getLogger(RetrieveQueue.class);
     private final LinkedBlockingQueue<Chunk> q;
     private final ManagedCallable r;
     private volatile boolean retrieve = true;
@@ -53,7 +57,7 @@ public class RetrieveQueue {
                 return c.getEntity(s);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("exception occured during retrieveQueue.poll", e);
         }
         return null;
     }
@@ -69,7 +73,7 @@ public class RetrieveQueue {
                 return c;
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("exception occured during retrieveQueue.cpoll", e);
         }
         return null;
     }

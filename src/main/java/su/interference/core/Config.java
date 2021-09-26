@@ -106,6 +106,8 @@ public class Config {
     private static final int HEAP_USE_THR_INDX_DEFAULT = 60;
     private static final int HEAP_USE_THR_TEMP_DEFAULT = 40;
     private static final int HEAP_USE_THR_UNDO_DEFAULT = 50;
+    // locks and processing
+    private static final boolean IGNORE_COMMAND_CHANNEL_FAILURES_DEFAULT = true;
 
     public final int LOCAL_NODE_ID;
     public final String DB_PATH;
@@ -141,6 +143,8 @@ public class Config {
     // internal
     public final int TEST_DISTRIBUTE_MODE = 1;
     public final int CHECK_AVAIL_FRAME_TIMEOUT = 3000;
+    // locks and processing
+    public final boolean IGNORE_COMMAND_CHANNEL_FAILURES = true;
 
     private final Properties p;
 

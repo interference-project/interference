@@ -595,7 +595,7 @@ public class NestedCondition extends Condition {
         return res;
     }
 
-    public SQLJoinDispatcher getJoinDispatcher(FrameIterator lbi, FrameIterator rbi, List<SQLColumn> rscols, IndexDescript leadingIndex, Session s) throws Exception {
+    public SQLJoinDispatcher getJoinDispatcher(FrameIterator lbi, FrameIterator rbi, List<SQLColumn> rscols, IndexDescript leadingIndex, boolean process, Session s) throws Exception {
         ArrayList<Condition> cs = this.conditions;
         int ctype = this.type;
         //in cursor we can not guaranteed uniqueness of base unique field
@@ -618,9 +618,9 @@ public class NestedCondition extends Condition {
                     final SQLColumn ccr = getSQLColumnByAlias(rscols, jc.getConditionColumnRight().getAlias());
                     //if (jc.getConditionColumn().isIndexOrUnique()||jc.getConditionColumnRight().isIndexOrUnique()) {
                         if (lbi.getObjectIds().contains(jc.getConditionColumn().getObjectId()) && rbi.getObjectIds().contains(jc.getConditionColumnRight().getObjectId())) {
-                            jlist.add(new SQLJoinDispatcher(lbi, rbi, cc, ccr, getSkipCheck(jc), this, leadingIndex, s));
+                            jlist.add(new SQLJoinDispatcher(lbi, rbi, cc, ccr, getSkipCheck(jc), this, leadingIndex, process, s));
                         } else if (lbi.getObjectIds().contains(jc.getConditionColumnRight().getObjectId()) && rbi.getObjectIds().contains(jc.getConditionColumn().getObjectId())) {
-                            jlist.add(new SQLJoinDispatcher(rbi, lbi, cc, ccr, getSkipCheck(jc), this, leadingIndex, s));
+                            jlist.add(new SQLJoinDispatcher(rbi, lbi, cc, ccr, getSkipCheck(jc), this, leadingIndex, process, s));
                         }
                     //}
                 }

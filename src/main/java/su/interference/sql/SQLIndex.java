@@ -51,6 +51,7 @@ public class SQLIndex implements FrameIterator {
     private final boolean unique;
     private final boolean merged;
     private final boolean leading;
+    private final boolean process;
     private final LinkedBlockingQueue<FrameData> frames;
     private final AtomicBoolean returned;
     private final AtomicBoolean terminate;
@@ -58,11 +59,11 @@ public class SQLIndex implements FrameIterator {
     private SQLIndexFrame mframe;
     private SQLIndexFrame rframe;
 
-    public SQLIndex(Table t, Table parent, boolean left, SQLColumn lkey, SQLColumn rkey, boolean merged, NestedCondition nc, int join, Session s) throws Exception {
-        this(t, parent, left, lkey, rkey, merged, nc, join, false, s);
+    public SQLIndex(Table t, Table parent, boolean left, SQLColumn lkey, SQLColumn rkey, boolean merged, NestedCondition nc, int join, boolean process, Session s) throws Exception {
+        this(t, parent, left, lkey, rkey, merged, nc, join, false, process, s);
     }
 
-    public SQLIndex(Table t, Table parent, boolean left, SQLColumn lkey, SQLColumn rkey, boolean merged, NestedCondition nc, int join, boolean leading, Session s) throws Exception {
+    public SQLIndex(Table t, Table parent, boolean left, SQLColumn lkey, SQLColumn rkey, boolean merged, NestedCondition nc, int join, boolean leading, boolean process, Session s) throws Exception {
         if (!t.isIndex()) throw new InternalException();
         this.t = t;
         this.s = s;
@@ -74,6 +75,7 @@ public class SQLIndex implements FrameIterator {
         this.unique = parent.getIndexDescriptByObjectId(t.getObjectId()).isUnique();
         this.merged = merged;
         this.leading = leading;
+        this.process = process;
         this.frames = join == SQLJoinDispatcher.MERGE ? null : join == SQLJoinDispatcher.RIGHT_INDEX ? null : left == false ? null : leading ? null : t.getFrames(s, t.getTableClass().getSimpleName());
         this.returned = new AtomicBoolean(false);
         this.terminate = new AtomicBoolean(false);
@@ -181,7 +183,7 @@ public class SQLIndex implements FrameIterator {
 
     @Override
     public boolean noDistribute() {
-        return this.vc != null || this.join == SQLJoinDispatcher.MERGE || this.leading;
+        return this.vc != null || this.join == SQLJoinDispatcher.MERGE || this.leading || this.process;
     }
 
     @Override

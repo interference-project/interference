@@ -72,7 +72,8 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
     public SyncFrame(Frame frame, Session s, FreeFrame fb, boolean proc) throws Exception {
         final Table t = Instance.getInstance().getTableById(frame.getObjectId());
         final FrameData bd = Instance.getInstance().getFrameById(frame.getPtr());
-        allowR = frame.isLocal() ? !t.isNoTran() || t.getName().equals("su.interference.persistent.UndoChunk") : false;
+        //allowR = frame.isLocal() || bd.isLockedLocally() ? !t.isNoTran() || t.getName().equals("su.interference.persistent.UndoChunk") : false;
+        allowR = !t.isNoTran() || (frame.isLocal() && t.getName().equals("su.interference.persistent.UndoChunk"));
         this.proc = bd == null ? false : proc;
         distributed = t.isDistributed();
 
@@ -113,7 +114,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
                     logger.info("evicted frame caused an NPE during SyncFrame construction id = " + frame.getPtr());
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("exception occured during SyncFrame.init", e);
             }
             parentId = 0;
             lcId = 0;

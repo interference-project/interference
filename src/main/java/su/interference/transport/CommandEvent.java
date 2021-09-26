@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import su.interference.core.Instance;
 import su.interference.persistent.FrameData;
 import su.interference.persistent.Session;
+import su.interference.persistent.Table;
 import su.interference.persistent.Transaction;
 
 /**
@@ -43,18 +44,30 @@ public class CommandEvent extends TransportEventImpl implements PersistentEvent 
     public static final int INITTRAN = 1;
     public static final int COMMIT = 2;
     public static final int ROLLBACK = 3;
-    public static final int LOCK = 4;
-    public static final int UNLOCK = 5;
+    public static final int LOCK_TABLE = 4;
+    public static final int UNLOCK_TABLE = 5;
+    public static final int LOCK_FRAME = 6;
+    public static final int UNLOCK_FRAME = 7;
     public static final int MAX_COMMAND = 10;
     private final int command;
     private final int nodeId;
     private final long id;
+    private final long id2;
 
     public CommandEvent(int command, int nodeId, long id, int channelId) {
         super(channelId);
         this.command = command;
         this.nodeId = nodeId;
         this.id = id;
+        this.id2 = 0;
+    }
+
+    public CommandEvent(int command, int nodeId, long id, long id2, int channelId) {
+        super(channelId);
+        this.command = command;
+        this.nodeId = nodeId;
+        this.id = id;
+        this.id2 = id2;
     }
 
     @Override
@@ -68,7 +81,7 @@ public class CommandEvent extends TransportEventImpl implements PersistentEvent 
             if (t != null) {
                 t.commit(s, true);
             } else {
-                return new EventResult(TransportCallback.FAILURE, null, 0, null, new RuntimeException("transaction in null"), null);
+                return new EventResult(TransportCallback.FAILURE, null, 0, null, new RuntimeException(TransportContext.TRANSACTION_ISNULL_MESSAGE), null);
             }
         }
         if (command == ROLLBACK) {
@@ -76,16 +89,30 @@ public class CommandEvent extends TransportEventImpl implements PersistentEvent 
             if (t != null) {
                 t.rollback(s, true);
             } else {
-                return new EventResult(TransportCallback.FAILURE, null, 0, null, new RuntimeException("transaction in null"), null);
+                return new EventResult(TransportCallback.FAILURE, null, 0, null, new RuntimeException(TransportContext.TRANSACTION_ISNULL_MESSAGE), null);
             }
         }
-        if (command == LOCK) {
-            final FrameData bd = Instance.getInstance().getFrameById(id);
-            bd.lock(this.nodeId);
+        if (command == LOCK_TABLE) {
+            final Table t = Instance.getInstance().getTableById((int)id2);
+            if (!t.lock(id)) {
+                return new EventResult(TransportCallback.FAILURE, null, 0, null, new RuntimeException(TransportContext.UNABLE_LOCK_TABLE_MESSAGE), null);
+            }
         }
-        if (command == UNLOCK) {
-            final FrameData bd = Instance.getInstance().getFrameById(id);
-            bd.unlock(this.nodeId);
+        if (command == UNLOCK_TABLE) {
+            final Table t = Instance.getInstance().getTableById((int)id2);
+            if (!t.unlock(id)) {
+                return new EventResult(TransportCallback.FAILURE, null, 0, null, new RuntimeException(TransportContext.UNABLE_UNLOCK_TABLE_MESSAGE), null);
+            }
+        }
+        if (command == LOCK_FRAME) {
+            final FrameData bd = Instance.getInstance().getFrameById(id2);
+            if (!bd.rlock(id, this.nodeId)) {
+                return new EventResult(TransportCallback.FAILURE, null, 0, null, new RuntimeException(TransportContext.UNABLE_LOCK_FRAME_MESSAGE), null);
+            }
+        }
+        if (command == UNLOCK_FRAME) {
+            //final FrameData bd = Instance.getInstance().getFrameById(id);
+            //bd.unlock(this.nodeId);
         }
         return new EventResult(TransportCallback.SUCCESS, null, 0, null, null, null);
     }

@@ -49,6 +49,7 @@ sync.lock.enable=true
 
 # size of blocking queue, which use in SQL retrieve
 # mechanism for prevent of heap overload
+# NOTE: too small values for large frame sizes may cause locks on queue.put() during distributed processing
 retrieve.queue.size=100000
 
 # the number of threads for parallel processing of the SQL query

@@ -92,7 +92,6 @@ public class SQLSelect implements SQLStatement {
         } catch (Exception e) {
             sqlException = new SQLException(e.getMessage());
             logger.error(e.getClass().getSimpleName()+" thrown during parse of sql statement: "+sql);
-            e.printStackTrace();
         }
     }
 
@@ -144,9 +143,9 @@ public class SQLSelect implements SQLStatement {
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("exception occured during sql execute", e);
         }
-        ArrayList<Object> result = new ArrayList<Object>();
+        ArrayList<Object> result = new ArrayList<>();
         Metrics.get("executeQuery").stop();
         return new DataSet(result.toArray(new Object[]{}), t, message);
     }
@@ -267,14 +266,23 @@ public class SQLSelect implements SQLStatement {
         for (int i=0; i<tbls.length; i++) {
             String[] tblss = tbls[i].trim().split(" ");
             if (tblss.length==1) { //without alias
-                this.tables.add(new SQLTable(tblss[0], tblss[0], process, evtprc));
+                this.tables.add(new SQLTable(tblss[0], tblss[0], process, evtprc, sn));
             }
             if (tblss.length==2) { //with alias
-                this.tables.add(new SQLTable(tblss[0], tblss[1], process, evtprc));
+                this.tables.add(new SQLTable(tblss[0], tblss[1], process, evtprc, sn));
             }
         }
 
         Collections.sort(this.tables);
+
+        if (process) {
+            if (this.tables.size() > 1) {
+                throw new RuntimeException("PROCESS statement should operate with one table");
+            }
+            if (!this.tables.get(0).getTable().lock(sn.getTransaction().getTransId())) {
+                throw new UnableToLockTableForProcess();
+            }
+        }
 
         this.cols = new CList (this.tables, clds);
 
