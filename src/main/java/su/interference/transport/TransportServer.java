@@ -58,7 +58,7 @@ public class TransportServer {
                 final int serverPort = Config.getConfig().RMPORT + i;
                 startServer(pool, serverPort, started);
             } catch(IOException e){
-                e.printStackTrace();
+                logger.error("exception occured during TransportServer.init", e);
             }
         }
     }
@@ -124,7 +124,7 @@ public class TransportServer {
                             try {
                                 Thread.sleep(1000);
                             } catch (InterruptedException ie) {
-                                ie.printStackTrace();
+                                logger.error("exception occured", ie);
                             }
 */
                         logger.debug("server socket timeout exception");

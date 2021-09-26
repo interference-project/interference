@@ -27,7 +27,6 @@ package su.interference.transport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.core.*;
-import su.interference.exception.InternalException;
 import su.interference.metrics.Metrics;
 import su.interference.persistent.*;
 
@@ -116,9 +115,8 @@ public class TransportSyncTask implements Runnable {
                             final boolean sent = event.getLatch().await(Config.getConfig().REMOTE_SYNC_TIMEOUT, TimeUnit.MILLISECONDS);
                             if (event.isFail() || !sent) {
                                 if (event.getProcessException() != null) {
-                                    event.getProcessException().printStackTrace();
+                                    logger.error("exception occured during remote SFE process: ", event.getProcessException());
                                 }
-                                throw new InternalException();
                             }
                             logger.info(sb.length + " frame(s) were sent and synced (node id = " + channel.getChannelId() + ")");
                         }
@@ -146,7 +144,7 @@ public class TransportSyncTask implements Runnable {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("exception occured during sync process", e);
         }
 
     }
@@ -163,6 +161,32 @@ public class TransportSyncTask implements Runnable {
                 logger.debug("persist command sync for channelId " + channel.getChannelId());
             }
         }
+    }
+
+    public static synchronized boolean sendNoPersistBroadcastCommand(int command, long id, long id2) throws Exception {
+        for (Map.Entry<Integer, TransportChannel> entry : HeartBeatProcess.channels.entrySet()) {
+            final TransportChannel channel = entry.getValue();
+            final CommandEvent event = new CommandEvent(command, Config.getConfig().LOCAL_NODE_ID, id, id2, channel.getChannelId());
+            TransportContext.getInstance().send(event);
+            event.getLatch().await();
+            if (event.isFail()) {
+                if (Config.getConfig().IGNORE_COMMAND_CHANNEL_FAILURES && event.getProcessException().getMessage().equals(TransportContext.CHANNEL_FAILURE_MESSAGE)) {
+                    continue;
+                }
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static synchronized boolean sendNoPersistCommand(int channelId, int command, long id, long id2) throws Exception {
+        final CommandEvent event = new CommandEvent(command, Config.getConfig().LOCAL_NODE_ID, id, id2, channelId);
+        TransportContext.getInstance().send(event);
+        event.getLatch().await();
+        if (event.isFail()) {
+            return false;
+        }
+        return true;
     }
 
     private void createInitTranCommands(SyncFrame[] sb, int channelId, Session s) throws Exception {

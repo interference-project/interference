@@ -424,7 +424,7 @@ public class IndexFrame extends Frame {
                     final long allocId = bd.getAllocId();
                     imap.put(c.getHeader().getFramePtr(), allocId);
                 } else {
-                    logger.error("getAllocaleMap found null data frame for frame id " + c.getHeader().getFramePtr());
+                    logger.error("getAllocateMap found null data frame for frame id " + c.getHeader().getFramePtr());
                 }
             }
         }

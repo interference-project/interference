@@ -47,6 +47,7 @@ public class SQLJoinDispatcher implements Comparable {
     private final boolean merged;
     private final boolean skipCheckNC;
     private final boolean furtherUseUC;
+    private final boolean process;
     private final SQLColumn joinedCC;
     private final int weight;
     private final int join;
@@ -58,7 +59,7 @@ public class SQLJoinDispatcher implements Comparable {
     public final static int RIGHT_INDEX = 4;
     public final static int NESTED_LOOPS = 10;
 
-    public SQLJoinDispatcher(FrameIterator lbi, FrameIterator rbi, SQLColumn c1, SQLColumn c2, boolean skip, NestedCondition nc, IndexDescript leadingIndex, Session s) throws Exception {
+    public SQLJoinDispatcher(FrameIterator lbi, FrameIterator rbi, SQLColumn c1, SQLColumn c2, boolean skip, NestedCondition nc, IndexDescript leadingIndex, boolean process, Session s) throws Exception {
 
         //depends on join columns is unique or index, standard iterators (Table, Cursor) must replace by additional
         //iterators - HashMap and Index. HashMap may be only RBI, Index may be LBI in case if both indexes exists
@@ -70,6 +71,7 @@ public class SQLJoinDispatcher implements Comparable {
         ix2 = vc2 == null ? c2.getIndex() : vc2.getCondition() == Condition.C_EQUAL || vc1.getCondition() == Condition.C_IN ? vc2.getConditionColumn().getIndex() : c2.getIndex();
         FrameIterator lbi_ = null;
         FrameIterator rbi_ = null;
+        this.process = process;
 
         //deprecated
         this.joinedCC = lbi.getType() == FrameIterator.TYPE_CURSOR?c1:c2;
@@ -80,8 +82,8 @@ public class SQLJoinDispatcher implements Comparable {
                 final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
                 final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
                 logger.info("use merge join for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
-                lbi_ = new SQLIndex(ix1, lt, true, c1, c2, true, nc, MERGE, s);
-                rbi_ = new SQLIndex(ix2, rt, false, c1, c2, true, nc, MERGE, s);
+                lbi_ = new SQLIndex(ix1, lt, true, c1, c2, true, nc, MERGE, this.process, s);
+                rbi_ = new SQLIndex(ix2, rt, false, c1, c2, true, nc, MERGE, this.process, s);
                 if (leadingIndex != null) {
                     if (ix1.getObjectId() == leadingIndex.getIndex().getObjectId()) {
                         leadingIndex.accept();
@@ -93,8 +95,8 @@ public class SQLJoinDispatcher implements Comparable {
                 final Table lt = Instance.getInstance().getTableById(rbi.getObjectId());
                 final Table rt = Instance.getInstance().getTableById(lbi.getObjectId());
                 logger.info("use merge join for " + lt.getName() + "." + c2.getColumn().getName() + " * " + rt.getName() + "." + c1.getColumn().getName());
-                lbi_ = new SQLIndex(ix2, lt, true, c2, c1, true, nc, MERGE, s);
-                rbi_ = new SQLIndex(ix1, rt, false, c2, c1, true, nc, MERGE, s);
+                lbi_ = new SQLIndex(ix2, lt, true, c2, c1, true, nc, MERGE, this.process, s);
+                rbi_ = new SQLIndex(ix1, rt, false, c2, c1, true, nc, MERGE, this.process, s);
                 if (leadingIndex != null) {
                     if (ix2.getObjectId() == leadingIndex.getIndex().getObjectId()) {
                         leadingIndex.accept();
@@ -107,11 +109,11 @@ public class SQLJoinDispatcher implements Comparable {
                 final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
                 FrameIterator hbi = null;
                 if (c1.isUnique()) {
-                    lbi_ = ix2 == null ? rbi : new SQLIndex(ix2, rt, true, c1, c2, false, nc, RIGHT_HASH, s);
-                    hbi = ix1 == null ? lbi : new SQLIndex(ix1, lt, false, c1, c2, false, nc, RIGHT_HASH, s);
+                    lbi_ = ix2 == null ? rbi : new SQLIndex(ix2, rt, true, c1, c2, false, nc, RIGHT_HASH, this.process, s);
+                    hbi = ix1 == null ? lbi : new SQLIndex(ix1, lt, false, c1, c2, false, nc, RIGHT_HASH, this.process, s);
                 } else if (c2.isUnique()) {
-                    lbi_ = ix1 == null ? lbi : new SQLIndex(ix1, lt, true, c1, c2, false, nc, RIGHT_HASH, s);
-                    hbi = ix2 == null ? rbi : new SQLIndex(ix2, rt, false, c1, c2, false, nc, RIGHT_HASH, s);
+                    lbi_ = ix1 == null ? lbi : new SQLIndex(ix1, lt, true, c1, c2, false, nc, RIGHT_HASH, this.process, s);
+                    hbi = ix2 == null ? rbi : new SQLIndex(ix2, rt, false, c1, c2, false, nc, RIGHT_HASH, this.process, s);
                 }
                 final Table lt_ = Instance.getInstance().getTableById(lbi_.getObjectId());
                 final Table rt_ = Instance.getInstance().getTableById(hbi.getObjectId());
@@ -133,11 +135,11 @@ public class SQLJoinDispatcher implements Comparable {
                 final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
                 logger.info("use index scan for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
                 if (ix1 != null) {
-                    lbi_ = ix2 == null ? rbi : new SQLIndex(ix1, lt, true, c1, c2, false, nc, RIGHT_INDEX, s);
-                    rbi_ = new SQLIndex(ix1, lt, false, c2, c1, false, nc, RIGHT_INDEX, s);
+                    lbi_ = ix2 == null ? rbi : new SQLIndex(ix1, lt, true, c1, c2, false, nc, RIGHT_INDEX, this.process, s);
+                    rbi_ = new SQLIndex(ix1, lt, false, c2, c1, false, nc, RIGHT_INDEX, this.process, s);
                 } else if (ix2 != null) {
                     lbi_ = lbi;
-                    rbi_ = new SQLIndex(ix2, rt, false, c1, c2, false, nc, RIGHT_INDEX, s);
+                    rbi_ = new SQLIndex(ix2, rt, false, c1, c2, false, nc, RIGHT_INDEX, this.process, s);
                 }
                 if (lbi_ instanceof SQLIndex) {
                     if (leadingIndex != null) {

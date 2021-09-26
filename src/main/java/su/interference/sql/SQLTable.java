@@ -26,10 +26,12 @@ package su.interference.sql;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import su.interference.persistent.Session;
 import su.interference.persistent.Table;
 import su.interference.persistent.FrameData;
 import su.interference.core.Instance;
 import su.interference.sqlexception.InvalidTableDescription;
+import su.interference.sqlexception.UnableToLockTableForProcess;
 
 import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -53,7 +55,7 @@ public class SQLTable implements Comparable, FrameIterator {
     private final boolean process;
     private final Class evtprc;
 
-    public SQLTable (String table, String alias, boolean process, Class evtprc) throws InvalidTableDescription {
+    public SQLTable (String table, String alias, boolean process, Class evtprc, Session s) throws InvalidTableDescription, UnableToLockTableForProcess {
         this.alias = alias;
         String[] tblss = table.trim().split("\\.");
         if (tblss.length==1) { //without schema prefix - use user default schema
@@ -65,7 +67,7 @@ public class SQLTable implements Comparable, FrameIterator {
             throw new InvalidTableDescription();
         }
 
-        frames = Instance.getInstance().getTableById(this.table.getObjectId()).getFrames();
+        this.frames = Instance.getInstance().getTableById(this.table.getObjectId()).getFrames();
         this.terminate = new AtomicBoolean(false);
         this.process = process;
         this.evtprc = evtprc;
@@ -154,7 +156,7 @@ public class SQLTable implements Comparable, FrameIterator {
 
     @Override
     public boolean noDistribute() {
-        return false;
+        return this.table.isIndexed() && this.process;
     }
 
     public boolean isIndexOrdered() {

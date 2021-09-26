@@ -46,11 +46,20 @@ public class TransportContext implements TransportApi {
     private static TransportContext transportContext;
     private final AtomicBoolean started = new AtomicBoolean(true);
     private final ConcurrentLinkedQueue<TransportEvent> mq = new ConcurrentLinkedQueue<>();
+    private final LinkedBlockingQueue<TransportMessage> inq = new LinkedBlockingQueue<>(10000);
     private final ExecutorService pool = Executors.newFixedThreadPool(1);
+    private final ExecutorService pool2 = Executors.newFixedThreadPool(2);
     private final Map<String, TransportMessage> mmap = new ConcurrentHashMap<>();
     private final int callbackPort;
     private final TransportChannel clientChannel;
     private TransportServer transportServer;
+    protected static final String CHANNEL_FAILURE_MESSAGE = "Channel failure";
+    protected static final String TRANSACTION_ISNULL_MESSAGE = "Transaction is null";
+    protected static final String WRONG_CALLBACK_NODE_MESSAGE = "Wrong callback node id";
+    protected static final String UNABLE_LOCK_TABLE_MESSAGE = "Unable to lock table";
+    protected static final String UNABLE_UNLOCK_TABLE_MESSAGE = "Unable to unlock table";
+    protected static final String UNABLE_LOCK_FRAME_MESSAGE = "Unable to lock frame";
+    protected static final String UNABLE_UNLOCK_FRAME_MESSAGE = "Unable to unlock frame";
 
     private TransportContext() {
         this.clientChannel = null;
@@ -64,6 +73,7 @@ public class TransportContext implements TransportApi {
 
     public void start() {
         startServer();
+        startIncomingMessageProcess();
         startClient();
     }
 
@@ -100,11 +110,7 @@ public class TransportContext implements TransportApi {
                             if (channel != null) {
                                 channel.send(transportMessage);
                             } else {
-                                try {
-                                    throw new InternalException();
-                                } catch(Exception e) {
-                                    e.printStackTrace();
-                                }
+                                logger.error("unable to find trasport channel by id="+transportEvent.getChannelId(), new RuntimeException());
                             }
                         } else {
                             if (clientChannel != null) {
@@ -126,7 +132,7 @@ public class TransportContext implements TransportApi {
                         try {
                             Thread.sleep(1);
                         } catch (InterruptedException ie) {
-                            ie.printStackTrace();
+                            logger.error("exception occured", ie);
                         }
                     }
                 }
@@ -135,9 +141,44 @@ public class TransportContext implements TransportApi {
     }
 
     // process incoming events
-    protected void onMessage(TransportMessage transportMessage, InetAddress inetAddress) throws InternalException {
+    protected void onMessage(TransportMessage transportMessage, InetAddress inetAddress) throws Exception {
+        inq.put(transportMessage);
+    }
+
+    private void startIncomingMessageProcess() {
+        pool2.submit(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    while (started.get()) {
+                        final TransportMessage transportMessage = inq.take();
+                        onMessage(transportMessage);
+                    }
+                } catch (InterruptedException ie) {
+                    logger.error("exception occured", ie);
+                }
+            }
+        });
+/*
+        pool2.submit(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    while (started.get()) {
+                        final TransportMessage transportMessage = inq.take();
+                        onMessage(transportMessage);
+                    }
+                } catch (InterruptedException ie) {
+                            logger.error("exception occured", ie);
+                }
+            }
+        });
+*/
+    }
+
+    private void onMessage(TransportMessage transportMessage) throws InternalException {
         if (transportMessage.getType() == TransportMessage.HEARTBEAT_MESSAGE) {
-            TransportCallback transportCallback = new TransportCallback(Config.getConfig().LOCAL_NODE_ID, transportMessage.getUuid(),
+            final TransportCallback transportCallback = new TransportCallback(Config.getConfig().LOCAL_NODE_ID, transportMessage.getUuid(),
                     new EventResult(TransportCallback.SUCCESS, null, 0, null, null, null));
             sendCallback(transportMessage.getSender(), new TransportMessage(TransportMessage.CALLBACK_MESSAGE, Config.getConfig().LOCAL_NODE_ID, null, transportCallback));
             logger.debug("heartbeat callback " + transportCallback.getMessageUUID() + " sent to node "+transportMessage.getSender());
@@ -148,7 +189,7 @@ public class TransportContext implements TransportApi {
             logger.debug("transport message received with UUID: " + transportMessage.getUuid() + ", type = " + transportMessage.getTransportEvent().getClass());
             transportMessage.getTransportEvent().setCallbackNodeId(transportMessage.getSender());
             final EventResult result = transportMessage.getTransportEvent().process();
-            TransportCallback transportCallback = new TransportCallback(Config.getConfig().LOCAL_NODE_ID, transportMessage.getUuid(), result);
+            final TransportCallback transportCallback = new TransportCallback(Config.getConfig().LOCAL_NODE_ID, transportMessage.getUuid(), result);
             sendCallback(transportMessage.getSender(), new TransportMessage(TransportMessage.CALLBACK_MESSAGE, Config.getConfig().LOCAL_NODE_ID, null, transportCallback));
             logger.debug("callback sent with UUID: " + transportMessage.getUuid() + ", type = " + transportMessage.getTransportEvent().getClass()+", destination="+transportMessage.getSender());
         }
@@ -173,7 +214,7 @@ public class TransportContext implements TransportApi {
             transportEvent.setLatch(new CountDownLatch(1));
             mq.offer(transportEvent);
         } else {
-            transportEvent.failure(transportEvent.getChannelId(), new RuntimeException("Channel failure"));
+            transportEvent.failure(transportEvent.getChannelId(), new RuntimeException(CHANNEL_FAILURE_MESSAGE));
         }
     }
 

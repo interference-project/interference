@@ -134,7 +134,7 @@ public class SyncQueue implements Runnable, ManagedProcess {
             try {
                 Thread.sleep(5);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                logger.error("exception occured", e);
             }
         }
     }
@@ -146,14 +146,14 @@ public class SyncQueue implements Runnable, ManagedProcess {
             try {
                 syncFramesFromQueue();
             } catch(Exception e) {
-                e.printStackTrace();
+                logger.error("exception occured during sync queue process", e);
             }
 
             try {
                 final int period = Config.getConfig().SYNC_PERIOD;
                 Thread.sleep(period);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                logger.error("exception occured", e);
             }
             latch.countDown();
         }

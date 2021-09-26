@@ -49,7 +49,7 @@ import su.interference.transport.TransportSyncTask;
 public class Instance implements Interference {
     
     public static final String RELEASE = "2021.1";
-    public static final int SYSTEM_VERSION = 20210905;
+    public static final int SYSTEM_VERSION = 20210926;
 
     public static final String DATA_FILE = "datafile";
     public static final String INDX_FILE = "indxfile";

@@ -29,6 +29,8 @@ import org.slf4j.LoggerFactory;
 import su.interference.core.*;
 import su.interference.mgmt.MgmtColumn;
 import su.interference.sql.FrameApi;
+import su.interference.transport.CommandEvent;
+import su.interference.transport.TransportSyncTask;
 
 import javax.persistence.Entity;
 import javax.persistence.Column;
@@ -196,7 +198,11 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     public ArrayList<Object> getFrameEntities(Session s) throws Exception {
         final ArrayList<Object> res = new ArrayList<>();
         for (Chunk c : getFrameChunks(s)) {
-            res.add(((DataChunk)c).getEntity());
+            if (isIndex() || isNoTran()) {
+                res.add(c.getEntity());
+            } else {
+                res.add(((EntityContainer) c.getEntity()).getEntity(s));
+            }
         }
         return res;
     }
@@ -227,6 +233,10 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     public boolean isIndex() {
         return getDataObject().isIndex();
+    }
+
+    public boolean isNoTran() {
+        return getDataObject().isNoTran();
     }
 
     public boolean isFrame() {
@@ -349,8 +359,8 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         this.getFrame().removeChunk(ptr, llt, false);
     }
 
-    public void deleteChunk(int ptr, Session s, LLT llt) throws Exception {
-        this.getFrame().deleteChunk(ptr, s, llt);
+    public void deleteChunk(int ptr, Session s, LLT llt, boolean ignoreNoLocal) throws Exception {
+        this.getFrame().deleteChunk(ptr, s, llt, ignoreNoLocal);
     }
 
     public DataFile getDataFile() {
@@ -520,6 +530,11 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         this.getFrame().rollbackTransaction(tran, ubs, s);
     }
 
+    public int getOwnerId() {
+        final long ownerId = this.getAllocFile()/Storage.MAX_NODES + 1;
+        return (int)ownerId;
+    }
+
     public int getPriority() {
         return priority.get();
     }
@@ -530,17 +545,58 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         }
     }
 
+/*
     public int getLock() {
         return lock.get();
     }
+*/
 
-    public void lock(int lock) {
-        this.lock.compareAndSet(0, lock);
+    public boolean isLocal() {
+        return this.getFrameId() == this.getAllocId();
     }
 
+    public boolean isLockedLocally() {
+        return this.lock.get() == Config.getConfig().LOCAL_NODE_ID;
+    }
+
+    public synchronized boolean lock(long transId) throws Exception {
+        if (this.lock.compareAndSet(Config.getConfig().LOCAL_NODE_ID, Config.getConfig().LOCAL_NODE_ID)) {
+            return true;
+        }
+        if (this.lock.compareAndSet(0, Config.getConfig().LOCAL_NODE_ID)) {
+            if (this.isLocal()) {
+                return true;
+            } else {
+                final boolean success = TransportSyncTask.sendNoPersistCommand(this.getOwnerId(), CommandEvent.LOCK_FRAME, transId, this.getAllocId());
+                if (!success) {
+                    this.lock.compareAndSet(Config.getConfig().LOCAL_NODE_ID, 0);
+                    return false;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public synchronized boolean rlock(long transId, int nodeId) {
+        if (this.isLocal()) {
+            if (this.lock.compareAndSet(0, nodeId)) {
+                return true;
+            }
+            if (this.lock.compareAndSet(nodeId, nodeId)) {
+                return true;
+            }
+        } else {
+            throw new RuntimeException("rlock method is not applicable to non-local frames");
+        }
+        return false;
+    }
+
+/*
     public void unlock(int lock) {
         this.lock.compareAndSet(lock, 0);
     }
+*/
 
     public boolean isSynced() {
         return synced.get();

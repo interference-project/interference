@@ -450,9 +450,11 @@ public class Frame implements Comparable {
         return chunk.getBytesAmount();
     }
 
-    public synchronized void deleteChunk (int ptr, Session s, LLT llt) {
+    public synchronized void deleteChunk (int ptr, Session s, LLT llt, boolean ignoreNoLocal) {
         if (!this.isLocal()) {
-            throw new CannotAccessToForeignRecord();
+            if (!ignoreNoLocal) {
+                throw new CannotAccessToForeignRecord();
+            }
         }
         final Transaction tran = s.getTransaction();
         final long sync = LLT.getSyncId();

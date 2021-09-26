@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2021 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -78,7 +78,7 @@ public final class HeartBeatProcess implements Runnable, ManagedProcess {
                             logger.debug("heartbeat failed");
                         }
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        logger.error("exception occured during heartbeat process", e);
                     }
                 } else {
                     logger.info(entry.getValue()+" not connected");

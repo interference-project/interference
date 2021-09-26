@@ -153,18 +153,18 @@ public class SQLCursor implements FrameIterator {
             this.rscols = rscols;
         }
 
-        hmap = nc.getJoinDispatcher(lbi, rbi, this.rscols, this.leadingIndex, s);
+        hmap = nc.getJoinDispatcher(lbi, rbi, this.rscols, this.leadingIndex, this.process, s);
 
         //todo move to SQLJoinDispatcher
         if (hmap == null && rbi == null) {
             final ValueCondition vc = nc.getIndexVC(lbi, null);
             if (vc != null) {
                 final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
-                this.lbi = new SQLIndex(vc.getConditionColumn().getIndex(), lt, true, vc.getConditionColumn(), vc.getConditionColumn(), false, nc, 0, s);
+                this.lbi = new SQLIndex(vc.getConditionColumn().getIndex(), lt, true, vc.getConditionColumn(), vc.getConditionColumn(), false, nc, 0, this.process, s);
                 this.rbi = rbi;
             } else if (this.leadingIndex != null && lbi.getObjectId() == leadingIndex.getT().getObjectId()) {
                 final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
-                this.lbi = new SQLIndex(leadingIndex.getIndex(), lt, true, null, null, false, nc, 0, true, s);
+                this.lbi = new SQLIndex(leadingIndex.getIndex(), lt, true, null, null, false, nc, 0, true, this.process, s);
                 this.leadingIndex.accept();
                 this.rbi = null;
             } else {
@@ -235,10 +235,14 @@ public class SQLCursor implements FrameIterator {
 
                         if (bd1 != null) {
                             if (rbi == null) {
-                                if (ns[i] == Config.getConfig().LOCAL_NODE_ID) {
-                                    ltasks.put(new FrameApiJoin(ns[i], c1, lbi, bd1, null));
+                                if (lbi.noDistribute()) {
+                                    ltasks.put(new FrameApiJoin(Config.getConfig().LOCAL_NODE_ID, c1, lbi, bd1, null));
                                 } else {
-                                    rtasks__.put(new FrameApiJoin(ns[i], c1, lbi, bd1, null));
+                                    if (ns[i] == Config.getConfig().LOCAL_NODE_ID) {
+                                        ltasks.put(new FrameApiJoin(ns[i], c1, lbi, bd1, null));
+                                    } else {
+                                        rtasks__.put(new FrameApiJoin(ns[i], c1, lbi, bd1, null));
+                                    }
                                 }
                                 i++;
                                 if (i == ns.length) {
@@ -283,7 +287,7 @@ public class SQLCursor implements FrameIterator {
             Runnable send = new Runnable() {
                 @Override
                 public void run() {
-                    Thread.currentThread().setName("interference sql cursor remote send "+Thread.currentThread().getId());
+                    Thread.currentThread().setName("interference-sql-cursor-remote-send-"+Thread.currentThread().getId());
                     try {
                         final Map<Integer, Map<String, FrameApiJoin>> joins = new HashMap<>();
                         for (Integer nodeId : ns) {
@@ -420,7 +424,7 @@ public class SQLCursor implements FrameIterator {
                     target.persist(new ResultSetTerm(), s);
                 } catch (Exception e) {
                     ((StreamQueue) target).stop();
-                    e.printStackTrace();
+                    logger.error("exception occured during sql stream", e);
                 }
             }
         };
@@ -620,6 +624,7 @@ public class SQLCursor implements FrameIterator {
     }
 
     public ResultSet flushTarget() throws InternalException {
+        final boolean process = this.isProcess();
         if (!flush) {
             Runnable r = new Runnable() {
                 @Override
@@ -634,6 +639,10 @@ public class SQLCursor implements FrameIterator {
 
                         if (!target.isPersistent()) {
                             target.persist(new ResultSetTerm(), s);
+                        }
+
+                        if (process) {
+                            logger.info("Process of cursor records complete");
                         }
                     } catch (Exception e) {
                         logger.error("Exception thrown during flush target operation", e);
@@ -660,6 +669,10 @@ public class SQLCursor implements FrameIterator {
 
     public FrameIterator getRbi() {
         return rbi;
+    }
+
+    public FrameIterator getPbi() {
+        return pbi;
     }
 
     public ResultSet getTarget() {

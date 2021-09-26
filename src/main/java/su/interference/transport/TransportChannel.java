@@ -105,7 +105,7 @@ public class TransportChannel {
                                             logger.debug("channel id = " + channelId + " sent " + transportMessage + " message with UUID: " + transportMessage.getUuid());
                                         } else {
                                             if (transportMessage.getType() == TransportMessage.TRANSPORT_MESSAGE || transportMessage.getType() == TransportMessage.HEARTBEAT_MESSAGE) {
-                                                transportMessage.getTransportEvent().failure(channelId, new RuntimeException("Channel failure"));
+                                                transportMessage.getTransportEvent().failure(channelId, new RuntimeException(TransportContext.CHANNEL_FAILURE_MESSAGE));
                                                 if (transportMessage.getTransportEvent().getLatch() != null) {
                                                     transportMessage.getTransportEvent().getLatch().countDown();
                                                 }
@@ -120,7 +120,7 @@ public class TransportChannel {
                                             try {
                                                 sock.close();
                                             } catch (Exception e_) {
-                                                e_.printStackTrace();
+                                                logger.error("transport channel failure: ", e_);
                                             }
                                             logger.error("channel id = " + channelId + " stopped by connection failure");
                                         }
@@ -128,7 +128,7 @@ public class TransportChannel {
                                         try {
                                             Thread.sleep(1);
                                         } catch (InterruptedException ie) {
-                                            ie.printStackTrace();
+                                            logger.error("transport channel failure: ", ie);
                                         }
                                     }
                                 } catch (IOException e) {
@@ -147,7 +147,7 @@ public class TransportChannel {
                                     try {
                                         sock.close();
                                     } catch (Exception e_) {
-                                        e_.printStackTrace();
+                                        logger.error("transport channel failure: ", e_);
                                     }
                                     logger.error("channel id = " + channelId + " stopped by connection failure");
                                     logger.error("failure cause: ", e);
@@ -155,12 +155,12 @@ public class TransportChannel {
                             }
                         } catch (IOException e) {
                             connected.set(false);
-                            e.printStackTrace();
+                            logger.error("transport channel failure: ", e);
                         }
                         logger.info("channel "+channelId+" closed");
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    logger.error("transport channel failure: ", e);
                 } finally {
                     started.set(false);
                 }
@@ -172,7 +172,7 @@ public class TransportChannel {
         while (mq.peek() != null) {
             final TransportMessage transportMessage = mq.poll();
             if (transportMessage.getType() == TransportMessage.TRANSPORT_MESSAGE || transportMessage.getType() == TransportMessage.HEARTBEAT_MESSAGE) {
-                transportMessage.getTransportEvent().failure(channelId, new RuntimeException("Channel failure"));
+                transportMessage.getTransportEvent().failure(channelId, new RuntimeException(TransportContext.CHANNEL_FAILURE_MESSAGE));
                 transportMessage.getTransportEvent().getLatch().countDown();
             }
         }
@@ -182,7 +182,7 @@ public class TransportChannel {
         for (Map.Entry<String, TransportMessage> entry : mmap.entrySet()) {
             final TransportMessage transportMessage = entry.getValue();
             if (transportMessage.getType() == TransportMessage.TRANSPORT_MESSAGE || transportMessage.getType() == TransportMessage.HEARTBEAT_MESSAGE) {
-                transportMessage.getTransportEvent().failure(channelId, new RuntimeException("Channel failure"));
+                transportMessage.getTransportEvent().failure(channelId, new RuntimeException(TransportContext.CHANNEL_FAILURE_MESSAGE));
                 transportMessage.getTransportEvent().getLatch().countDown();
             }
             mmap.remove(entry.getKey());
@@ -206,7 +206,7 @@ public class TransportChannel {
             mq.offer(transportMessage);
         } else {
             if (transportMessage.getType() == TransportMessage.TRANSPORT_MESSAGE || transportMessage.getType() == TransportMessage.HEARTBEAT_MESSAGE) {
-                transportMessage.getTransportEvent().failure(channelId, new RuntimeException("Channel failure"));
+                transportMessage.getTransportEvent().failure(channelId, new RuntimeException(TransportContext.CHANNEL_FAILURE_MESSAGE));
                 transportMessage.getTransportEvent().getLatch().countDown();
             } else if (transportMessage.getType() == TransportMessage.CALLBACK_MESSAGE) {
                 cbq.add(transportMessage);
