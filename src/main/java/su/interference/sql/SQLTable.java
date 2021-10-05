@@ -102,13 +102,20 @@ public class SQLTable implements Comparable, FrameIterator {
 
     public synchronized FrameData nextFrame() throws Exception {
         if (hasNextFrame()) {
-            final FrameData bd = frames.take();
-            if (bd.getObjectId() == 0 && bd.getFrameId() == 0) {
-                terminate.compareAndSet(false, true);
-                return null;
+            boolean cnue = true;
+            while (cnue) {
+                final FrameData bd = frames.take();
+                if (bd.getObjectId() == 0 && bd.getFrameId() == 0) {
+                    cnue = false;
+                    terminate.compareAndSet(false, true);
+                    return null;
+                }
+                if (bd.isValid()) {
+                    cnue = false;
+                    logger.debug(this.table.getName() + " returns next frame with allocId = " + bd.getAllocId());
+                    return bd;
+                }
             }
-            logger.debug(this.table.getName()+" returns next frame with allocId = "+bd.getAllocId());
-            return bd;
         }
         return null;
     }

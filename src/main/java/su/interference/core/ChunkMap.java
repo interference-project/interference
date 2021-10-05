@@ -107,7 +107,10 @@ public class ChunkMap {
                 }
             }
             imap.get(c.getDcs()).remove(i_);
-            list.remove(hmap.get(i));
+            if (imap.get(c.getDcs()).size() == 0) {
+                imap.remove(c.getDcs());
+            }
+            list.remove(c);
         }
         sorted = false;
         used = used - c.getBytesAmount();

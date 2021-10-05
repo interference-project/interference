@@ -50,7 +50,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Entity
 @SystemEntity
 @DisableSync
-public class FrameData implements Serializable, Comparable, FrameApi, FilePartitioned {
+public class FrameData implements Serializable, Comparable, FrameApi, FilePartitioned, OnDelete {
 
     @Transient
     private final static long serialVersionUID = 8712349857239487288L;
@@ -115,6 +115,8 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     private volatile boolean rbck;
     @Transient
     private volatile Frame frame;
+    @Transient
+    private AtomicInteger freed = new AtomicInteger(0);
     @Transient
     private Table dataObject;
     @Transient
@@ -499,6 +501,11 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         tcounter.remove(id);
     }
 
+    public int checkTcounter(long id) {
+        Map<Long, TransFrame> map = tcounter.get(id);
+        return map == null ? -1 : map.size();
+    }
+
     public synchronized Map<Long, List<Long>> getLiveUFrameAllocIds() {
         final Map<Long, List<Long>> uframes = new HashMap<>();
         for (Map.Entry<Long, Map<Long, TransFrame>> entry : tcounter.entrySet()) {
@@ -645,6 +652,23 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     public synchronized void setMv(ValueSet mv) {
         this.mv = mv;
+    }
+
+    public boolean isFree() {
+        return freed.compareAndSet(1, 1);
+    }
+
+    public boolean isValid() {
+        return freed.compareAndSet(0, 0);
+    }
+
+    public void free() {
+        this.freed.compareAndSet(0, 1);
+    }
+
+    public void onDelete() {
+        this.frame = null;
+        this.free();
     }
 
     @Override

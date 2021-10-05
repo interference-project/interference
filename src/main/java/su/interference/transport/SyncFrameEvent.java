@@ -79,7 +79,7 @@ public class SyncFrameEvent extends TransportEventImpl {
                 updateTransactions(b.getRtran(), s);
                 FrameData bd = Instance.getInstance().getFrameByAllocId(b.getAllocId());
                 final Table t = Instance.getInstance().getTableByName(b.getClassName());
-                if (t == null) {
+                if (t == null || b.isFree()) {
                     final FreeFrame fb = new FreeFrame(0, bd.getFrameId(), bd.getSize());
                     s.persist(fb, llt);
                     b.setDf(Instance.getInstance().getDataFileById(bd.getFile()));

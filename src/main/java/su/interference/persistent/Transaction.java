@@ -294,6 +294,7 @@ public class Transaction implements Serializable {
     public synchronized void rollback (Session s, boolean remote) {
         final ArrayList<FrameData> ubd1 = new ArrayList<>();
         final ArrayList<FrameData> ubd2 = new ArrayList<>();
+        final Map<Integer, List<Long>> fmap = new HashMap<>();
 
         if (remote) {
             if (isLocal()) {
@@ -385,6 +386,10 @@ public class Transaction implements Serializable {
                     final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
                     cb.decreaseTcounter(this.transId);
                     if (cb.getUsed() == 0) {
+                        if (fmap.get(cb.getObjectId()) == null) {
+                            fmap.put(cb.getObjectId(), new ArrayList<>());
+                        }
+//                        fmap.get(cb.getObjectId()).add(cb.getFrameId());
                         logger.info("rollback freeing frame " + cb.getFile() + " " + cb.getPtr());
                         freeFrames(cb, s);
                     }
@@ -398,9 +403,39 @@ public class Transaction implements Serializable {
         }
 
         try {
+            //post-rollback check
+            Map<Long, Integer> checkmap = new HashMap<>();
+            int is_ok = 0;
+            int is_fail = 0;
+            for (TransFrame tf : Instance.getInstance().getTransFramesByTransId(this.transId)) {
+                if (checkmap.get(tf.getCframeId()) == null) {
+                    FrameData bd = Instance.getInstance().getFrameById(tf.getCframeId());
+                    if (bd != null) { //frame already freed
+                        checkmap.put(tf.getCframeId(), bd.checkTcounter(this.transId));
+                    }
+                }
+            }
+            for (Map.Entry<Long, Integer> entry : checkmap.entrySet()) {
+                if (entry.getValue() >= 0) {
+                    is_fail++;
+                    logger.warn("check failed "+entry.getValue()+" on frame "+entry.getKey());
+                } else {
+                    is_ok++;
+                }
+            }
+            logger.info("check frames failed: "+is_fail);
+            logger.info("check frames ok: "+is_ok);
+
             this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
             this.transType = TRAN_THR;
             s.persist(this);
+
+/*
+            for (Map.Entry<Integer, List<Long>> entry : fmap.entrySet()) {
+                Table t = Instance.getInstance().getTableById(entry.getKey());
+                t.freeFrames(entry.getValue(), s, this, "rollback");
+            }
+*/
         } catch (Exception e) {
             logger.error("exception occured during transaction rollback", e);
         }
@@ -482,7 +517,7 @@ public class Transaction implements Serializable {
     }
 
     public void storeRFrame(long uframeId, long frameId, int objectId, Session s) throws Exception {
-        rframes.add(uframeId);
+        rframes.add(frameId);
         final TransFrame tb = Instance.getInstance().getTransFrameById(this.transId, frameId, uframeId);
         if (tb == null) {
             final TransFrame ntb = new TransFrame(this.transId, objectId, frameId, uframeId);
@@ -499,7 +534,7 @@ public class Transaction implements Serializable {
                 tframes.add(tf);
             } else {
                 if (tf.getUframeId() > 0) {
-                    rframes.add(tf.getUframeId());
+                    rframes.add(tf.getCframeId());
                 }
             }
         }

@@ -389,6 +389,7 @@ public class Session implements OnDelete {
     }
 
     //todo uncommitted data not retrieved
+    @Deprecated
     public void stream (Class c, StreamCallable task) {
         final Map<Long, Long> retrieved = new HashMap<>();
         final Table t = Instance.getInstance().getTableByName(c.getName());
