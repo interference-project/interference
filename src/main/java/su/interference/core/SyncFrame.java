@@ -56,6 +56,7 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
     private final boolean proc;
     private final boolean started;
     private final boolean distributed;
+    private final boolean freed;
     private final Map<Long, Long> imap;
     private final Map<Long, Transaction> rtran;
     private final Map<Long, List<Long>> uframes;
@@ -73,11 +74,12 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
         final Table t = Instance.getInstance().getTableById(frame.getObjectId());
         final FrameData bd = Instance.getInstance().getFrameById(frame.getPtr());
         //allowR = frame.isLocal() || bd.isLockedLocally() ? !t.isNoTran() || t.getName().equals("su.interference.persistent.UndoChunk") : false;
-        allowR = !t.isNoTran() || (frame.isLocal() && t.getName().equals("su.interference.persistent.UndoChunk"));
+        this.allowR = !t.isNoTran() || (frame.isLocal() && t.getName().equals("su.interference.persistent.UndoChunk"));
         this.proc = bd == null ? false : proc;
-        distributed = t.isDistributed();
+        this.distributed = t.isDistributed();
+        this.freed = bd == null || bd.isFree();
 
-        if (bd == null && allowR) {
+        if ((bd == null || bd.isFree()) && allowR) {
             final FreeFrame fframe = Instance.getInstance().getFreeFrameById(frame.getPtr());
             if (fframe == null) {
                 logger.warn(frame.getClass().getSimpleName()+" does not match any system objects");
@@ -248,6 +250,10 @@ public class SyncFrame implements Comparable, Serializable, AllowRPredicate {
 
     public boolean isDistributed() {
         return distributed;
+    }
+
+    public boolean isFree() {
+        return freed;
     }
 
     public boolean equals (SyncFrame bl) {

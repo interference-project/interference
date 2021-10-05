@@ -118,12 +118,19 @@ public class SQLIndex implements FrameIterator {
             return new SQLIndexFrame(t, parent, null, lkey, rkey, vc, left, unique, merged, join, leading, s);
         } else {
             if (hasNextFrame()) {
-                final FrameData bd = frames.take();
-                if (bd.getObjectId() == 0 && bd.getFrameId() == 0) {
-                    terminate.compareAndSet(false, true);
-                    return null;
+                boolean cnue = true;
+                while (cnue) {
+                    final FrameData bd = frames.take();
+                    if (bd.getObjectId() == 0 && bd.getFrameId() == 0) {
+                        cnue = false;
+                        terminate.compareAndSet(false, true);
+                        return null;
+                    }
+                    if (bd.isValid()) {
+                        cnue = false;
+                        return new SQLIndexFrame(t, parent, bd, lkey, rkey, vc, left, unique, merged, join, leading, s);
+                    }
                 }
-                return new SQLIndexFrame(t, parent, bd, lkey, rkey, vc, left, unique, merged, join, leading, s);
             }
         }
         return null;

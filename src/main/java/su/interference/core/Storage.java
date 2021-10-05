@@ -579,5 +579,50 @@ public class Storage {
         return res;
     }
 
+    public void createSystemLog() throws Exception {
+        final Table t = new Table(true);
+        for (DataFile df : Storage.getStorage().getInitDataFiles()) {
+            long start = Instance.getInstance().getFrameSize(); //first data frame
+            while (true) {
+                final FrameData bb = new FrameData(df.getFileId(), start, df.getType() == Storage.INDXFILE_TYPEID ? Instance.getInstance().getFrameSize2() : Instance.getInstance().getFrameSize(), t);
+                DataFrame db = null;
+                try {
+                    db = bb.getDataFrame();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                start = db.getNextFrame();
+                for (Chunk c : db.getChunks()) {
+                    if (c.getHeader().getState()==Header.RECORD_NORMAL_STATE) {  //miss deleted or archived records
+                        final FrameData bd = (FrameData)((DataChunk)c).getEntity(FrameData.class, null);
+                        if (bd.getFrameId()==bb.getFrameId()) {
+                            bd.setFrame(db);
+                        }
+                        //res.add(bd.getObjectId(), c);
+                    }
+                }
+                if (start==0) { break; }
+            }
+        }
+    }
 
+    public String getHexByInt (int val) {
+        String s = Integer.toHexString(val);
+        StringBuffer p = new StringBuffer();
+        for (int i = 0; i < 8 - s.length(); i++) {
+            p.append("0");
+        }
+        p.append(s);
+        return p.toString();
+    }
+
+    public String getHexByLong (long val) {
+        String s = Long.toHexString(val);
+        StringBuffer p = new StringBuffer();
+        for (int i = 0; i < 16 - s.length(); i++) {
+            p.append("0");
+        }
+        p.append(s);
+        return p.toString();
+    }
 }

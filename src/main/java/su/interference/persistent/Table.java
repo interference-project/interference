@@ -1099,6 +1099,38 @@ public class Table implements ResultSet {
         }
     }
 
+    protected synchronized void freeFrames (List<Long> flist, Session s, Transaction tran, String cause) throws Exception {
+        for (Long frameId : flist) {
+            final FrameData cb = Instance.getInstance().getFrameById(frameId);
+            logger.info("freeing frame " + cb.getFile() + " " + cb.getPtr() + " by " + cause + " of " + tran.getTransId());
+            if (cb.getUsed() > 0) {
+                throw new InternalException();
+            }
+            if (!this.checkLBS(cb)) { //LB can't deallocated!!! May be empty
+                //check for other transactions, which locked this frame
+                if (!cb.isFrameBusy()) {
+                    final FreeFrame fb = new FreeFrame(0, cb.getFrameId(), cb.getSize());
+                    final FrameData pb = cb.getPrevFrameId() > 0 ? Instance.getInstance().getFrameById(cb.getPrevFrameId()) : null;
+                    final FrameData nb = Instance.getInstance().getFrameById(cb.getNextFrameId());
+                    if (nb != null) {
+                        nb.setPrevFile(pb == null ? 0 : pb.getFile());
+                        nb.setPrevFrame(pb == null ? 0 : pb.getPtr());
+                        s.persist(nb); //update
+                    }
+                    if (pb != null) {
+                        pb.setNextFile(nb.getFile());
+                        pb.setNextFrame(nb.getPtr());
+                        s.persist(pb); //update
+                    }
+                    s.persist(fb); //insert
+                    s.delete(cb);
+                    this.decFrameAmount();
+                    s.persist(this);
+                }
+            }
+        }
+    }
+
     private WaitFrame getAvailableFrame(final Object o, final boolean fpart) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException {
         Metrics.get("getAvailableFrame").start();
         final long st = System.currentTimeMillis();
@@ -1157,6 +1189,7 @@ public class Table implements ResultSet {
     }
 
     protected DataChunk persist (final Object o, final Session s, final LLT extllt) throws Exception {
+        final boolean ignoreNoLocal = false;
         final Class cc = o.getClass();
         boolean fpart = false;
 
@@ -1307,10 +1340,16 @@ public class Table implements ResultSet {
                         return nc;
 
                     } else {
+                        final FrameData bd = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId()+dc.getHeader().getRowID().getFramePointer());
+
+                        if (!bd.getFrame().isLocal()) {
+                            if (!ignoreNoLocal) {
+                                throw new CannotAccessToForeignRecord();
+                            }
+                        }
 
                         final DataChunk udc = dc.lock(s, llt);
                         final int len = dc.getBytesAmount();
-                        final FrameData bd = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId() + dc.getHeader().getRowID().getFramePointer());
                         final int newlen = bd.updateChunk(dc, o, s, llt);
                         final int diff = newlen - len - bd.getFrameFree();
 
@@ -1383,25 +1422,28 @@ public class Table implements ResultSet {
         }
 
         final LLT llt = extllt==null?LLT.getLLT():extllt;
-        final DataChunk dc = this.getChunkByEntity(o, s, llt);
-        if (dc == null) {
-            throw new CannotAccessToDeletedRecord();
-        }
-        if (dc.getHeader().getState() == Header.RECORD_DELETED_STATE) {
-            throw new CannotAccessToDeletedRecord();
-        }
-        final int len = dc.getBytesAmount();
-        final FrameData bd = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId()+dc.getHeader().getRowID().getFramePointer());
-
-        if (!bd.getFrame().isLocal()) {
-            if (!ignoreNoLocal) {
-                throw new CannotAccessToForeignRecord();
-            }
-        }
-
-        DataChunk udc = null;
-
         try {
+            final DataChunk dc = this.getChunkByEntity(o, s, llt);
+
+            if (dc == null) {
+                throw new CannotAccessToDeletedRecord();
+            }
+
+            if (dc.getHeader().getState() == Header.RECORD_DELETED_STATE) {
+                throw new CannotAccessToDeletedRecord();
+            }
+
+            final int len = dc.getBytesAmount();
+            final FrameData bd = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId()+dc.getHeader().getRowID().getFramePointer());
+
+            if (!bd.getFrame().isLocal()) {
+                if (!ignoreNoLocal) {
+                    throw new CannotAccessToForeignRecord();
+                }
+            }
+
+            DataChunk udc = null;
+
             if (!noTran) { //save undo information
                 udc = dc.lock(s, llt);
             }
@@ -1585,8 +1627,10 @@ public class Table implements ResultSet {
                             if (stopped.get()) {
                                 return true;
                             }
-                            for (Chunk c : b.getDataFrame().getFrameChunks(s)) {
-                                q.put(c);
+                            if (b.isValid()) {
+                                for (Chunk c : b.getDataFrame().getFrameChunks(s)) {
+                                    q.put(c);
+                                }
                             }
                         }
                     }
@@ -1717,6 +1761,7 @@ public class Table implements ResultSet {
         return null;
     }
 
+    @Deprecated
     protected ArrayList<FrameData> getStream (Map<Long, Long> retrieved, Session s) throws Exception {
         final ArrayList<FrameData> r = new ArrayList<>();
         if (this.isIndex()) { //index table
@@ -1729,8 +1774,10 @@ public class Table implements ResultSet {
                 if (b.getObjectId() == 0 && b.getFrameId() == 0) {
                     cnue = false;
                 } else {
-                    if (retrieved.get(b.getFrameId()) == null) {
-                        r.add(b);
+                    if (b.isValid()) {
+                        if (retrieved.get(b.getFrameId()) == null) {
+                            r.add(b);
+                        }
                     }
                 }
             }
@@ -1770,10 +1817,14 @@ public class Table implements ResultSet {
                         if (b.getObjectId() == 0 && b.getFrameId() == 0) {
                             cnue = false;
                         } else {
-                            for (Chunk dc : b.getDataFrame().getFrameChunks(s)) {
-                                if (Arrays.equals(id, ((DataChunk) dc).getSerializedId(s))) {
-                                    if (llt != null) { llt.add(((DataChunk) dc).getFrameData().getFrame()); }
-                                    return (DataChunk) dc;
+                            if (b.isValid()) {
+                                for (Chunk dc : b.getDataFrame().getFrameChunks(s)) {
+                                    if (Arrays.equals(id, ((DataChunk) dc).getSerializedId(s))) {
+                                        if (llt != null) {
+                                            llt.add(((DataChunk) dc).getFrameData().getFrame());
+                                        }
+                                        return (DataChunk) dc;
+                                    }
                                 }
                             }
                         }
@@ -1803,10 +1854,14 @@ public class Table implements ResultSet {
                             if (b.getObjectId() == 0 && b.getFrameId() == 0) {
                                 cnue = false;
                             } else {
-                                for (Chunk dc : b.getDataFrame().getFrameChunks(s)) {
-                                    if (Arrays.equals(id, ((DataChunk) dc).getSerializedId(s))) {
-                                        if (llt != null) { llt.add(((DataChunk) dc).getFrameData().getFrame()); }
-                                        return (DataChunk) dc;
+                                if (b.isValid()) {
+                                    for (Chunk dc : b.getDataFrame().getFrameChunks(s)) {
+                                        if (Arrays.equals(id, ((DataChunk) dc).getSerializedId(s))) {
+                                            if (llt != null) {
+                                                llt.add(((DataChunk) dc).getFrameData().getFrame());
+                                            }
+                                            return (DataChunk) dc;
+                                        }
                                     }
                                 }
                             }
@@ -1857,9 +1912,11 @@ public class Table implements ResultSet {
                     if (b.getObjectId() == 0 && b.getFrameId() == 0) {
                         cnue = false;
                     } else {
-                        for (Chunk c : b.getDataFrame().getFrameChunks(s)) {
-                            if (Arrays.equals(iid, ((DataChunk) c).getSerializedId(s))) {
-                                return (DataChunk) c;
+                        if (b.isValid()) {
+                            for (Chunk c : b.getDataFrame().getFrameChunks(s)) {
+                                if (Arrays.equals(iid, ((DataChunk) c).getSerializedId(s))) {
+                                    return (DataChunk) c;
+                                }
                             }
                         }
                     }

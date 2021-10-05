@@ -90,6 +90,14 @@ public class SQLEvent extends TransportEventImpl {
                     }
                     final FrameApi bd1 = c.getLbi() instanceof SQLIndex ? b : Instance.getInstance().getFrameByAllocId(j.getLeftAllocId());
                     final FrameApi bd2 = j.getRightAllocId() == 0 ? b_ : Instance.getInstance().getFrameByAllocId(j.getRightAllocId());
+
+                    // todo may caused by ghost (non-freed) allocIds resulting on some nodes after distributed rollback
+                    // todo this problem is known and should be fixed in future
+                    if (bd1 == null) {
+                        logger.error("SQLEvent unable to retrieve frame by allocId: " + j.getLeftAllocId());
+                        return new EventResult(TransportCallback.FAILURE, null, this.cursorId, res, null, null);
+                    }
+
                     flist.add(c.execute(c.getPbi(), bd1, bd2, j));
                     res.add(j);
                 }

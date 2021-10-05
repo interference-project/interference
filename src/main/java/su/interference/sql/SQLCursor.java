@@ -55,7 +55,6 @@ public class SQLCursor implements FrameIterator {
     private static ExecutorService rspool = Executors.newCachedThreadPool();
     private final LinkedBlockingQueue<FrameApiJoin> ltasks;
     private final LinkedBlockingQueue<FrameApiJoin> rtasks;
-    private final LinkedBlockingQueue<FrameApiJoin> rtasks_;
     boolean ldone = false;
     boolean rdone = false;
     private FrameData bdnext;
@@ -133,7 +132,6 @@ public class SQLCursor implements FrameIterator {
 
         ltasks = new LinkedBlockingQueue<>();
         rtasks = new LinkedBlockingQueue<>();
-        rtasks_ = new LinkedBlockingQueue<>();
 
         //rebuild column set for sqlcursor iterator
         final SQLCursor cursor_ = lbi.getType() == FrameIterator.TYPE_CURSOR ? (SQLCursor) lbi : rbi != null && rbi.getType() == FrameIterator.TYPE_CURSOR ? (SQLCursor) rbi : null;
@@ -470,7 +468,6 @@ public class SQLCursor implements FrameIterator {
 
     private synchronized FrameData nextFrame2() throws InternalException {
         boolean done = ldone && rdone;
-        boolean prcrj = true;
         FrameData ret = current.getFrame(ldone && rdone);
 
         if (ret != null) {
@@ -483,44 +480,35 @@ public class SQLCursor implements FrameIterator {
                 final ArrayList<FrameApiJoin> flist = new ArrayList<>();
                 final ArrayList<Future<FrameApiJoin>> flist2 = new ArrayList<>();
 
-                for (int i = 0; i < BATCH_SIZE; i++) {
-                    if (!ldone) {
-                        final FrameApiJoin j = ltasks.take();
-                        if (j.isTerminate()) {
-                            ldone = true;
-                        } else {
-                            exec2.submit(j);
-                            flist.add(j);
+                if (!ldone) {
+                    for (int i = 0; i < BATCH_SIZE; i++) {
+                        if (!ldone) {
+                            final FrameApiJoin j = ltasks.take();
+                            if (j.isTerminate()) {
+                                ldone = true;
+                            } else {
+                                exec2.submit(j);
+                                flist.add(j);
+                            }
                         }
                     }
                 }
 
-                for (int i = 0; i < BATCH_SIZE; i++) {
-                    if (!rdone) {
-                        final FrameApiJoin j = rtasks.take();
-                        if (j.isTerminate()) {
-                            rdone = true;
-                        } else {
-                            flist2.add(exec2.submit(j));
+                if (!rdone) {
+                    for (int i = 0; i < BATCH_SIZE; i++) {
+                        if (!rdone) {
+                            final FrameApiJoin j = rtasks.take();
+                            if (j.isTerminate()) {
+                                rdone = true;
+                            } else {
+                                flist2.add(exec2.submit(j));
+                            }
                         }
                     }
                 }
-
-//                for (int i=0; i < BATCH_SIZE; i++) {
-                if (!prcrj) {
-                    final FrameApiJoin j = rtasks_.take();
-                    if (j.isTerminate()) {
-                        prcrj = true;
-                    } else {
-                        exec2.submit(j);
-                        flist.add(j);
-                    }
-                }
-//                }
 
                 for (FrameApiJoin j : flist) {
                     try {
-                        //final FrameApiJoin j = f.get();
                         final BlockingQueue<Object> q = j.getResult();
                         boolean cnue = true;
                         while (cnue) {
@@ -545,8 +533,18 @@ public class SQLCursor implements FrameIterator {
                         final FrameApiJoin j = f.get();
                         if (j.isFailed()) {
                             FrameApiJoin j_ = new FrameApiJoin(Config.getConfig().LOCAL_NODE_ID, this, pbi, j.getBd1(), j.getBd2());
-                            rtasks_.put(j_);
-                            prcrj = false;
+                            Future<FrameApiJoin> f_ = exec2.submit(j_);
+                            final FrameApiJoin j__ = f_.get();
+                            final BlockingQueue<Object> q = j__.getResult();
+                            boolean cnue = true;
+                            while (cnue) {
+                                final Object o = q.take();
+                                if (o instanceof ResultSetTerm) {
+                                    cnue = false;
+                                } else {
+                                    target.persist(o, s);
+                                }
+                            }
                         } else {
                             final BlockingQueue<Object> q = j.getResult();
                             boolean cnue = true;
@@ -568,10 +566,7 @@ public class SQLCursor implements FrameIterator {
                     }
                 }
 
-                done = ldone && rdone && prcrj;
-                if (rdone && !prcrj) {
-                    rtasks_.put(new FrameApiJoin());
-                }
+                done = ldone && rdone;
             }
 
             ret = current.getFrame(ldone && rdone);
