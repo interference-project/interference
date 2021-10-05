@@ -6,7 +6,7 @@
 current revision: release 2021.1
 for detailed information see doc/InterferenceManual.pdf
 
-contacts: info@inteference.su
+contacts: info@interference.su
 ##### https://github.com/interference-project/interference
 ##### http://io.digital
 
