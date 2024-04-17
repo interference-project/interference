@@ -8,7 +8,7 @@ for detailed information see doc/InterferenceManual.pdf
 
 contacts: info@interference.su
 ##### https://github.com/interference-project/interference
-##### http://io.digital
+##### http://ioc.digital
 
 
 ## Concepts & features
