@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -101,7 +101,7 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
         final Class r = target instanceof ResultSetImpl ? ((ResultSetImpl)target).getTableClass() : target instanceof StreamQueue ? ((StreamQueue) target).getRstable().getSc() : null;
         final boolean rs_ = !Arrays.asList(r.getInterfaces()).contains(EntityContainer.class);
         final Class c_ = rs_ ? r : r.getSuperclass();
-        final Field[] fs = c_.getDeclaredFields();
+        final FieldContainer[] fs = getDeclaredFields(c_);
         final int t1 = bd1.getObjectId();
         final int t2 = bd2==null?0:bd2.getObjectId();
         final Class c1 = Instance.getInstance().getTableById(t1).getTableClass();
@@ -340,7 +340,7 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
         return q;
     }
 
-    private void processRecords(Class r, Class c1, Class c2, int t1, int t2, Object o1, Object o2, boolean isrs, Field[] fs) throws Exception {
+    private void processRecords(Class r, Class c1, Class c2, int t1, int t2, Object o1, Object o2, boolean isrs, FieldContainer[] fs) throws Exception {
         if (hmap.skipCheckNC()) {
             if (process) {
                 final Object o = processleft ? o1 : o2;
@@ -423,6 +423,22 @@ public class FrameJoinTask implements Callable<BlockingQueue<Object>> {
     private Comparable getHashKeyValue(Class c, Object o, SQLColumn sqlc, Session s) throws InvocationTargetException, IllegalAccessException {
         final Method y = sqlc.getGetter();
         return sqlc.isCursor() ? (Comparable) y.invoke(o, null) : (Comparable) y.invoke(o, null);
+    }
+
+    private FieldContainer[] getDeclaredFields(Class c) throws NoSuchMethodException{
+        final Field[] fs = c.getDeclaredFields();
+        final boolean rs = !Arrays.asList(c.getInterfaces()).contains(EntityContainer.class);
+        final List<FieldContainer> ret = new ArrayList<>();
+
+        for (Field f : fs) {
+            if (!(f.getType() == DataChunk.class || f.getType() == RowId.class || f.getName().equals("serialVersionUID"))) {
+                String mname = "get" + f.getName().substring(0, 1).toUpperCase() + f.getName().substring(1, f.getName().length());
+                Method m = rs ? c.getMethod(mname, null) : c.getMethod(mname, Session.class);
+                ret.add(new FieldContainer(f, m));
+            }
+        }
+
+        return ret.toArray(new FieldContainer[]{});
     }
 
     public LinkedBlockingQueue<Object> getQ() {

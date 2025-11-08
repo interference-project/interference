@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -87,7 +87,7 @@ public class Session implements OnDelete {
     private String ipAddress;
 
     @Transient
-    private Transaction transaction;
+    private volatile Transaction transaction;
 
     //store params from webform for auth session
     @Transient
@@ -132,50 +132,40 @@ public class Session implements OnDelete {
     }
 
     public Transaction getTransaction() {
-        try {
-            if (Instance.getInstance().getSystemState()==Instance.SYSTEM_STATE_UP) {
-                return transaction;
-            }
-        } catch (Exception e) {
-            e.printStackTrace(); 
+        if (Instance.getInstance().getSystemState() == Instance.SYSTEM_STATE_UP) {
+            return transaction;
         }
         return null;
     }
 
-    protected Transaction createTransaction(long tranId, LLT llt) {
-        try {
-            if (Instance.getInstance().getSystemState()==Instance.SYSTEM_STATE_UP) {
-                if (transaction==null) {
-                    transaction = new Transaction();
-                    transaction.setSid(this.getSid());
-                    transaction.setTransId(tranId);
-                    this.persist(transaction, llt);
-                }
-                return transaction;
+    protected Transaction createTransaction(long tranId, LLT llt) throws Exception {
+        if (Instance.getInstance().getSystemState() == Instance.SYSTEM_STATE_UP) {
+            if (transaction == null) {
+                transaction = new Transaction();
+                transaction.setSid(this.getSid());
+                transaction.setTransId(tranId);
+                this.persist(transaction, llt);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+            return transaction;
         }
         return null;
     }
 
     public void startStatement() throws Exception {
-        if (this.getTransaction()==null) { this.createTransaction(0, null); }
+        if (this.getTransaction() == null) { this.createTransaction(0, null); }
         this.getTransaction().startStatement(this);
     }
 
     protected void startStatement(long tranId) throws Exception {
-        if (this.getTransaction()==null) { this.createTransaction(tranId, null); }
+        if (this.getTransaction() == null) { this.createTransaction(tranId, null); }
         this.getTransaction().startStatement(this);
     }
 
-    private void startStatement(LLT llt) throws Exception {
-        //if (this.getTransaction()==null) { this.createTransaction(0, llt); }
-        //this.getTransaction().startStatement(this, llt);
-    }
-
-    protected void setTransaction(Transaction transaction) {
-        this.transaction = transaction;
+    public Transaction startTransaction() throws Exception {
+        if (this.transaction == null || !this.transaction.started || this.transaction.getMTran() == 0) {
+            this.startStatement();
+        }
+        return this.transaction;
     }
 
     public Table registerTable (String n, Session s) throws Exception {
@@ -529,6 +519,17 @@ public class Session implements OnDelete {
         this.sessionChannel = channel;
     }
 
+    public Session (int nodeId, String sessionId) {
+        if (sessionId == null) {
+            throw new RuntimeException("Session cannot instantiate with empty sessionId");
+        }
+        this.sessionId = sessionId;
+        this.userId = 0;
+        this.dateStart = new Date();
+        this.nodeId = nodeId;
+        this.sessionChannel = null;
+    }
+
     public Session (String ipAddress) {
         this.sessionId = UUID.randomUUID().toString();
         this.userId = 0;
@@ -561,6 +562,24 @@ public class Session implements OnDelete {
             }
         }
         return s;
+    }
+
+    public static synchronized Session getSession (int nodeId, String sessionId) {
+        try {
+            final Session s = new Session(nodeId, sessionId);
+            if (Instance.getInstance().getSystemState() == Instance.SYSTEM_STATE_UP) {
+                try {
+                    s.persist(s); //insert
+                    contextSession.set(s);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            return s;
+        } catch (Exception e) {
+            logger.error("Exception occcured during getSession: ", e);
+        }
+        return null;
     }
 
     public static synchronized Session getSession (TransportChannel channel) throws Exception {

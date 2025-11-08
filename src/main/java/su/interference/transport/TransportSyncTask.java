@@ -91,6 +91,8 @@ public class TransportSyncTask implements Runnable {
                             final boolean sent = event.getLatch().await(Config.getConfig().REMOTE_SYNC_TIMEOUT, TimeUnit.MILLISECONDS);
                             if (!event.isFail() && sent) {
                                 logger.info(psb.size() + "(" + psb_.size() + ") persisted sync frame(s) were sent and synced (node id = " + channel.getChannelId() + ")");
+                            } else {
+                                done_ = false;
                             }
                         }
                     } catch (Exception e) {
@@ -114,33 +116,19 @@ public class TransportSyncTask implements Runnable {
                             TransportContext.getInstance().send(event);
                             final boolean sent = event.getLatch().await(Config.getConfig().REMOTE_SYNC_TIMEOUT, TimeUnit.MILLISECONDS);
                             if (event.isFail() || !sent) {
+                                processSyncFailure(sb, channel);
                                 if (event.getProcessException() != null) {
                                     logger.error("exception occured during remote SFE process: ", event.getProcessException());
                                 }
+                            } else {
+                                logger.info(sb.length + " frame(s) were sent and synced (node id = " + channel.getChannelId() + ")");
                             }
-                            logger.info(sb.length + " frame(s) were sent and synced (node id = " + channel.getChannelId() + ")");
                         }
                     } catch (Exception e) {
-                        final String syncUUID = UUID.randomUUID().toString();
-                        createInitTranCommands(sb, channel.getChannelId(), s);
-                        for (SyncFrame b : sb) {
-                            FrameSync bs = new FrameSync(b.getAllocId(), channel.getChannelId(), b.getFrameId(), syncUUID);
-                            s.persist(bs);
-                            logger.debug("persist framesync " + bs);
-                            Metrics.get("syncQueue").put(1);
-                        }
-                        logger.error(sb.length+" frame(s) were not sync due to channel failure (channel id = " + channel.getChannelId() + ")");
+                        processSyncFailure(sb, channel);
                     }
                 } else {
-                    logger.info("node "+channel.getChannelId()+" unavailable");
-                    final String syncUUID = UUID.randomUUID().toString();
-                    createInitTranCommands(sb, channel.getChannelId(), s);
-                    for (SyncFrame b : sb) {
-                        FrameSync bs = new FrameSync(b.getAllocId(), channel.getChannelId(), b.getFrameId(), syncUUID);
-                        s.persist(bs);
-                        logger.debug("persist framesync: " + bs);
-                    }
-                    logger.info(sb.length+" frame(s) were not sync due to node unavailable (channel id = " + channel.getChannelId() + ")");
+                    processSyncFailure(sb, channel);
                 }
             }
         } catch (Exception e) {
@@ -187,6 +175,18 @@ public class TransportSyncTask implements Runnable {
             return false;
         }
         return true;
+    }
+
+    private void processSyncFailure(SyncFrame[] sb, TransportChannel channel) throws Exception {
+        final String syncUUID = UUID.randomUUID().toString();
+        createInitTranCommands(sb, channel.getChannelId(), s);
+        for (SyncFrame b : sb) {
+            FrameSync bs = new FrameSync(b.getAllocId(), channel.getChannelId(), b.getFrameId(), syncUUID);
+            s.persist(bs);
+            logger.debug("persist framesync " + bs);
+            Metrics.get("syncQueue").put(1);
+        }
+        logger.error(sb.length+" frame(s) were not sync due to channel failure or node unavailable (channel id = " + channel.getChannelId() + ")");
     }
 
     private void createInitTranCommands(SyncFrame[] sb, int channelId, Session s) throws Exception {

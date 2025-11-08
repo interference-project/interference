@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -819,27 +819,28 @@ public class DataChunk implements Chunk {
         this.terminate = terminate;
     }
 
-    public void setIc(DataChunk ic) {
+    public synchronized void setIc(DataChunk ic) {
         final Table t_ = ic.t == null ? Instance.getInstance().getTableByName(ic.getEntity().getClass().getName()) : ic.t;
         this.ics.put(t_.getObjectId(), ic);
     }
 
-    public void clearIcs() {
+    public synchronized void clearIcs() {
         this.ics.clear();
     }
 
-    protected void cleanUpIcs() {
+    protected synchronized void cleanUpIcs() {
         for (Map.Entry<Integer, DataChunk> entry : this.ics.entrySet()) {
             final IndexChunk ic = (IndexChunk) entry.getValue().getEntity();
             ic.setDataChunk(null);
         }
     }
 
-    public DataChunk getIc(IndexDescript ids, Session s) throws Exception {
+    public synchronized DataChunk getIc(IndexDescript ids, Session s) throws Exception {
         final DataChunk ic = this.ics.get(ids.getIndex().getObjectId());
         if (ic == null) {
             final ValueSet key = this.getValueByColumnName(ids.getColumns(), s);
-            final DataChunk ic_ = ids.getIndex().getObjectByKey(key, s);
+            final DataChunk ic_ = ids.isUnique() ? ids.getIndex().getObjectByKey(key, s) :
+                    ids.getIndex().getObjectByKey(key, this.getHeader().getFPtr(), this.getHeader().getPtr(), s);
             if (ic_ != null) {
                 this.ics.put(ids.getIndex().getObjectId(), ic_);
                 return ic_;
@@ -850,7 +851,7 @@ public class DataChunk implements Chunk {
         return ic;
     }
 
-    public DataChunk getIcForUpdate(IndexDescript ids, Session s, LLT llt) throws Exception {
+    public synchronized DataChunk getIcForUpdate(IndexDescript ids, Session s, LLT llt) throws Exception {
         final DataChunk ic = getIc(ids, s);
         llt.add(ic.getFrameData().getFrame());
         this.ics.remove(ids.getIndex().getObjectId());

@@ -1,14 +1,20 @@
 # interference open cluster
 
 ##### pure-java opensource distributed database platform
-(c) 2010 - 2021 head systems, ltd
+(c) 2010 - 2025 head systems, ltd
 
-current revision: release 2021.1
+current revision: release 2025.1
 for detailed information see doc/InterferenceManual.pdf
 
-contacts: info@interference.su
+contacts: ioc@ioc.digital
 ##### https://github.com/interference-project/interference
-##### http://io.digital
+##### http://ioc.digital
+
+#####Donate: 
+
+##### http://ioc.digital/donate.html
+
+Thanks for all who cares. 
 
 
 ## Concepts & features

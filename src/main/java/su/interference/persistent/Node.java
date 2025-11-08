@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -29,7 +29,6 @@ import su.interference.exception.InternalException;
 import su.interference.mgmt.MgmtColumn;
 import su.interference.mgmt.MgmtAction;
 import su.interference.transport.MgmtEvent;
-import su.interference.transport.SQLEvent;
 import su.interference.transport.TransportContext;
 
 import javax.persistence.*;
@@ -161,12 +160,12 @@ public class Node implements Serializable {
 
     @MgmtAction(name="Startup", enable="enableStartup")
     public void startup(Session s) {
-        TransportContext.getInstance().send(new MgmtEvent(this.nodeId, MgmtEvent.MGMT_STARTUP));
+        TransportContext.getInstance().send(new MgmtEvent(this.nodeId, MgmtEvent.MGMT_STARTUP, s.getSessionId()));
     }
 
     @MgmtAction(name="Shutdown", enable="enableShutdown")
     public void shutdown(Session s) {
-        TransportContext.getInstance().send(new MgmtEvent(this.nodeId, MgmtEvent.MGMT_SHUTDOWN));
+        TransportContext.getInstance().send(new MgmtEvent(this.nodeId, MgmtEvent.MGMT_SHUTDOWN, s.getSessionId()));
     }
 
     public void updateNodeState(int newState) {

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -370,8 +370,8 @@ public class Table implements ResultSet {
 
         if (this.sc!=null) {
             final SystemEntity ca = (SystemEntity)this.sc.getAnnotation(SystemEntity.class);
-            if (ca==null) { //transactional
-                if (s.getTransaction()==null) { s.createTransaction(0,null); }
+            if (ca == null) { //transactional
+                s.startTransaction();
                 final EntityContainer to = (EntityContainer)this.sc.getConstructor(cs).newInstance(params);
                 to.setTran(s.getTransaction());
                 ident(to, s, null);
@@ -1135,6 +1135,7 @@ public class Table implements ResultSet {
         Metrics.get("getAvailableFrame").start();
         final long st = System.currentTimeMillis();
         final int a = avframeStart.get()%this.lbs.length;
+        int ctr = 0;
 
         while (true) {
             final long tp = System.currentTimeMillis() - st;
@@ -1147,7 +1148,18 @@ public class Table implements ResultSet {
                     Metrics.get("getAvailableFrame").stop();
                     return bd;
                 }
+                ctr++;
             }
+            if (ctr > Config.getConfig().CHECK_AVAIL_FRAME_ATTEMPTS) {
+                for (int i = 0; i < this.lbs.length; i++) {
+                    logger.warn("lbs: "+lbs[i].getBd().getFrameId()+":"+lbs[i].getBusy().get());
+                }
+                logger.warn("avframestart: "+avframeStart.get());
+                logger.warn("total time ms: "+tp);
+                logger.warn("number of attempts exceeded for getavailableframe method: " + Config.getConfig().CHECK_AVAIL_FRAME_ATTEMPTS);
+                break;
+            }
+/*
             if (tp > Config.getConfig().CHECK_AVAIL_FRAME_TIMEOUT) {
                 for (int i = 0; i < this.lbs.length; i++) {
                     logger.warn("lbs: "+lbs[i].getBd().getFrameId()+":"+lbs[i].getBusy().get());
@@ -1156,6 +1168,7 @@ public class Table implements ResultSet {
                 logger.warn("timeout occured during getavailableframe method: " + Config.getConfig().CHECK_AVAIL_FRAME_TIMEOUT);
                 break;
             }
+*/
         }
         Metrics.get("getAvailableFrame").stop();
         return null;
@@ -1281,12 +1294,7 @@ public class Table implements ResultSet {
             }
         } else {
             synchronized (this) {
-                if (s.getTransaction() == null || !s.getTransaction().started || s.getTransaction().getMTran() == 0) {
-                    s.startStatement();
-                }
-                if (s.getTransaction() == null || !s.getTransaction().started || s.getTransaction().getMTran() == 0) {
-                    throw new InternalException();
-                }
+                s.startTransaction();
                 final EntityContainer to = (EntityContainer) o;
                 if (to.getTran() != null && to.getTran().getCid() == 0) {
                     if (to.getTran().getTransId() != s.getTransaction().getTransId()) {
@@ -1406,22 +1414,17 @@ public class Table implements ResultSet {
     }
 
     //event process action - ignore nolocal frame constraint
-    public synchronized void delete (final Object o, final Session s) throws Exception {
+    public void delete (final Object o, final Session s) throws Exception {
         this.delete(o, s, null, false, true);
     }
 
     protected void delete (final Object o, final Session s, LLT extllt, boolean ignoreTransaction, boolean ignoreNoLocal) throws Exception {
         final boolean noTran = ignoreTransaction ? true : isNoTran();
+        final LLT llt = extllt==null?LLT.getLLT():extllt;
         if (!noTran) {
-            if (s.getTransaction() == null || !s.getTransaction().started || s.getTransaction().getMTran() == 0) {
-                s.startStatement();
-            }
-            if (s.getTransaction() == null || !s.getTransaction().started || s.getTransaction().getMTran() == 0) {
-                throw new InternalException();
-            }
+            s.startTransaction();
         }
 
-        final LLT llt = extllt==null?LLT.getLLT():extllt;
         try {
             final DataChunk dc = this.getChunkByEntity(o, s, llt);
 
@@ -1442,11 +1445,7 @@ public class Table implements ResultSet {
                 }
             }
 
-            DataChunk udc = null;
-
-            if (!noTran) { //save undo information
-                udc = dc.lock(s, llt);
-            }
+            final DataChunk udc = noTran ? null : dc.lock(s, llt);
 
             if (bd == null) {
                 logger.error("cannot found frame " + dc.getHeader().getRowID().getFileId() + ":" + dc.getHeader().getRowID().getFramePointer() + " during delete " + o.getClass().getSimpleName() + Thread.currentThread().getName());
@@ -1801,11 +1800,11 @@ public class Table implements ResultSet {
             final IndexField ix = this.getIndexFieldByColumn(idf.getName());
             if (mf != null) {
                 final DataChunk dc = (DataChunk) mf.getMap().get(idmethod.invoke(o, null));
-                if (llt != null) { llt.add(dc.getFrameData().getFrame()); }
+                if (llt != null && dc != null) { llt.add(dc.getFrameData().getFrame()); }
                 return dc;
             } else if (ix != null) {
                 final DataChunk dc = (DataChunk) ix.getIndex().getObjectByKey(new IndexElementKey(new Object[]{idMethod.invoke(o, null)}));
-                if (llt != null) { llt.add(dc.getFrameData().getFrame()); }
+                if (llt != null && dc != null) { llt.add(dc.getFrameData().getFrame()); }
                 return dc;
             } else {
                 final byte[] id = new DataChunkId(o, this, s).getIdBytes();
@@ -2320,6 +2319,18 @@ public class Table implements ResultSet {
         return r;
     }
 
+    public synchronized DataChunk getObjectByKey (ValueSet key, long frameptr, int ptr, Session s) throws Exception {
+        final long start = this.fileStart+this.frameStart;
+        final List<DataChunk> r = getLocalObjectsByKey(start, key, frameptr, ptr, s);
+        for (Map.Entry<Integer, Long> entry : ixstartfs.entrySet()) {
+            r.addAll(getLocalObjectsByKey(entry.getValue(), key, frameptr, ptr, s));
+        }
+        if (r.size() > 1) {
+            throw new RuntimeException("Non-unique index returns more than one object for explicit frame/row pointer");
+        }
+        return r.size() == 0 ? null : r.get(0);
+    }
+
     //for unique indexes
     private synchronized DataChunk getLocalObjectByKey (long start, ValueSet key, Session s) throws Exception {
         boolean cnue = true;
@@ -2353,6 +2364,35 @@ public class Table implements ResultSet {
             for (IndexFrame target : targets) {
                 if (target.getType()==1) { //leaf
                     r.addAll(target.getObjectsByKey(key, s));
+                    cnue = false;
+                } else {
+                    ArrayList<Long> cptr = target.getChildElementsPtr(key);
+                    if (cptr.size()>0) {
+                        for (Long i : cptr) {
+                            ntargets.add(Instance.getInstance().getFrameById(i).getIndexFrame());
+                        }
+                    }
+                    if (target.getLcId()>0) {
+                        ntargets.add(Instance.getInstance().getFrameById(target.getLcId()).getIndexFrame()); //get by last child
+                    }
+                }
+            }
+            targets = ntargets;
+        }
+        return r;
+    }
+
+    //for non-unique indexes - get unique object by ptr
+    private synchronized List<DataChunk> getLocalObjectsByKey (long start, ValueSet key, long frameptr, int ptr, Session s) throws Exception {
+        final List<DataChunk> r = new ArrayList<>();
+        boolean cnue = true;
+        List<IndexFrame> targets = new ArrayList<>();
+        targets.add(Instance.getInstance().getFrameById(start).getIndexFrame());
+        while (cnue) {
+            List<IndexFrame> ntargets = new ArrayList<>();
+            for (IndexFrame target : targets) {
+                if (target.getType()==1) { //leaf
+                    r.addAll(target.getObjectsByKey(key, frameptr, ptr, s));
                     cnue = false;
                 } else {
                     ArrayList<Long> cptr = target.getChildElementsPtr(key);

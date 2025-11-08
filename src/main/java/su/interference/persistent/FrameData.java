@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -168,6 +168,10 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     }
 
     public synchronized IndexFrame getIndexFrame() throws Exception {
+        return getIndexFrame(true);
+    }
+
+    public synchronized IndexFrame getIndexFrame(boolean dcinit) throws Exception {
         if (frame == null) {
             this.priority.set(SystemCleanUp.INDEX_RETRIEVED_PRIORITY);
             List<FrameData> uframes = new ArrayList<>();
@@ -178,7 +182,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
                     }
                 }
             }
-            frame = new IndexFrame(this.file, this.ptr, 0, this, dataObject, entityClass, uframes);
+            frame = new IndexFrame(this.file, this.ptr, 0, this, dataObject, entityClass, uframes, dcinit);
         }
         return (IndexFrame) frame;
     }
@@ -533,8 +537,16 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
         }
     }
 
-    public synchronized void rollbackTransaction(Transaction tran, ArrayList<FrameData> ubs, Session s) throws Exception {
-        this.getFrame().rollbackTransaction(tran, ubs, s);
+    public synchronized void rollbackTransaction(Transaction tran, List<FrameData> ubs, Session s) throws Exception {
+        if (frame == null) {
+            if (isIndex()) {
+                frame = getIndexFrame(false);
+            } else {
+                frame = getDataFrame();
+            }
+            frame.setFrameData(this);
+        }
+        this.frame.rollbackTransaction(tran, ubs, s);
     }
 
     public int getOwnerId() {

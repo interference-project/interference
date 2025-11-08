@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -24,23 +24,8 @@
 
 package su.interference.serialize;
 
-import su.interference.core.DataChunk;
-import su.interference.core.Instance;
-import su.interference.core.RowHeader;
-import su.interference.core.Types;
-import su.interference.exception.InternalException;
-import su.interference.persistent.Table;
-
-import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Field;
-import java.net.MalformedURLException;
 import java.nio.ByteBuffer;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.Map;
 
 /**
  * @author Yuriy Glotanov
@@ -139,4 +124,20 @@ public class ByteString {
         return res;
     }
 
+    public void append(Map<byte[], byte[]> cmap) {
+        int amt = 0;
+        for (Map.Entry<byte[], byte[]> entry : cmap.entrySet()) {
+            amt = amt + entry.getKey().length;
+            amt = amt + entry.getValue().length;
+        }
+        final byte[] res = new byte[b.length + amt];
+        System.arraycopy(b, 0, res, 0, b.length);
+        int pos = b.length;
+        for (Map.Entry<byte[], byte[]> entry : cmap.entrySet()) {
+            System.arraycopy(entry.getKey(), 0, res, pos, entry.getKey().length);
+            System.arraycopy(entry.getValue(), 0, res, pos + entry.getKey().length, entry.getValue().length);
+            pos = pos + entry.getKey().length + entry.getValue().length;
+        }
+        this.b = res;
+    }
 }
