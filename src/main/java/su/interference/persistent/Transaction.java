@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -147,7 +147,7 @@ public class Transaction implements Serializable {
 
         //get LBS frames
 //        List<Object> bds = ixl.getObjectsByKey(this.objectId);
-        ArrayList<WaitFrame> lbs = new ArrayList<WaitFrame>();
+        ArrayList<WaitFrame> lbs = new ArrayList<>();
 
         for (int i=0; i<Config.getConfig().FILES_AMOUNT; i++) {
             lbs.add(new WaitFrame());
@@ -171,34 +171,75 @@ public class Transaction implements Serializable {
         }
     }
 
-    public WaitFrame getAvailableFrame(final FilePartitioned o, final boolean fpart) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException {
+    public WaitFrame getAvailableFrame(final FilePartitioned o, final boolean fpart) throws InternalException {
         Metrics.get("getAvailableFrame").start();
         final long st = System.currentTimeMillis();
-        final long timeout = 1000;
-        final int start = avframeStart.get();
-        final AtomicInteger i = new AtomicInteger(start);
+        final int a = avframeStart.get();
+        int ctr = 0;
+
         while (true) {
-//            for (int i=0; i<this.lbs.length; i++) {
-            final WaitFrame wb = this.lbs[i.get()];
-            final WaitFrame bd = fpart?wb.acquire(getTargetFileId(o.getFile())):wb.acquire();
-            if (bd != null) {
-                if (avframeStart.get()==this.lbs.length-1) { avframeStart.set(0); }
-                else { avframeStart.getAndIncrement(); }
-                Metrics.get("getAvailableFrame").stop();
-                return bd;
+            final long tp = System.currentTimeMillis() - st;
+            for (int i = 0; i < this.lbs.length; i++) {
+                final int i_ = (a + i) % this.lbs.length;
+                final WaitFrame wb = this.lbs[i_];
+                final WaitFrame bd = fpart ? wb.acquire(getTargetFileId(((FilePartitioned) o).getFile())) : wb.acquire();
+                if (bd != null) {
+                    avframeStart.getAndIncrement();
+                    Metrics.get("getAvailableFrame").stop();
+                    return bd;
+                }
+                ctr++;
             }
-//            }
-            if (System.currentTimeMillis() - st > timeout) {
-                logger.error("get available frame method failed by timeout="+timeout);
+            if (ctr > Config.getConfig().CHECK_AVAIL_FRAME_ATTEMPTS) {
+                //file-depends acquire fails - try forced acquire
+                for (int i = 0; i < this.lbs.length; i++) {
+                    final int i_ = (a + i) % this.lbs.length;
+                    final WaitFrame wb = this.lbs[i_];
+                    final WaitFrame bd = wb.acquire();
+                    if (bd != null) {
+                        avframeStart.getAndIncrement();
+                        Metrics.get("getAvailableFrame").stop();
+                        return bd;
+                    }
+                }
+
+                //critical stop
+                for (int i = 0; i < this.lbs.length; i++) {
+                    logger.warn("lbs: "+lbs[i].getBd().getFrameId()+":"+lbs[i].getBusy().get());
+                }
+                logger.warn("avframestart: "+avframeStart.get());
+                logger.warn("number of attempts exceeded for getavailableframe method: " + Config.getConfig().CHECK_AVAIL_FRAME_ATTEMPTS);
                 break;
             }
-            if (i.get()==this.lbs.length-1) { i.set(0); } else { i.incrementAndGet(); }
+/*
+            if (tp > Config.getConfig().CHECK_AVAIL_FRAME_TIMEOUT) {
+                //file-depends acquire fails - try forced acquire
+                for (int i = 0; i < this.lbs.length; i++) {
+                    final int i_ = (a + i) % this.lbs.length;
+                    final WaitFrame wb = this.lbs[i_];
+                    final WaitFrame bd = wb.acquire();
+                    if (bd != null) {
+                        avframeStart.getAndIncrement();
+                        Metrics.get("getAvailableFrame").stop();
+                        return bd;
+                    }
+                }
+
+                //critical stop
+                for (int i = 0; i < this.lbs.length; i++) {
+                    logger.warn("lbs: "+lbs[i].getBd().getFrameId()+":"+lbs[i].getBusy().get());
+                }
+                logger.warn("avframestart: "+avframeStart.get());
+                logger.warn("timeout occured during getavailableframe method: " + Config.getConfig().CHECK_AVAIL_FRAME_TIMEOUT);
+                break;
+            }
+*/
         }
         Metrics.get("getAvailableFrame").stop();
         return null;
     }
 
-    private int getTargetFileId(final int fileId) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException {
+    private int getTargetFileId(final int fileId) throws InternalException {
         for (DataFile f : Storage.getStorage().getUndoFiles()) {
             if (f.order(fileId)) {
                 return f.getFileId();
@@ -292,8 +333,10 @@ public class Transaction implements Serializable {
 
     @SuppressWarnings("unchecked")
     public synchronized void rollback (Session s, boolean remote) {
-        final ArrayList<FrameData> ubd1 = new ArrayList<>();
-        final ArrayList<FrameData> ubd2 = new ArrayList<>();
+        //final ArrayList<FrameData> ubd1 = new ArrayList<>();
+        //final ArrayList<FrameData> ubd2 = new ArrayList<>();
+        final Map<Long, List<FrameData>> ubd1 = new HashMap<>();
+        final Map<Long, List<FrameData>> ubd2 = new HashMap<>();
         final Map<Integer, List<Long>> fmap = new HashMap<>();
 
         if (remote) {
@@ -322,6 +365,40 @@ public class Transaction implements Serializable {
         try {
             Collections.sort(tframes);
 
+            logger.info("transaction frames sorted");
+
+            for (TransFrame tb : tframes) {
+                final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
+                if (cb.isIndex()) {
+                    if (ubd2.get(tb.getCframeId()) == null) {
+                        List<FrameData> fdl = new ArrayList<>();
+                        if (tb.getUframeId() > 0) {
+                            fdl.add(Instance.getInstance().getFrameById(tb.getUframeId()));
+                        }
+                        ubd2.put(tb.getCframeId(), fdl);
+                    } else {
+                        if (tb.getUframeId() > 0) {
+                            ubd2.get(tb.getCframeId()).add(Instance.getInstance().getFrameById(tb.getUframeId()));
+                        }
+                    }
+                } else {
+                    if (ubd1.get(tb.getCframeId()) == null) {
+                        List<FrameData> fdl = new ArrayList<>();
+                        if (tb.getUframeId() > 0) {
+                            fdl.add(Instance.getInstance().getFrameById(tb.getUframeId()));
+                        }
+                        ubd1.put(tb.getCframeId(), fdl);
+                    } else {
+                        if (tb.getUframeId() > 0) {
+                            ubd1.get(tb.getCframeId()).add(Instance.getInstance().getFrameById(tb.getUframeId()));
+                        }
+                    }
+                }
+            }
+
+            logger.info("transaction frames maps prepared");
+
+/*
             for (TransFrame tb : tframes) {
                 final FrameData cb = Instance.getInstance().getFrameById(tb.getCframeId());
                 if (cb.isIndex()) {
@@ -334,7 +411,11 @@ public class Transaction implements Serializable {
                     }
                 }
             }
-            for (FrameData ub : ubd2) {
+*/
+
+            for (Map.Entry<Long, List<FrameData>> entry : ubd2.entrySet()) {
+                final FrameData ub = Instance.getInstance().getFrameById(entry.getKey());
+/*
                 final ArrayList<FrameData> ubs = new ArrayList<>();
                 for (TransFrame tb : tframes) {
                     if (ub.getFrameId() == tb.getCframeId()) {
@@ -344,13 +425,17 @@ public class Transaction implements Serializable {
                         }
                     }
                 }
+*/
 
                 if (ub.isIndex()) {
-                    ub.setRbck(true);
-                    ub.rollbackTransaction(this, ubs, s);
+//                    ub.setRbck(true);
+                    ub.rollbackTransaction(this, entry.getValue(), s);
                 }
             }
-            for (FrameData ub : ubd1) {
+
+            for (Map.Entry<Long, List<FrameData>> entry : ubd1.entrySet()) {
+                final FrameData ub = Instance.getInstance().getFrameById(entry.getKey());
+/*
                 final ArrayList<FrameData> ubs = new ArrayList<>();
                 for (TransFrame tb : tframes) {
                     if (ub.getFrameId() == tb.getCframeId()) {
@@ -360,12 +445,15 @@ public class Transaction implements Serializable {
                         }
                     }
                 }
+*/
 
                 if (!ub.isIndex()) {
-                    ub.rollbackTransaction(this, ubs, s);
+                    ub.rollbackTransaction(this, entry.getValue(), s);
                 }
             }
-            for (FrameData ub : ubd2) {
+
+            for (Map.Entry<Long, List<FrameData>> entry : ubd2.entrySet()) {
+                final FrameData ub = Instance.getInstance().getFrameById(entry.getKey());
                 final Frame frame_ = ub.getFrame();
                 if (frame_ instanceof IndexFrame) {
                     ub.setRbck(false);

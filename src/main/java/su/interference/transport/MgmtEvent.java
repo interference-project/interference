@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -26,6 +26,8 @@ package su.interference.transport;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import su.interference.core.Instance;
+import su.interference.persistent.Session;
 
 /**
  * @author Yuriy Glotanov
@@ -38,15 +40,36 @@ public class MgmtEvent extends TransportEventImpl {
     private final static Logger logger = LoggerFactory.getLogger(MgmtEvent.class);
     public final static int MGMT_STARTUP = 1;
     public final static int MGMT_SHUTDOWN = 2;
+    public final static int MGMT_GETSTATE = 3;
     private int command;
+    private String sessionId;
 
-    public MgmtEvent(int channelId, int command) {
+    public MgmtEvent(int channelId, int command, String sessionId) {
         super(channelId);
         this.command = command;
+        this.sessionId = sessionId;
     }
 
     @Override
     public EventResult process() {
-        return new EventResult(TransportCallback.SUCCESS, null, 0, null, null, null);
+        try {
+            Session s = Instance.getInstance().getSession(sessionId);
+            if (s == null) {
+                s = Session.getSession(this.channelId, this.sessionId);
+            }
+            if (this.command == MGMT_GETSTATE) {
+                return new EventResult(TransportCallback.SUCCESS, Instance.getInstance().getSystemState(), 0, null, null, null);
+            } else if (this.command == MGMT_STARTUP) {
+                Instance.getInstance().startupDatabase(s);
+                return new EventResult(TransportCallback.SUCCESS, 0, 0, null, null, null);
+            } else if (this.command == MGMT_SHUTDOWN) {
+                Instance.getInstance().shutdownDatabase(s);
+                return new EventResult(TransportCallback.SUCCESS, 0, 0, null, null, null);
+            } else {
+                return new EventResult(TransportCallback.SUCCESS, null, 0, null, null, null);
+            }
+        } catch (Exception e) {
+            return new EventResult(TransportCallback.FAILURE, e.getMessage(), 0, null, null, null);
+        }
     }
 }

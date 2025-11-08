@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -53,6 +53,7 @@ public class TransportContext implements TransportApi {
     private final int callbackPort;
     private final TransportChannel clientChannel;
     private TransportServer transportServer;
+    private boolean dbOpen = false;
     protected static final String CHANNEL_FAILURE_MESSAGE = "Channel failure";
     protected static final String TRANSACTION_ISNULL_MESSAGE = "Transaction is null";
     protected static final String WRONG_CALLBACK_NODE_MESSAGE = "Wrong callback node id";
@@ -75,6 +76,7 @@ public class TransportContext implements TransportApi {
         startServer();
         startIncomingMessageProcess();
         startClient();
+        logger.info("Transport context successfully started");
     }
 
     public void stop() {
@@ -82,6 +84,14 @@ public class TransportContext implements TransportApi {
         if (transportServer != null) {
             transportServer.stop();
         }
+    }
+
+    public boolean isDbOpen() {
+        return dbOpen;
+    }
+
+    public void setDbOpen(boolean dbOpen) {
+        this.dbOpen = dbOpen;
     }
 
     private void startServer() {

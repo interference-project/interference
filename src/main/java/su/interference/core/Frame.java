@@ -1,7 +1,7 @@
 /**
 The MIT License (MIT)
 
-Copyright (c) 2010-2021 head systems, ltd
+Copyright (c) 2010-2025 head systems, ltd
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -294,13 +294,14 @@ public class Frame implements Comparable {
         final long sync = LLT.getSyncId();
 
         if (Config.getConfig().SYNC_LOCK_ENABLE||sync==0) {
+            Map<byte[], byte[]> cmap = new HashMap<>();
             for (Chunk c : data.getChunks()) {
                 final byte[] chunk_ = c.getChunk();
                 c.getHeader().setLen(chunk_.length);
-                res2.append(c.getHeader().getHeader());
-                res2.append(chunk_);
+                cmap.put(c.getHeader().getHeader(), chunk_);
                 used = used + c.getBytesAmount();
             }
+            res2.append(cmap);
         } else {
             if (sync==0) {
                 throw new InvalidFrame();
@@ -562,7 +563,7 @@ public class Frame implements Comparable {
         return res;
     }
 
-    public synchronized void rollbackTransaction(Transaction tran, ArrayList<FrameData> ubs, Session s) throws Exception {
+    public synchronized void rollbackTransaction(Transaction tran, List<FrameData> ubs, Session s) throws Exception {
         data.check();
         final LLT llt = LLT.getLLT();
         llt.add(this);

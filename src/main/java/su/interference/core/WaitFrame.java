@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2020 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -24,6 +24,8 @@
 
 package su.interference.core;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import su.interference.persistent.FrameData;
 
 import java.util.concurrent.atomic.AtomicLong;
@@ -37,6 +39,7 @@ public class WaitFrame {
 
     private volatile FrameData bd;
     private final AtomicLong busy;
+    private final static Logger logger = LoggerFactory.getLogger(WaitFrame.class);
 
     public WaitFrame() {
         this.busy = new AtomicLong(0);
@@ -49,6 +52,7 @@ public class WaitFrame {
 
     public synchronized WaitFrame acquire() {
         if (this.bd == null) {
+            logger.warn("WaitFrame does not contain any frame");
             return null;
         }
         if (this.busy.compareAndSet(0, Thread.currentThread().getId())) {
@@ -59,6 +63,7 @@ public class WaitFrame {
 
     public synchronized WaitFrame acquire(final int fileId) {
         if (this.bd == null) {
+            logger.warn("WaitFrame does not contain any frame");
             return null;
         }
         if (this.bd.getFile() == fileId) {

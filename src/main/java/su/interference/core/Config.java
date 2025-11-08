@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -92,6 +92,7 @@ public class Config {
     private static final int RETRIEVE_THREADS_AMOUNT_DEFAULT=8;
     private static final String CODEPAGE_DEFAULT="UTF8";
     private static final String DATEFORMAT_DEFAULT="dd.MM.yyyy";
+    private static final String JSON_DATEFORMAT_DEFAULT="dd.MM.yyyy mm:HH:ss";
     // transport
     private static final int REMOTE_SYNC_TIMEOUT_DEFAULT = 60000;
     private static final int READ_BUFFER_SIZE_DEFAULT = 33554432;
@@ -126,6 +127,7 @@ public class Config {
     public final int RETRIEVE_THREADS_AMOUNT;
     public final String CODEPAGE;
     public final String DATEFORMAT;
+    public final String JSON_DATEFORMAT = JSON_DATEFORMAT_DEFAULT;
     // transport
     public final int REMOTE_SYNC_TIMEOUT;
     public final int READ_BUFFER_SIZE;
@@ -143,6 +145,7 @@ public class Config {
     // internal
     public final int TEST_DISTRIBUTE_MODE = 1;
     public final int CHECK_AVAIL_FRAME_TIMEOUT = 3000;
+    public final int CHECK_AVAIL_FRAME_ATTEMPTS = 1000000;
     // locks and processing
     public final boolean IGNORE_COMMAND_CHANNEL_FAILURES = true;
 
@@ -158,12 +161,9 @@ public class Config {
 
     public static final int[] bss = new int[]{4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288};
     private final static Logger logger = LoggerFactory.getLogger(Config.class);
-    private static Config config;
+    private final static Config config = new Config();
 
-    public static synchronized Config getConfig() {
-        if (config==null) {
-            config = new Config();
-        }
+    public static Config getConfig() {
         return config;
     }
 

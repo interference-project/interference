@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -61,21 +61,14 @@ public class IndexFrame extends Frame {
         this.terminate = true;
     }
 
-    public IndexFrame(int file, long pointer, int size, FrameData bd, Table t, Class c, List<FrameData> uframes) throws Exception {
+    public IndexFrame(int file, long pointer, int size, FrameData bd, Table t, Class c, List<FrameData> uframes, boolean dcinit) throws Exception {
         super(null, file, pointer, size, bd, t, c);
         this.terminate = false;
 
         Map<Integer, UndoChunk> ucs = new HashMap<>();
         for (FrameData uframe : uframes) {
             final DataFrame uf = uframe.getDataFrame();
-            for (Chunk udc : uf.getChunks()) {
-                UndoChunk uc = (UndoChunk) udc.getEntity();
-                final long frameId = file + pointer;
-                final long frameId_ = uc.getFile() + uc.getFrame();
-                if (frameId == frameId_) {
-                    ucs.put(uc.getPtr(), uc);
-                }
-            }
+            uf.data.getUCs(ucs, file, pointer);
         }
 
         int ptr = FRAME_HEADER_SIZE;
@@ -86,7 +79,7 @@ public class IndexFrame extends Frame {
                 if ((h.getPtr()>0)&&(h.getLen()>0)) {
                     final DataChunk dc = new DataChunk(bs.substring(ptr, ptr+INDEX_HEADER_SIZE+h.getLen()), this.getFile(), this.getPointer(), INDEX_HEADER_SIZE, this.getDataObject(), this.getEntityClass());
                     if (this.getType()==INDEX_FRAME_LEAF) {
-                        if (INITIALIZE_DURING_CONSTRUCT == 1) {
+                        if (dcinit) {
                             final IndexChunk ib = (IndexChunk) dc.getEntity();
                         }
                     }
@@ -139,7 +132,7 @@ public class IndexFrame extends Frame {
     }
 
     @Override
-    public synchronized void rollbackTransaction(Transaction tran, ArrayList<FrameData> ubs, Session s) throws Exception {
+    public synchronized void rollbackTransaction(Transaction tran, List<FrameData> ubs, Session s) throws Exception {
         data.check();
         final LLT llt = LLT.getLLT();
         llt.add(this);
@@ -386,6 +379,46 @@ public class IndexFrame extends Frame {
                     if (((DataChunk)ie).getHeader().getTran()!=null) {
                         if ((tr != ((DataChunk)ie).getHeader().getTran().getTransId()) && (((DataChunk)ie).getHeader().getTran().getCid() == 0 || ((DataChunk)ie).getHeader().getTran().getCid() > mtran)) {
                             r.add((DataChunk)ie);
+                        }
+                    }
+                }
+            }
+        }
+        return r;
+    }
+
+    //return unique element by ptr - for non-unique indexes
+    public synchronized List<DataChunk> getObjectsByKey(ValueSet key, long frameptr, int ptr, Session s) throws InternalException {
+        final List<DataChunk> r = new ArrayList<>();
+        final long tr = s.getTransaction().getTransId();
+        final long mtran = s.getTransaction().getMTran();
+        for (Chunk ie : this.data.getChunks()) {
+            if (((DataChunk)ie).getDcs().equals(key)) {
+                if (((DataChunk)ie).getHeader().getState() == Header.RECORD_NORMAL_STATE) {
+                    if (((DataChunk) ie).getUndoChunk() != null && ((DataChunk) ie).getHeader().getTran().getCid() == 0) { //updated chunk in live transaction
+                        if (((DataChunk) ie).getHeader().getFramePtr() == frameptr && ((DataChunk) ie).getHeader().getFramePtrRowId().getRowPointer() == ptr) {
+                            r.add((DataChunk) ie);
+                        }
+                    } else {
+                        if (((DataChunk) ie).getHeader().getTran() == null || s.isStream()) {
+                            if (((DataChunk) ie).getHeader().getFramePtr() == frameptr && ((DataChunk) ie).getHeader().getFramePtrRowId().getRowPointer() == ptr) {
+                                r.add((DataChunk) ie);
+                            }
+                        } else {
+                            if ((tr == ((DataChunk) ie).getHeader().getTran().getTransId()) || (((DataChunk) ie).getHeader().getTran().getCid() > 0 && ((DataChunk) ie).getHeader().getTran().getCid() <= mtran)) {
+                                if (((DataChunk) ie).getHeader().getFramePtr() == frameptr && ((DataChunk) ie).getHeader().getFramePtrRowId().getRowPointer() == ptr) {
+                                    r.add((DataChunk) ie);
+                                }
+                            }
+                        }
+                    }
+                }
+                if (((DataChunk)ie).getHeader().getState() == Header.RECORD_DELETED_STATE) {
+                    if (((DataChunk)ie).getHeader().getTran()!=null) {
+                        if ((tr != ((DataChunk)ie).getHeader().getTran().getTransId()) && (((DataChunk)ie).getHeader().getTran().getCid() == 0 || ((DataChunk)ie).getHeader().getTran().getCid() > mtran)) {
+                            if (((DataChunk) ie).getHeader().getFramePtr() == frameptr && ((DataChunk) ie).getHeader().getFramePtrRowId().getRowPointer() == ptr) {
+                                r.add((DataChunk) ie);
+                            }
                         }
                     }
                 }

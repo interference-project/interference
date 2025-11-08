@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -38,8 +38,8 @@ import java.lang.reflect.InvocationTargetException;
 
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
-import su.interference.transport.TransportContext;
-import su.interference.transport.TransportSyncTask;
+import su.interference.rest.HTTPServer;
+import su.interference.transport.*;
 
 /**
  * @author Yuriy Glotanov
@@ -48,8 +48,8 @@ import su.interference.transport.TransportSyncTask;
 
 public class Instance implements Interference {
     
-    public static final String RELEASE = "2021.1";
-    public static final int SYSTEM_VERSION = 20210926;
+    public static final String RELEASE = "2025.1";
+    public static final int SYSTEM_VERSION = 20251107;
 
     public static final String DATA_FILE = "datafile";
     public static final String INDX_FILE = "indxfile";
@@ -84,10 +84,17 @@ public class Instance implements Interference {
     private String userHome;
 
     private static Instance instance;
-    private int systemState;
-    private int clusterState;
+    private volatile int systemState;
+    private volatile int clusterState;
     private static final URLClassLoader ucl;
     private Table tt;
+    private Table tDataFile;
+    private Table tFrameData;
+    private Table tTransaction;
+    private Table tTransFrame;
+    private Table tRetrieveLock;
+    private Table tFrameSync;
+    private Table tFreeFrame;
 
     private static final Logger logger = LoggerFactory.getLogger(Instance.class);
 
@@ -130,23 +137,6 @@ public class Instance implements Interference {
 
     public void rollback (Session s) {
         s.rollback();
-    }
-
-    public static boolean initParams (String[] params) {
-        final Config cfg = Config.getConfig();
-
-/*
-        try {
-            new HTTPServer(cfg.MMPORT);
-            return true;
-        } catch (IOException e) {
-            return false;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-*/
-
-        return true;
     }
 
     private static int validateNodeId(int id) {
@@ -354,7 +344,7 @@ public class Instance implements Interference {
         return err;
     }
 
-    public void startupInstance(Session s) throws Exception, NoSuchMethodException, IOException, InternalException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    public void startupInstance(Session s) throws Exception {
 
         boolean ok = true;
 
@@ -367,30 +357,15 @@ public class Instance implements Interference {
         }
 
         if (ok) {
-
             logger.info("interference is starting...");
             Thread.currentThread().setName("interference-main-thread-"+Thread.currentThread().getId());
-            Storage.getStorage().restoreJournal();
-            Storage.getStorage().openDataFiles();
-            initSystemTable();
-            Storage.getStorage().closeDataFiles();
-            Storage.getStorage().openStorage(getDataFiles());
-            s.persist(Session.getDntmSession());
-            for (String cl : Config.getConfig().REGISTER_CLASSES) {
-                try {
-                    s.registerTable(cl, s);
-                } catch (Exception e) {
-                    logger.error("Class registration failed: " + cl, e);
-                }
-            }
+            HTTPServer.getInstance();
             TransportContext.getInstance().start();
-            startProcesses(s);
-            checkOpenTransactions(s);
-            systemState = Instance.SYSTEM_STATE_UP;
+            startupDatabase(s);
             //checkInMemoryIndexes();
             logger.info("\n----------------------------------------------------------------------\n" +
                           "------------------------ interference started ------------------------\n" +
-                          "------------------ (c) head systems, ltd 2010-2021 -------------------\n" +
+                          "------------------ (c) head systems, ltd 2010-2025 -------------------\n" +
                           "--------------------------- release "+RELEASE+" ---------------------------\n" +
                           "----------------------------------------------------------------------");
         } else {
@@ -399,6 +374,28 @@ public class Instance implements Interference {
 
         }
 
+    }
+
+    public void startupDatabase(Session s) throws Exception {
+        Storage.getStorage().restoreJournal();
+        Storage.getStorage().openDataFiles();
+        initSystemTable();
+        initSystemTableLinks();
+        Storage.getStorage().closeDataFiles();
+        Storage.getStorage().openStorage(getDataFiles());
+        s.persist(Session.getDntmSession());
+        for (String cl : Config.getConfig().REGISTER_CLASSES) {
+            try {
+                s.registerTable(cl, s);
+            } catch (Exception e) {
+                logger.error("Class registration failed: " + cl, e);
+            }
+        }
+        startProcesses(s);
+        checkOpenTransactions(s);
+        TransportContext.getInstance().setDbOpen(true);
+        systemState = Instance.SYSTEM_STATE_UP;
+        logger.info("Database processes successfully started");
     }
 
     private static void registerMetrics() throws Exception {
@@ -501,20 +498,35 @@ public class Instance implements Interference {
         shutdownImmediate(s);
     }
 
-    private void shutdownImmediate(Session s) throws Exception {
+    public void shutdownImmediate(Session s) throws Exception {
         logger.info("Shutdown instance...");
-        stopProcesses(s);
+        shutdownDatabase(s);
         TransportContext.getInstance().stop();
-        Storage.getStorage().closeStorage(getDataFiles());
-        Session.setDntmSession(s);
-        systemState = Instance.SYSTEM_STATE_DOWN;
+        HTTPServer.getInstance().stop();
         logger.info("Instance succesfully down");
     }
 
+    public void shutdownDatabase(Session s) throws Exception {
+        TransportContext.getInstance().setDbOpen(false);
+        stopProcesses(s);
+        Storage.getStorage().closeStorage(getDataFiles());
+        Session.setDntmSession(s);
+        systemState = Instance.SYSTEM_STATE_DOWN;
+        logger.info("Database processes succesfully down");
+    }
+
+    public Node[] getNodes() {
+        final Table t = getTableByName("su.interference.persistent.Node");
+        final ArrayList<Node> res = new ArrayList<>();
+        for (Object o : t.getIndexFieldByColumn("nodeId").getIndex().getContent()) {
+            res.add((Node)((DataChunk)o).getEntity());
+        }
+        return res.toArray(new Node[]{});
+    }
+
     public DataFile[] getDataFiles() {
-        final Table t = getTableByName("su.interference.persistent.DataFile");
-        final ArrayList<DataFile> res = new ArrayList<DataFile>();
-        for (Object o : t.getIndexFieldByColumn("fileId").getIndex().getContent()) {
+        final ArrayList<DataFile> res = new ArrayList<>();
+        for (Object o : tDataFile.getIndexFieldByColumn("fileId").getIndex().getContent()) {
             res.add((DataFile)((DataChunk)o).getEntity());
         }
         return res.toArray(new DataFile[]{});
@@ -568,14 +580,12 @@ public class Instance implements Interference {
     }
 
     public Map getFramesMap () {
-        final Table t = getTableByName("su.interference.persistent.FrameData");
-        final MapField ixf = t.getMapFieldByColumn("frameId");
+        final MapField ixf = tFrameData.getMapFieldByColumn("frameId");
         return ixf.getMap();
     }
 
     public FrameData getFrameById (long id) {
-        final Table t = getTableByName("su.interference.persistent.FrameData");
-        final MapField ixf = t.getMapFieldByColumn("frameId");
+        final MapField ixf = tFrameData.getMapFieldByColumn("frameId");
         final Map ixl = ixf.getMap();
         final DataChunk dc = (DataChunk)ixl.get(id);
         if (dc != null) {
@@ -585,8 +595,7 @@ public class Instance implements Interference {
     }
 
     public FrameData getFrameByIdForUpdate (long id, LLT llt) {
-        final Table t = getTableByName("su.interference.persistent.FrameData");
-        final MapField ixf = t.getMapFieldByColumn("frameId");
+        final MapField ixf = tFrameData.getMapFieldByColumn("frameId");
         final Map ixl = ixf.getMap();
         final DataChunk dc = (DataChunk)ixl.get(id);
         if (dc != null) {
@@ -598,8 +607,7 @@ public class Instance implements Interference {
     }
 
     public FrameData getFrameByAllocId (long id) {
-        final Table t = getTableByName("su.interference.persistent.FrameData");
-        final MapField ixf = t.getMapFieldByColumn("allocId");
+        final MapField ixf = tFrameData.getMapFieldByColumn("allocId");
         final Map ixl = ixf.getMap();
         final DataChunk dc = (DataChunk)ixl.get(id);
         if (dc!=null) {
@@ -609,8 +617,7 @@ public class Instance implements Interference {
     }
 
     public Chunk getChunkByPointer (long frameId, int ptr) throws Exception {
-        final Table t = getTableByName("su.interference.persistent.FrameData");
-        final MapField ixf = t.getMapFieldByColumn("frameId");
+        final MapField ixf = tFrameData.getMapFieldByColumn("frameId");
         final Map ixl = ixf.getMap();
         final DataChunk dc = (DataChunk)ixl.get(frameId);
         if (dc!=null) {
@@ -620,55 +627,55 @@ public class Instance implements Interference {
     }
 
     public DataFile getDataFileById (int id) {
-        final Table t = getTableByName("su.interference.persistent.DataFile");
-        return (DataFile)((DataChunk)t.getIndexFieldByColumn("fileId").getIndex().getObjectByKey(id)).getEntity();
+        return (DataFile)((DataChunk)tDataFile.getIndexFieldByColumn("fileId").getIndex().getObjectByKey(id)).getEntity();
     }
 
     public ArrayList<DataFile> getDataFilesByType (int id) {
-        final Table t = getTableByName("su.interference.persistent.DataFile");
         final ArrayList<DataFile> r = new ArrayList<>();
-        for (Object o : t.getIndexFieldByColumn("type").getIndex().getObjectsByKey(id)) {
+        for (Object o : tDataFile.getIndexFieldByColumn("type").getIndex().getObjectsByKey(id)) {
             r.add((DataFile)((DataChunk)o).getEntity());
         }
         return r;
     }
 
     public synchronized Session getSession (String sessionId) {
+        if (sessionId == null) {
+            return null;
+        }
         if (Instance.getInstance().systemState==Instance.SYSTEM_STATE_UP) {
             Table t = getTableByName("su.interference.persistent.Session");
-            return (Session)((DataChunk)t.getIndexFieldByColumn("sessionId").getIndex().getObjectByKey(sessionId)).getEntity();
+            final DataChunk dc = (DataChunk)t.getIndexFieldByColumn("sessionId").getIndex().getObjectByKey(sessionId);
+            return dc == null ? null : (Session) dc.getEntity();
         } else {
             return Session.getDntmSession();
         }
     }
 
     public synchronized Session getSessionBySid (long sid) {
-        Table t = getTableByName("su.interference.persistent.Session");
-        return (Session)((DataChunk)t.getIndexFieldByColumn("sid").getIndex().getObjectByKey(sid)).getEntity();
-    }
-
-    public synchronized Transaction getTransactionById (long transId) {
-        if (transId == 0) { return null; }
-        Table t = getTableByName("su.interference.persistent.Transaction");
-        DataChunk dc = ((DataChunk)t.getMapFieldByColumn("transId").getMap().get(transId));
-        if (dc==null) {
+        if (sid == 0L) {
             return null;
         }
-        return (Transaction)dc.getEntity();
+        Table t = getTableByName("su.interference.persistent.Session");
+        final DataChunk dc = (DataChunk)t.getIndexFieldByColumn("sid").getIndex().getObjectByKey(sid);
+        return dc == null ? null : (Session) dc.getEntity();
+    }
+
+    public Transaction getTransactionById (long transId) {
+        if (transId == 0 || tTransaction == null) { return null; }
+        final DataChunk dc = ((DataChunk)tTransaction.getMapFieldByColumn("transId").getMap().get(transId));
+        return dc == null ? null : (Transaction)dc.getEntity();
     }
 
     public List<Transaction> getTransactionsBySid (long id) {
-        final Table t = getTableByName("su.interference.persistent.Transaction");
         final ArrayList<Transaction> r = new ArrayList<>();
-        for (Object o : t.getIndexFieldByColumn("sid").getIndex().getObjectsByKey(id)) {
+        for (Object o : tTransaction.getIndexFieldByColumn("sid").getIndex().getObjectsByKey(id)) {
             r.add((Transaction)((DataChunk)o).getEntity());
         }
         return r;
     }
 
     public FreeFrame getFreeFrameById (long id) {
-        final Table t = getTableByName("su.interference.persistent.FreeFrame");
-        final DataChunk dc = (DataChunk)t.getIndexFieldByColumn("frameId").getIndex().getObjectByKey(id);
+        final DataChunk dc = (DataChunk)tFreeFrame.getIndexFieldByColumn("frameId").getIndex().getObjectByKey(id);
         if (dc==null) {
             return null;
         }
@@ -676,10 +683,9 @@ public class Instance implements Interference {
     }
 
     public ArrayList<FrameSync> getSyncFrames(int nodeId) {
-        final Table t = getTableByName("su.interference.persistent.FrameSync");
         final ArrayList<FrameSync> r = new ArrayList<>();
         String uuid = null;
-        for (Object o : t.getIndexFieldByColumn("syncId").getIndex().getContent(TransportSyncTask.REMOTE_SYNC_DEFERRED_AMOUNT)) {
+        for (Object o : tFrameSync.getIndexFieldByColumn("syncId").getIndex().getContent(TransportSyncTask.REMOTE_SYNC_DEFERRED_AMOUNT)) {
             final FrameSync fs = (FrameSync)((DataChunk)o).getEntity();
             if (fs.getNodeId() == nodeId) {
                 if (uuid == null) {
@@ -711,19 +717,14 @@ public class Instance implements Interference {
 
     //used in storeFrame
     public TransFrame getTransFrameById(long transId, long cframeId, long uframe) {
-        final Table t = getTableByName("su.interference.persistent.TransFrame");
         final TransFrameId id = new TransFrameId(cframeId, uframe, transId);
-        DataChunk dc = (DataChunk) t.getMapFieldByColumn("frameId").getMap().get(id);
-        if (dc != null) {
-            return (TransFrame) dc.getEntity();
-        }
-        return null;
+        final DataChunk dc = (DataChunk) tTransFrame.getMapFieldByColumn("frameId").getMap().get(id);
+        return dc == null ? null : (TransFrame) dc.getEntity();
     }
 
     public List<TransFrame> getTransFramesByTransId(long transId) {
         List<TransFrame> res = new ArrayList<>();
-        final Table t = getTableByName("su.interference.persistent.TransFrame");
-        for (Map.Entry entry : ((Map<Object, Object>)t.getMapFieldByColumn("frameId").getMap()).entrySet()) {
+        for (Map.Entry entry : ((Map<Object, Object>)tTransFrame.getMapFieldByColumn("frameId").getMap()).entrySet()) {
             final TransFrame tf = (TransFrame) ((DataChunk) entry.getValue()).getEntity();
             if (tf.getTransId() == transId) {
                 res.add(tf);
@@ -745,14 +746,13 @@ public class Instance implements Interference {
 
     //used in unlock table mechanism
     @Deprecated
-    public synchronized ArrayList<TransFrame> getTransFrameByObjectId (int objectId) {
+    public ArrayList<TransFrame> getTransFrameByObjectId (int objectId) {
         //final Table t = getTableByName("su.interference.persistent.TransFrame");
         return new ArrayList<TransFrame>();
     }
 
     public RetrieveLock getRetrieveLockById(RetrieveLock p) {
-        final Table t = getTableByName("su.interference.persistent.RetrieveLock");
-        for (Object o : t.getIndexFieldByColumn("objectId").getIndex().getObjectsByKey(p.getObjectId())) {
+        for (Object o : tRetrieveLock.getIndexFieldByColumn("objectId").getIndex().getObjectsByKey(p.getObjectId())) {
             final RetrieveLock rl = (RetrieveLock)((DataChunk)o).getEntity();
             if (rl.getTransId()==p.getTransId()) {
                 return rl;
@@ -762,8 +762,7 @@ public class Instance implements Interference {
     }
 
     public RetrieveLock getRetrieveLockById(int obj, long tran) {
-        final Table t = getTableByName("su.interference.persistent.RetrieveLock");
-        for (Object o : t.getIndexFieldByColumn("objectId").getIndex().getObjectsByKey(obj)) {
+        for (Object o : tRetrieveLock.getIndexFieldByColumn("objectId").getIndex().getObjectsByKey(obj)) {
             final RetrieveLock rl = (RetrieveLock)((DataChunk)o).getEntity();
             if (rl.getTransId()==tran) {
                 return rl;
@@ -774,8 +773,7 @@ public class Instance implements Interference {
 
     public ArrayList<RetrieveLock> getRetrieveLocksByObjectId(int obj) {
         final ArrayList<RetrieveLock> r = new ArrayList<>();
-        final Table t = getTableByName("su.interference.persistent.RetrieveLock");
-        for (Object o : t.getIndexFieldByColumn("objectId").getIndex().getObjectsByKey(obj)) {
+        for (Object o : tRetrieveLock.getIndexFieldByColumn("objectId").getIndex().getObjectsByKey(obj)) {
             final RetrieveLock rl = (RetrieveLock)((DataChunk)o).getEntity();
             r.add(rl);
         }
@@ -783,9 +781,8 @@ public class Instance implements Interference {
     }
 
     public synchronized List<Transaction> getTransactions() {
-        final Table t = getTableByName("su.interference.persistent.Transaction");
         final ArrayList<Transaction> res = new ArrayList<>();
-        for (Object o : t.getMapFieldByColumn("transId").getMap().entrySet()) {
+        for (Object o : tTransaction.getMapFieldByColumn("transId").getMap().entrySet()) {
             res.add((Transaction)((DataChunk)((Map.Entry)o).getValue()).getEntity());
         }
         return res;
@@ -793,6 +790,16 @@ public class Instance implements Interference {
 
     private synchronized void initSystemTable () throws Exception {
         this.tt = Storage.getStorage().bootstrapLoad();
+    }
+
+    private synchronized void initSystemTableLinks() {
+        tDataFile = getTableByName("su.interference.persistent.DataFile");
+        tFrameData = getTableByName("su.interference.persistent.FrameData");
+        tTransFrame = getTableByName("su.interference.persistent.TransFrame");
+        tTransaction = getTableByName("su.interference.persistent.Transaction");
+        tRetrieveLock = getTableByName("su.interference.persistent.RetrieveLock");
+        tFrameSync = getTableByName("su.interference.persistent.FrameSync");
+        tFreeFrame = getTableByName("su.interference.persistent.FreeFrame");
     }
 
     public long getFreeMemory() {
@@ -809,6 +816,86 @@ public class Instance implements Interference {
 
     public int getSystemState() {
         return systemState;
+    }
+
+    public int getSystemState(int node) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException, InterruptedException {
+        if (node == getLocalNodeId()) {
+            return systemState;
+        } else {
+            final TransportEvent transportEvent = new MgmtEvent(node, MgmtEvent.MGMT_GETSTATE, null);
+            TransportContext.getInstance().send(transportEvent);
+            transportEvent.getLatch().await();
+            if (!transportEvent.isFail()) {
+                EventResult result = transportEvent.getCallback().getResult();
+                return (int) result.getResultObject();
+            } else {
+                return 0;
+            }
+        }
+    }
+
+    public String getSystemStateString(int node) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException, InterruptedException {
+        switch(this.getSystemState(node)) {
+            case SYSTEM_STATE_ONLINE:
+                return "ONLINE";
+            case SYSTEM_STATE_UP:
+                return "UP";
+            case SYSTEM_STATE_FAIL:
+                return "FAILED";
+            case SYSTEM_STATE_RECOVER:
+                return "RECOVER";
+            case SYSTEM_STATE_IDLE:
+                return "IDLE";
+            case SYSTEM_STATE_NA:
+                return "N/A";
+            case SYSTEM_STATE_DOWN:
+                return "DOWN";
+        }
+        return "N/A";
+    }
+
+    public String getBtnStringByState(int node) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException, InterruptedException {
+        switch(this.getSystemState(node)) {
+            case SYSTEM_STATE_ONLINE:
+                return "Shutdown";
+            case SYSTEM_STATE_UP:
+                return "Shutdown";
+            case SYSTEM_STATE_FAIL:
+                return null;
+            case SYSTEM_STATE_RECOVER:
+                return null;
+            case SYSTEM_STATE_IDLE:
+                return null;
+            case SYSTEM_STATE_NA:
+                return null;
+            case SYSTEM_STATE_DOWN:
+                return "Startup";
+            case 0:
+                return null;
+        }
+        return null;
+    }
+
+    public String getSystemStateCellColor(int node) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException, InterruptedException {
+        switch(this.getSystemState(node)) {
+            case SYSTEM_STATE_ONLINE:
+                return "#20ff20";
+            case SYSTEM_STATE_UP:
+                return "#d0d000";
+            case SYSTEM_STATE_FAIL:
+                return "#e00000";
+            case SYSTEM_STATE_RECOVER:
+                return "#ff2000";
+            case SYSTEM_STATE_IDLE:
+                return "#20a000";
+            case SYSTEM_STATE_NA:
+                return "#808080";
+            case SYSTEM_STATE_DOWN:
+                return "#308030";
+            case 0:
+                return "#ff2000";
+        }
+        return "N/A";
     }
 
     public int getClusterState() {

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -36,7 +36,6 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 
 /**
@@ -57,7 +56,7 @@ public class NestedCondition extends Condition {
     private int type;        // 1 - AND, 2 - OR
     private boolean empty;
 
-    public boolean checkNC (Object o, Field[] fs, int sqlcid, boolean last, Session s) throws UnsupportedEncodingException, InternalException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
+    public boolean checkNC (Object o, FieldContainer[] fs, int sqlcid, boolean last, Session s) throws UnsupportedEncodingException, InternalException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
         final Class cl = o.getClass();
         final boolean rs_ = !Arrays.asList(o.getClass().getInterfaces()).contains(EntityContainer.class);
         boolean res = false;
@@ -99,12 +98,12 @@ public class NestedCondition extends Condition {
         return res;
     }
 
-    private boolean sqlEquals (Class c, Field[] fs, Object o, ValueCondition vc, boolean rs_, Session s) throws UnsupportedEncodingException, InternalException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
+    private boolean sqlEquals (Class c, FieldContainer[] fs, Object o, ValueCondition vc, boolean rs_, Session s) throws UnsupportedEncodingException, InternalException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
         boolean res = false;
 
         for (int j = 0; j < fs.length; j++) {
-            final Field f = fs[j];
-            if (f.getName().equals(vc.getConditionColumn().getAlias())) {
+            final FieldContainer f = fs[j];
+            if (f.getField().getName().equals(vc.getConditionColumn().getAlias())) {
                 res = sqlEquals(c, o, f, null, vc.getValues(), vc.getCondition(), rs_, s);
             }
         }
@@ -112,18 +111,18 @@ public class NestedCondition extends Condition {
         return res;
     }
 
-    private boolean sqlEquals (Class c, Field[] fs, Object o, JoinCondition jc, boolean rs_, Session s) throws InternalException, UnsupportedEncodingException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
+    private boolean sqlEquals (Class c, FieldContainer[] fs, Object o, JoinCondition jc, boolean rs_, Session s) throws InternalException, UnsupportedEncodingException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
         boolean res = false;
 
-        Field lf = null;
-        Field rf = null;
+        FieldContainer lf = null;
+        FieldContainer rf = null;
 
         for (int j = 0; j < fs.length; j++) {
-            Field f = fs[j];
-            if (f.getName().equals(jc.getConditionColumn().getAlias())) {
+            FieldContainer f = fs[j];
+            if (f.getField().getName().equals(jc.getConditionColumn().getAlias())) {
                 lf = f;
             }
-            if (f.getName().equals(jc.getConditionColumnRight().getAlias())) {
+            if (f.getField().getName().equals(jc.getConditionColumnRight().getAlias())) {
                 rf = f;
             }
         }
@@ -136,23 +135,23 @@ public class NestedCondition extends Condition {
     }
 
     //rf used for join condition, ro - for value condition
-    private boolean sqlEquals (Class c, Object o, Field lf, Field rf, Object[] ro, int ctype, boolean rs_, Session s) throws InternalException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
-        final String t1 = lf.getType().getName();
-        final String t2 = rf==null?t1:rf.getType().getName();
+    private boolean sqlEquals (Class c, Object o, FieldContainer lf, FieldContainer rf, Object[] ro, int ctype, boolean rs_, Session s) throws InternalException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
+        final String t1 = lf.getField().getType().getName();
+        final String t2 = rf==null?t1:rf.getField().getType().getName();
 
         if (!Types.sqlCheck(t1, t2)) {
             throw new InternalException();
         }
 
         if (t1.equals(Types.t_string)&&t2.equals(Types.t_string)) {
-            final String d1 = (String)invoke(c, o, lf.getName(), rs_, s);
+            final String d1 = (String)invoke(o, lf.getGetter(), rs_, s);
             final String[] d2 = new String[rf==null?ro.length:1];
             if (rf==null) {
                 for (int i=0;i<ro.length;i++) {
                     d2[i] = (String)ro[i];
                 }
             } else {
-                d2[0] = (String)invoke(c, o, rf.getName(), rs_, s);
+                d2[0] = (String)invoke(o, rf.getGetter(), rs_, s);
             }
             if ((ctype==Condition.C_EQUAL)||(ctype==Condition.C_IN)) {
                 for (int i=0; i<d2.length; i++) {
@@ -188,14 +187,14 @@ public class NestedCondition extends Condition {
             }
         }
         if (t1.equals(Types.t_date)&&t2.equals(Types.t_date)) {
-            final Date d1 = (Date)invoke(c, o, lf.getName(), rs_, s);
+            final Date d1 = (Date)invoke(o, lf.getGetter(), rs_, s);
             final Date[] d2 = new Date[rf==null?ro.length:1];
             if (rf==null) {
                 for (int i=0;i<ro.length;i++) {
                     d2[i] = (Date)ro[i];
                 }
             } else {
-                d2[0] = (Date)invoke(c, o, rf.getName(), rs_, s);
+                d2[0] = (Date)invoke(o, rf.getGetter(), rs_, s);
             }
             if ((ctype==Condition.C_EQUAL)||(ctype==Condition.C_IN)) {
                 for (int i=0; i<d2.length; i++) {
@@ -219,20 +218,20 @@ public class NestedCondition extends Condition {
             Long d1 = new Long(0);
             Long[] d2 = new Long[rf==null?ro.length:1];
             if ((t1.equals(Types.p_int)||t1.equals(Types.t_int)||t1.equals(Types.c_int))&&(t2.equals(Types.p_int)||t2.equals(Types.t_int)||t2.equals(Types.c_int))) {
-                Integer dd = (Integer)invoke(c, o, lf.getName(), rs_, s);
+                Integer dd = (Integer)invoke(o, lf.getGetter(), rs_, s);
                 d1 = new Long(dd);
                 if (rf==null) {
                     for (int i=0;i<ro.length;i++) {
                         d2[i] = new Long((Integer)ro[i]);
                     }
                 } else {
-                    Integer dr = (Integer)invoke(c, o, rf.getName(), rs_, s);
+                    Integer dr = (Integer)invoke(o, rf.getGetter(), rs_, s);
                     d2[0] = new Long(dr);
                 }
             }
             if ((t1.equals(Types.p_long)||t1.equals(Types.t_long)||t1.equals(Types.c_long))&&(t2.equals(Types.p_long)||t2.equals(Types.t_long)||t2.equals(Types.c_long))) {
-                d1 = (Long)c.getMethod("get"+lf.getName().substring(0,1).toUpperCase()+lf.getName().substring(1,lf.getName().length()), null).invoke(o, null);
-                d2 = rf==null?(Long[])ro:new Long[]{(Long)c.getMethod("get"+rf.getName().substring(0,1).toUpperCase()+rf.getName().substring(1,rf.getName().length()), null).invoke(o,null)};
+                d1 = (Long)lf.getGetter().invoke(o, null);
+                d2 = rf==null?(Long[])ro:new Long[]{(Long)rf.getGetter().invoke(o,null)};
             }
             if ((ctype==Condition.C_EQUAL)||(ctype==Condition.C_IN)) {
                 for (int i=0; i<d2.length; i++) {
@@ -288,7 +287,7 @@ public class NestedCondition extends Condition {
             Double d1 = new Double(0);
             Double[] d2 = new Double[rf==null?ro.length:1];
             if ((t1.equals(Types.p_float)||t1.equals(Types.t_float))&&(t2.equals(Types.p_float)||t2.equals(Types.t_float))) {
-                Float dd = (Float)invoke(c, o, lf.getName(), rs_, s);
+                Float dd = (Float)invoke(o, lf.getGetter(), rs_, s);
                 d1 = new Double(dd);
                 if (rf==null) {
                     for (int i=0;i<ro.length;i++) {
@@ -296,13 +295,13 @@ public class NestedCondition extends Condition {
                         d2[i] = (Double)ro[i];
                     }
                 } else {
-                    Float dr = (Float)invoke(c, o, rf.getName(), rs_, s);
+                    Float dr = (Float)invoke(o, rf.getGetter(), rs_, s);
                     d2[0] = new Double(dr);
                 }
             }
             if ((t1.equals(Types.p_double)||t1.equals(Types.t_double))&&(t2.equals(Types.p_double)||t2.equals(Types.t_double))) {
-                d1 = (Double)invoke(c, o, lf.getName(), rs_, s);
-                d2 = rf==null?(Double[])ro:new Double[]{(Double)invoke(c, o, rf.getName(), rs_, s)};
+                d1 = (Double)invoke(o, lf.getGetter(), rs_, s);
+                d2 = rf==null?(Double[])ro:new Double[]{(Double)invoke(o, rf.getGetter(), rs_, s)};
             }
             if ((ctype==Condition.C_EQUAL)||(ctype==Condition.C_IN)) {
                 for (int i=0; i<d2.length; i++) {
@@ -357,9 +356,7 @@ public class NestedCondition extends Condition {
         return false;
     }
 
-    private Object invoke(Class c, Object o, String fname, boolean rs_, Session s) throws IllegalAccessException, NoSuchMethodException, InvocationTargetException {
-        final String mtname = "get"+fname.substring(0,1).toUpperCase()+fname.substring(1,fname.length());
-        final Method m = rs_ ? c.getMethod(mtname, null) :  c.getMethod(mtname, Session.class);
+    private Object invoke(Object o, Method m, boolean rs_, Session s) throws IllegalAccessException, InvocationTargetException {
         return rs_ ? m.invoke(o, null) : m.invoke(o, s);
     }
 
