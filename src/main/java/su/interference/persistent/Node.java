@@ -26,7 +26,6 @@ package su.interference.persistent;
 
 import su.interference.core.*;
 import su.interference.exception.InternalException;
-import su.interference.mgmt.MgmtColumn;
 import su.interference.mgmt.MgmtAction;
 import su.interference.transport.MgmtEvent;
 import su.interference.transport.TransportContext;
@@ -76,44 +75,31 @@ public class Node implements Serializable {
     @Column
     @Id
     @IndexColumn
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private int nodeId;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private String host;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private int port;
     @Column
     @IndexColumn
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private int type;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private int rtype;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private int state;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private int hbeat;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private String token;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private int cpuAmount;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private Date lastRated;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private int requestRate;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private int cpuRate;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private int allocRate;
 
     @Transient

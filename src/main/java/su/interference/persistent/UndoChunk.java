@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -27,7 +27,6 @@ package su.interference.persistent;
 import su.interference.core.DisableSync;
 import su.interference.core.SystemEntity;
 import su.interference.core.DataChunk;
-import su.interference.core.RowId;
 import su.interference.mgmt.MgmtColumn;
 import su.interference.exception.InternalException;
 
@@ -49,16 +48,16 @@ import java.net.MalformedURLException;
 public class UndoChunk implements FilePartitioned {
 
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Transaction Id",width=10)
     private long transId;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="File Id",width=10)
     private int file;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Frame",width=10)
     private long frame;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="PTR",width=10)
     private int ptr;
     @Column
     private DataChunk dataChunk;

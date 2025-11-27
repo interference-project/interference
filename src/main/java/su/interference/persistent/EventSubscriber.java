@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -48,11 +48,9 @@ public class EventSubscriber {
     @Id
     @Column
     @MapColumn
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private String entityId;
     @Column
     @IndexColumn
-    @MgmtColumn(width=20, show=true, form=false, edit=false)
     private String subscriberId;
 
     @Transient

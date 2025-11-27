@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -27,7 +27,6 @@ package su.interference.persistent;
 import su.interference.core.DisableSync;
 import su.interference.core.IndexColumn;
 import su.interference.core.SystemEntity;
-import su.interference.mgmt.MgmtColumn;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -47,11 +46,9 @@ public class RQFrame {
     @Id
     @Column
     @IndexColumn
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private long frameId;
     @Column
     @IndexColumn
-    @MgmtColumn(width=20, show=true, form=false, edit=false)
     private int nodeId;
 
     @Transient

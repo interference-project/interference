@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -27,6 +27,8 @@ package su.interference.persistent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.core.*;
+import su.interference.mgmt.MgmtAction;
+import su.interference.mgmt.MgmtClass;
 import su.interference.mgmt.MgmtColumn;
 import su.interference.exception.InternalException;
 
@@ -45,25 +47,26 @@ import java.net.MalformedURLException;
 @Entity
 @SystemEntity
 @DisableSync
+@MgmtClass
 public class Process implements Comparable {
 
     @Column
     @Id
     @IndexColumn
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Process Id",width=10)
     private int processId;
 
     @Column
     @IndexColumn
-    @MgmtColumn(width=40, show=true, form=false, edit=false)
+    @MgmtColumn(name="Name",width=40)
     private String processName;
 
     @Column
-    @MgmtColumn(width=40, show=true, form=false, edit=false)
+    @MgmtColumn(name="Class",width=40)
     private String className;
 
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="State",width=10)
     private String state;
 
     @Transient
@@ -93,9 +96,29 @@ public class Process implements Comparable {
     }
 
     public void stop () throws InterruptedException {
-        if (th!=null&&ro!=null) {
+        if (th !=null && ro != null) {
             ((ManagedProcess)ro).stop();
             th.join();
+            this.state = "STOPPED";
+        }
+    }
+
+    public synchronized String getActionButtonCommand() throws Exception {
+        if ("STOPPED".equals(this.state)) {
+            return "Start";
+        } else {
+            return "Stop";
+        }
+    }
+
+    @MgmtAction(name="@getActionButtonCommand", enable="")
+    public synchronized void startupAction(String command, String sessionId) throws Exception {
+        final Session session = sessionId == null ? null : Instance.getInstance().getSession(sessionId);
+        if ("Start".equals(command)) {
+            this.start(this.ro, session);
+        }
+        if ("Stop".equals(command)) {
+            this.stop();
         }
     }
 

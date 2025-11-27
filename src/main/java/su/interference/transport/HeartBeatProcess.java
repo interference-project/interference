@@ -47,16 +47,28 @@ public final class HeartBeatProcess implements Runnable, ManagedProcess {
     private final static Logger logger = LoggerFactory.getLogger(HeartBeatProcess.class);
 
     protected final static Map<Integer, TransportChannel> channels = new HashMap<>();
+    protected final static Map<Integer, TransportChannel> channelsMCC = new HashMap<>();
 
     static {
+        final TransportChannel local = new TransportChannel();
+        channelsMCC.put(local.getChannelId(), local);
         for (int i = 0; i < Config.getConfig().CLUSTER_NODES.length; i++) {
             final TransportChannel channel = new TransportChannel(Config.getConfig().CLUSTER_NODES[i]);
             channels.put(channel.getChannelId(), channel);
+            channelsMCC.put(channel.getChannelId(), channel);
         }
     }
 
     public static Map<Integer, TransportChannel> getChannels() {
         return channels;
+    }
+
+    public static Map<Integer, TransportChannel> getChannelsMCC() {
+        return channelsMCC;
+    }
+
+    public static TransportChannel getChannelById(int id) {
+        return channelsMCC.get(id);
     }
 
     public void run () {

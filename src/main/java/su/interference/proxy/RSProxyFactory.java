@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -116,7 +116,7 @@ public class RSProxyFactory {
         for (int i=0; i<cs.size(); i++) {
             Field f = cs.get(i).getColumn();
             sb.append("    @Column\n");
-            sb.append("    @MgmtColumn(width=50, show=true, form=false, edit=false)\n");
+            sb.append("    @MgmtColumn(name=\""+cs.get(i).getAlias()+"\", width=20)\n");
             sb.append("    private ");
             sb.append(cs.get(i).getResultSetType());
             sb.append(" ");

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -27,7 +27,6 @@ package su.interference.persistent;
 import su.interference.core.SystemEntity;
 import su.interference.core.IndexColumn;
 import su.interference.core.DataChunk;
-import su.interference.mgmt.MgmtColumn;
 import su.interference.exception.InternalException;
 
 import javax.persistence.Entity;
@@ -48,16 +47,12 @@ public class MgmtModule {
     @Column
     @Id
     @IndexColumn
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private int moduleId;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private String name;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private String className;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
     private int accessId;
 
     @Transient

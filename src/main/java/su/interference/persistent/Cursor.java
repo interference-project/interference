@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -26,6 +26,7 @@ package su.interference.persistent;
 
 import su.interference.core.*;
 import su.interference.exception.InternalException;
+import su.interference.mgmt.MgmtClass;
 import su.interference.mgmt.MgmtColumn;
 import su.interference.sql.SQLSelect;
 
@@ -42,6 +43,7 @@ import java.util.List;
 @Entity
 @SystemEntity
 @DisableSync
+@MgmtClass
 public class Cursor implements Serializable {
     @Transient
     public static final int MASTER_TYPE     = 1;
@@ -65,25 +67,25 @@ public class Cursor implements Serializable {
     @IndexColumn
     @GeneratedValue
     @DistributedId
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Cursor Id",width=10)
     private long cursorId;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="SQL",width=50)
     private String sql;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Target Node",width=10)
     private int targetNodeId;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Target Id",width=10)
     private int targetId;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Target Class",width=10)
     private String targetClassName;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Type",width=10)
     private int type;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="State",width=10)
     private int state;
 
     @Transient
