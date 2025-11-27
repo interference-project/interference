@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import su.interference.core.MapField;
 import su.interference.core.*;
 import su.interference.exception.*;
+import su.interference.mgmt.MgmtClass;
 import su.interference.mgmt.MgmtColumn;
 import su.interference.proxy.*;
 import su.interference.sql.ResultSet;
@@ -54,6 +55,7 @@ import javax.persistence.*;
 @Entity
 @SystemEntity
 @DisableSync
+@MgmtClass
 public class Session implements OnDelete {
     @Transient
     public static final int ROOT_USER_ID = 1;
@@ -63,27 +65,27 @@ public class Session implements OnDelete {
     @DistributedId
     @Column
     @IndexColumn
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Session Id",width=10)
     private long sid;
     @Column
     @IndexColumn
-    @MgmtColumn(width=10, show=true, form=true, edit=false)
+    @MgmtColumn(name="SID",width=10)
     private String sessionId;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Node Id",width=10)
     private int nodeId;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="User Id",width=10)
     private int userId;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Date Start",width=10)
     private Date dateStart;
     @Column
     private Date dateEnd;
     @Column
     private Date dateLastAction;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="IP",width=10)
     private String ipAddress;
 
     @Transient

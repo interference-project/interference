@@ -41,6 +41,7 @@ import su.interference.core.*;
 import su.interference.exception.*;
 import su.interference.metrics.Meter;
 import su.interference.metrics.Metrics;
+import su.interference.mgmt.MgmtClass;
 import su.interference.mgmt.MgmtClassIdColumn;
 import su.interference.mgmt.MgmtColumn;
 import su.interference.sql.ResultSet;
@@ -58,6 +59,7 @@ import javax.persistence.*;
 @Entity
 @SystemEntity
 @DisableSync
+@MgmtClass
 public class Table implements ResultSet {
 
     @Transient
@@ -73,11 +75,11 @@ public class Table implements ResultSet {
     @Id
     @MapColumn
     @GeneratedValue
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Table ID", width=10)
     private int objectId;
     @Column
     @MapColumn
-    @MgmtColumn(width=80, show=true, form=true, edit=false)
+    @MgmtColumn(name="Name", width=80)
     @MgmtClassIdColumn
     private String name;
     @Column
@@ -85,7 +87,7 @@ public class Table implements ResultSet {
     @Column
     private long frameStart;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Size (frames)", width=10)
     private int frameSize;
     @Column
     private int fileLast;

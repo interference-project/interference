@@ -532,9 +532,17 @@ public class Instance implements Interference {
         return res.toArray(new DataFile[]{});
     }
 
+    public Map<Integer, DataFile> getDataFilesMap() {
+        final Map<Integer, DataFile> res = new HashMap<>();
+        for (Object o : tDataFile.getIndexFieldByColumn("fileId").getIndex().getContent()) {
+            res.put(((DataFile)((DataChunk)o).getEntity()).getFileId(), (DataFile)((DataChunk)o).getEntity());
+        }
+        return res;
+    }
+
     public MgmtModule[] getMgmtModules() {
         final Table t = getTableByName("su.interference.persistent.MgmtModule");
-        final ArrayList<MgmtModule> res = new ArrayList<MgmtModule>();
+        final ArrayList<MgmtModule> res = new ArrayList<>();
         for (Object o : t.getIndexFieldByColumn("moduleId").getIndex().getContent()) {
             res.add((MgmtModule)((DataChunk)o).getEntity());
         }
@@ -551,6 +559,15 @@ public class Instance implements Interference {
         return (Cursor)((DataChunk)t.getIndexFieldByColumn("cursorId").getIndex().getObjectByKey(id)).getEntity();
     }
 
+    public synchronized List<Cursor> getCursors () {
+        final Table t = getTableByName("su.interference.persistent.Cursor");
+        final ArrayList<Cursor> res = new ArrayList<>();
+        for (Object o : t.getIndexFieldByColumn("cursorId").getIndex().getContent()) {
+            res.add((Cursor)((DataChunk)o).getEntity());
+        }
+        return res;
+    }
+
     public Table getTableById (int id) {
         if (tt != null) {
             final MapField map = tt.getMapFieldByColumn("objectId");
@@ -562,6 +579,22 @@ public class Instance implements Interference {
             }
         }
         return null;
+    }
+
+    public List<Table> getTables () {
+        final List<Table> result = new ArrayList<>();
+        if (tt != null) {
+            final MapField map = tt.getMapFieldByColumn("objectId");
+            if (map != null) {
+                for (Object o : map.getMap().entrySet()) {
+                    final DataChunk c = (DataChunk) ((Map.Entry) o).getValue();
+                    if (c != null) {
+                        result.add((Table) c.getEntity());
+                    }
+                }
+            }
+        }
+        return result;
     }
 
     public synchronized Table getTableByName (String name) {
@@ -582,6 +615,22 @@ public class Instance implements Interference {
     public Map getFramesMap () {
         final MapField ixf = tFrameData.getMapFieldByColumn("frameId");
         return ixf.getMap();
+    }
+
+    public List<FrameData> getSortedDataFrames (Map<Integer, DataFile> dfsmap, int type) {
+        final MapField ixf = tFrameData.getMapFieldByColumn("frameId");
+        final ArrayList<FrameData> r = new ArrayList<>();
+        //ixf.getMap().values().stream().map(o -> ((DataChunk) o).getEntity()).filter(o -> dfsmap.get(((FrameData) o).getAllocFile()).getType() == type).sorted().forEach(o -> r.add((FrameData) o));
+        for (Object o : ixf.getMap().values()) {
+            FrameData fd = (FrameData) ((DataChunk) o).getEntity();
+            int fileId = (int) fd.getFile();
+            System.out.println(fileId);
+            if (dfsmap.get(fileId).getType() == type) {
+                r.add(fd);
+            }
+        }
+        Collections.sort(r);
+        return r;
     }
 
     public FrameData getFrameById (long id) {
@@ -636,6 +685,19 @@ public class Instance implements Interference {
             r.add((DataFile)((DataChunk)o).getEntity());
         }
         return r;
+    }
+
+    public synchronized List<Session> getSessions () {
+        List<Session> res = new ArrayList<>();
+        if (Instance.getInstance().systemState==Instance.SYSTEM_STATE_UP) {
+            Table t = getTableByName("su.interference.persistent.Session");
+            for (Object o : t.getIndexFieldByColumn("sessionId").getIndex().getContent()) {
+                res.add((Session) ((DataChunk) o).getEntity());
+            }
+        } else {
+            res.add(Session.getDntmSession());
+        }
+        return res;
     }
 
     public synchronized Session getSession (String sessionId) {
@@ -701,6 +763,11 @@ public class Instance implements Interference {
         return r;
     }
 
+    public synchronized Process getProcessById (int id) {
+        final Table t = getTableByName("su.interference.persistent.Process");
+        return (Process)((DataChunk)t.getIndexFieldByColumn("processId").getIndex().getObjectByKey(id)).getEntity();
+    }
+
     public synchronized Process getProcessByName (String name) {
         final Table t = getTableByName("su.interference.persistent.Process");
         return (Process)((DataChunk)t.getIndexFieldByColumn("processName").getIndex().getObjectByKey(name)).getEntity();
@@ -708,7 +775,7 @@ public class Instance implements Interference {
 
     public synchronized List<Process> getProcesses () {
         final Table t = getTableByName("su.interference.persistent.Process");
-        final ArrayList<Process> r = new ArrayList<Process>();
+        final ArrayList<Process> r = new ArrayList<>();
         for (Object o : t.getIndexFieldByColumn("processId").getIndex().getContent()) {
             r.add((Process)((DataChunk)o).getEntity());
         }

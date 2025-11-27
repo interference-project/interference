@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -51,20 +51,20 @@ public class FreeFrame implements Comparable, FilePartitioned {
     @Id
     @Column
     @IndexColumn
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Frame Id",width=10)
     private long frameId;
     @Column
     @IndexColumn
-    @MgmtColumn(width=20, show=true, form=false, edit=false)
+    @MgmtColumn(name="File Id",width=20)
     private int fileId;
     @Column
-    @MgmtColumn(width=20, show=true, form=false, edit=false)
+    @MgmtColumn(name="Object Id",width=20)
     private int objectId;
     @Column
-    @MgmtColumn(width=30, show=true, form=false, edit=false)
+    @MgmtColumn(name="Size",width=30)
     private int size;
     @Column
-    @MgmtColumn(width=30, show=true, form=false, edit=false)
+    @MgmtColumn(name="Passed",width=30)
     private int passed;
 
     @Transient

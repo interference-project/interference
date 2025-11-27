@@ -28,9 +28,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.persistent.Session;
 import su.interference.core.*;
-import su.interference.transport.MgmtEvent;
-import su.interference.transport.TransportContext;
+import su.interference.transport.HeartBeatProcess;
 
+import java.lang.reflect.Method;
 import java.net.Socket;
 import java.io.*;
 import java.util.*;
@@ -77,31 +77,21 @@ public class HTTPSession implements Runnable {
         pool.submit(this);
     }
 
-    private HTTPResponse processRequest(Properties params, String uri, String method, Properties header) {
+    private HTTPResponse processRequest(Properties params, String uri, String method, Properties header) throws Exception {
         //process request
         final String sessionId = (String)params.get("session_id");
         final String pageId = (String)params.get("page_id");
-        final String nodeId = (String)params.get("node_id");
+        final String objectId = (String)params.get("object_id");
+        final String type = (String)params.get("type");
         final String command = (String)params.get("command");
+        final String param = (String)params.get("param");
         final Session session = sessionId == null ? null : Instance.getInstance().getSession(sessionId);
-        if (session != null) {
-            try {
-                if ("Startup".equals(command)) {
-                    if (Integer.valueOf(nodeId) == Instance.getInstance().getLocalNodeId()) {
-                        Instance.getInstance().startupDatabase(session);
-                    } else {
-                        TransportContext.getInstance().send(new MgmtEvent(Integer.valueOf(nodeId), MgmtEvent.MGMT_STARTUP, sessionId));
-                    }
-                }
-                if ("Shutdown".equals(command)) {
-                    if (Integer.valueOf(nodeId) == Instance.getInstance().getLocalNodeId()) {
-                        Instance.getInstance().shutdownDatabase(session);
-                    } else {
-                        TransportContext.getInstance().send(new MgmtEvent(Integer.valueOf(nodeId), MgmtEvent.MGMT_SHUTDOWN, sessionId));
-                    }
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
+        if (session != null && type != null && objectId != null) {
+            final Object object = getObjectByTypeAndId(type, objectId);
+            if (object != null) {
+                Class c = object.getClass();
+                Method m = c.getDeclaredMethod(command, String.class, String.class);
+                m.invoke(object, param, session.getSessionId());
             }
         }
         try {
@@ -109,6 +99,30 @@ public class HTTPSession implements Runnable {
             return response;
         } catch (Exception e) {
             logger.error("Exception occured during process HTTP request", e);
+        }
+        return null;
+    }
+
+    private Object getObjectByTypeAndId(String type, String objectId) {
+        switch (type) {
+            case "Table":
+                int id = Integer.valueOf(objectId);
+                return Instance.getInstance().getTableById(id);
+            case "Session":
+                long sid = Integer.valueOf(objectId);
+                return Instance.getInstance().getSessionBySid(sid);
+            case "Transaction":
+                long transId = Integer.valueOf(objectId);
+                return Instance.getInstance().getTransactionById(transId);
+            case "Cursor":
+                long cid = Integer.valueOf(objectId);
+                return Instance.getInstance().getCursorById(cid);
+            case "TransportChannel":
+                int tcid = Integer.valueOf(objectId);
+                return HeartBeatProcess.getChannelById(tcid);
+            case "Process":
+                int pid = Integer.valueOf(objectId);
+                return Instance.getInstance().getProcessById(pid);
         }
         return null;
     }
@@ -200,7 +214,7 @@ public class HTTPSession implements Runnable {
             in.close();
             is.close();
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             logger.error("Exception occured during HTTP session process", e);
             sendResponse(HTTP_500_INTERNAL_ERROR, "500 Internal Error");
         }

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2019 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -24,8 +24,6 @@
 
 package su.interference.persistent;
 
-import su.interference.mgmt.MgmtColumn;
-import su.interference.core.SystemEntity;
 import javax.persistence.*;
 
 /**
@@ -38,13 +36,10 @@ public class Source {
     @Column
     @Id
     @GeneratedValue
-    @MgmtColumn(width=5, show=true, form=false, edit=false)
     private int sourceId;
     @Column
-    @MgmtColumn(width=5, show=true, form=false, edit=true)
     private int type;
     @Column
-    @MgmtColumn(width=25, show=true, form=true, edit=true)
     private String text;
 
     public Source() {

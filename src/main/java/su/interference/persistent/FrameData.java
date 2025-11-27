@@ -27,6 +27,7 @@ package su.interference.persistent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.core.*;
+import su.interference.mgmt.MgmtClass;
 import su.interference.mgmt.MgmtColumn;
 import su.interference.sql.FrameApi;
 import su.interference.transport.CommandEvent;
@@ -50,6 +51,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Entity
 @SystemEntity
 @DisableSync
+@MgmtClass
 public class FrameData implements Serializable, Comparable, FrameApi, FilePartitioned, OnDelete {
 
     @Transient
@@ -61,35 +63,35 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     @Column
     @IndexColumn
-    @MgmtColumn(width=20, show=true, form=false, edit=false)
+    @MgmtColumn(name="Frame Id",width=20)
     private volatile int objectId;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="File Id",width=10)
     private volatile int file;
     @Column
-    @MgmtColumn(width=30, show=true, form=true, edit=false)
+    @MgmtColumn(name="PTR",width=30)
     private volatile long ptr;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Size",width=10)
     private volatile int size;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Used",width=10)
     private volatile int used;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Prev File Id",width=10)
     private volatile int prevFile;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Prev PTR",width=10)
     private volatile long prevFrame;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Next File Id",width=10)
     private volatile int nextFile;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Next PTR",width=10)
     private volatile long nextFrame;
     @Column
     @MapColumn
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Alloc Id",width=10)
     private volatile long allocId; //virtual Id field
     @Column
     private int frameType;

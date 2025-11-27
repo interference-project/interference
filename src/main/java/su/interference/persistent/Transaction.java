@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.core.*;
 import su.interference.metrics.Metrics;
+import su.interference.mgmt.MgmtClass;
 import su.interference.mgmt.MgmtColumn;
 import su.interference.exception.InternalException;
 import su.interference.sql.SQLJoin;
@@ -48,6 +49,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Entity
 @SystemEntity
 @DisableSync
+@MgmtClass
 public class Transaction implements Serializable {
     @Transient
     public static final int TRAN_READ_COMMITTED = 0;
@@ -63,23 +65,23 @@ public class Transaction implements Serializable {
     @MapColumn
     @GeneratedValue
     @DistributedId
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Transaction Id",width=10)
     private long transId;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="SID",width=10)
     @IndexColumn
     private long sid;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Timestamp",width=10)
     private long timeStamp;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Transaction type",width=10)
     private int transType; // 0 - READ COMMITTED, 1 - SERIALIZABLE, 9 - THR
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="MTRAN",width=10)
     private long mTran;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Commit Id",width=10)
     private long cid;
 
     @Transient

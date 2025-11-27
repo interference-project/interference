@@ -28,12 +28,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.core.Config;
 import su.interference.core.Instance;
-import su.interference.persistent.Node;
-import su.interference.persistent.Session;
+import su.interference.core.Storage;
+import su.interference.mgmt.MgmtAction;
+import su.interference.mgmt.MgmtClass;
+import su.interference.mgmt.MgmtColumn;
+import su.interference.mgmt.MgmtContainer;
+import su.interference.persistent.*;
+import su.interference.persistent.Cursor;
 import su.interference.transport.HeartBeatProcess;
 import su.interference.transport.TransportChannel;
 
-import java.util.Map;
+import javax.persistence.Id;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.*;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * @author Yuriy Glotanov
@@ -52,17 +63,14 @@ public class MCContainer {
         result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 3, "Sessions")+"</td>";
         result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 4, "Transactions")+"</td>";
         result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 5, "SQL Queries")+"</td>";
+        result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 6, "Frames")+"</td>";
         result = result + "<td width=50% height=50 align=left valign=center>&nbsp;</td></tr>";
-        result = result + "<tr><td class=body colspan=6 width=100% height=100% align=left valign=top>"+getPageContent(pageId, sessionId)+"</td></tr></table>";
+        result = result + "<tr><td class=body colspan=7 width=100% height=100% align=left valign=top>"+getPageContent(pageId, sessionId)+"</td></tr></table>";
         return result;
     }
 
     private static String getPageA1(String sessionId, int pageId, String pageName) {
         return "<a class=hed href=\"?session_id="+sessionId+"&page_id="+pageId+"\">"+pageName+"</a>";
-    }
-
-    private static String getPageA2(String sessionId, int pageId, String pageName) {
-        return "<a href=\"?session_id="+sessionId+"&page_id="+pageId+"\">"+pageName+"</a>";
     }
 
     private static String getPageContent(String pageId, String sessionId) throws Exception {
@@ -73,13 +81,15 @@ public class MCContainer {
                     case 1:
                         return getSystemPage(sessionId, id);
                     case 2:
-                        return getTablesPage();
+                        return getTablesPage(sessionId, id);
                     case 3:
-                        return getSessionsPage();
+                        return getSessionsPage(sessionId, id);
                     case 4:
-                        return getTransactionsPage();
+                        return getTransactionsPage(sessionId, id);
                     case 5:
-                        return getSQLQueriesPage();
+                        return getSQLQueriesPage(sessionId, id);
+                    case 6:
+                        return getFramesPage(sessionId, id);
                 }
             } catch (NumberFormatException e) {
                 return "Wrong page idetifier";
@@ -88,54 +98,100 @@ public class MCContainer {
         return "No page defined";
     }
 
-    private static String getSystemPage(String sessionId, int pageId) throws Exception {
-        Map<Integer, TransportChannel> channels = HeartBeatProcess.getChannels();
-        String result = "<table class=head border=0 cellpadding=5 cellspacing=1 width=100%>\n";
-        result = result + "<tr><td bgcolor=#ffffff width=10% height=50 align=left valign=top>"+Instance.getInstance().getLocalNodeId()+"</td>";
-        result = result + "<td bgcolor=#ffffff width=10% height=50 align=left valign=center>"+mmhost+"</td>";
-        result = result + "<td bgcolor=#ffffff width=10% height=50 align=left valign=center>"+Config.getConfig().RMPORT+"</td>";
-        result = result + "<td bgcolor="+Instance.getInstance().getSystemStateCellColor(Instance.getInstance().getLocalNodeId())+" width=10% height=50 align=left valign=center>"+Instance.getInstance().getSystemStateString(Instance.getInstance().getLocalNodeId())+"</td>";
-        result = result + "<td bgcolor=#ffffff width=10% height=50 align=left valign=center>"+getStartupButtonForm(sessionId, Instance.getInstance().getLocalNodeId(), pageId, mmhost, Config.getConfig().MMPORT)+"</td>";
-        result = result + "<td bgcolor=#ffffff width=10% height=50 align=left valign=center>LOCAL</td></tr>";
-        for (Map.Entry<Integer, TransportChannel> entry : channels.entrySet()) {
-            result = result + "<tr><td bgcolor=#ffffff width=10% height=50 align=left valign=center>"+entry.getKey()+"</td>";
-            result = result + "<td bgcolor=#ffffff width=10% height=50 align=left valign=center>"+entry.getValue().getHost()+"</td>";
-            result = result + "<td bgcolor=#ffffff width=10% height=50 align=left valign=center>"+entry.getValue().getPort()+"</td>";
-            result = result + "<td bgcolor="+Instance.getInstance().getSystemStateCellColor(entry.getKey())+" width=10% height=50 align=left valign=center>"+Instance.getInstance().getSystemStateString(entry.getKey())+"</td>";
-            result = result + "<td bgcolor=#ffffff width=10% height=50 align=left valign=center>"+getStartupButtonForm(sessionId, entry.getKey(), pageId, mmhost, Config.getConfig().MMPORT)+"</td>";
-            result = result + "<td bgcolor=#ffffff width=10% height=50 align=left valign=center>REMOTE</td></tr>";
+    private static String getButtonForm(Class c, Object o, MgmtContainer mgmtcnt, String sessionId, String type, String objectId, int pageId, String host, int port) throws Exception {
+        String btn = mgmtcnt.getMgmtAction().name();
+        String command = mgmtcnt.getMethod().getName();
+        if (btn == null || btn.equals("")) {
+            return "";
         }
-        result = result + "</table>\n";
-
-        return result;
-    }
-
-    private static String getStartupButtonForm(String sessionId, int nodeId, int pageId, String host, int port) throws Exception {
-        String btn = Instance.getInstance().getBtnStringByState(nodeId);
-        String result = btn == null ? "" : "<form method=\"POST\" action=\"http://"+host+":"+port+"\">\n" +
+        String name = btn;
+        if (btn.startsWith("@")) {
+            String methodName = btn.substring(1);
+            if (!methodName.equals("")) {
+                Method m = c.getDeclaredMethod(methodName, null);
+                if (m.getReturnType().getSimpleName().equals("String")) {
+                    name = (String) m.invoke(o, null);
+                    if (name == null) {
+                        return "";
+                    }
+                } else {
+                    throw new RuntimeException();
+                }
+            }
+        }
+        String result = "<form method=\"POST\" action=\"http://"+host+":"+port+"\">\n" +
                 "<input type=\"hidden\" name=\"session_id\" value=\""+sessionId+"\">\n" +
                 "<input type=\"hidden\" name=\"page_id\" value=\""+pageId+"\">\n" +
-                "<input type=\"hidden\" name=\"node_id\" value=\""+nodeId+"\">\n" +
-                "<input type=\"hidden\" name=\"command\" value=\""+btn+"\">\n" +
-                "<input type=\"submit\" name=\"sys_button\" value=\""+btn+"\">\n" +
+                "<input type=\"hidden\" name=\"object_id\" value=\""+objectId+"\">\n" +
+                "<input type=\"hidden\" name=\"type\" value=\""+type+"\">\n" +
+                "<input type=\"hidden\" name=\"command\" value=\""+command+"\">\n" +
+                "<input type=\"hidden\" name=\"param\" value=\""+name+"\">\n" +
+                "<input type=\"submit\" name=\"sys_button\" value=\""+name+"\" onclick=\"javascript:this.disabled=true; this.form.submit()\">\n" +
                 "</form>\n";
         return result;
     }
 
-    private static String getTablesPage() {
-        return "TABLES";
+    private static String getSystemPage(String sessionId, int pageId) throws Exception {
+        return getChannelsPage(sessionId, pageId) + "<br>" + getDataFilesPage(sessionId, pageId) + "<br>" +getProcessesPage(sessionId, pageId);
     }
 
-    private static String getSessionsPage() {
-        return "SESSIONS";
+    private static String getChannelsPage(String sessionId, int pageId) throws Exception {
+        List<TransportChannel> channels = HeartBeatProcess.getChannelsMCC().values().stream().collect(Collectors.toList());
+        return getContentByMgmtObjects(channels, sessionId, pageId, mmhost, Config.getConfig().MMPORT);
     }
 
-    private static String getTransactionsPage() {
-        return "TRANSACTIONS";
+    private static String getDataFilesPage(String sessionId, int pageId) throws Exception {
+        List datafiles = Arrays.asList(Instance.getInstance().getDataFiles());
+        return getContentByMgmtObjects(datafiles, sessionId, pageId, mmhost, Config.getConfig().MMPORT);
     }
 
-    private static String getSQLQueriesPage() {
-        return "SQL QUERIES";
+    private static String getProcessesPage(String sessionId, int pageId) throws Exception {
+        List processes = Instance.getInstance().getProcesses();
+        return getContentByMgmtObjects(processes, sessionId, pageId, mmhost, Config.getConfig().MMPORT);
+    }
+
+    private static String getTablesPage(String sessionId, int pageId) throws Exception {
+        List tables = Instance.getInstance().getTables();
+        return getContentByMgmtObjects(tables, sessionId, pageId, mmhost, Config.getConfig().MMPORT);
+    }
+
+    private static String getSessionsPage(String sessionId, int pageId) throws Exception {
+        List<Session> sessions = Instance.getInstance().getSessions();
+        return getContentByMgmtObjects(sessions, sessionId, pageId, mmhost, Config.getConfig().MMPORT);
+    }
+
+    private static String getTransactionsPage(String sessionId, int pageId) throws Exception {
+        List<Transaction> transactions = Instance.getInstance().getTransactions();
+        return getContentByMgmtObjects(transactions, sessionId, pageId, mmhost, Config.getConfig().MMPORT);
+    }
+
+    private static String getSQLQueriesPage(String sessionId, int pageId) throws Exception {
+        List<Cursor> cursors = Instance.getInstance().getCursors();
+        return getContentByMgmtObjects(cursors, sessionId, pageId, mmhost, Config.getConfig().MMPORT);
+    }
+
+    private static String getFramesPage(String sessionId, int pageId) throws Exception {
+        Map<Integer, DataFile> dfsmap = Instance.getInstance().getDataFilesMap();
+        List<FrameData> frames = Instance.getInstance().getSortedDataFrames(dfsmap, Storage.DATAFILE_TYPEID);
+        StringBuffer result = new StringBuffer();
+        result.append("<table class=head border=0 cellpadding=5 cellspacing=1 width=100%>\n");
+        int size = frames.size()/24 + (frames.size()%24 > 0 ? 1 : 0);
+        for (int i = 0; i < size; i++) {
+            result.append("<tr>");
+            for (int j = 0; j < 24; j++) {
+                int ptr = (j + 1) * (i + 1) - 1;
+                if (ptr < frames.size()) {
+                    FrameData frameData = frames.get(ptr);
+                    result.append("<td class=frame width=6% height=50 align=left valign=top>" + frameData.getFrameId() + "<br>" + frameData.getAllocId() + "<br>" + frameData.getFrameUsed() + "</td>");
+                } else {
+                    result.append("<td class=frame width=6% height=50 align=left valign=top>No frame</td>");
+                }
+            }
+            result.append("</tr>");
+        }
+        result.append("</table>");
+
+        return result.toString();
     }
 
     protected static String getMCContent(String pageId, Session s) throws Exception {
@@ -149,6 +205,60 @@ public class MCContainer {
         "<body aLink=\"0000ff\" bgColor=\"efefef\" link=\"0000ff\" text=\"000000\" topMargin=\"0\" leftMargin=\"0\" rightMargin=\"0\" vLink=\"0000ff\">\n" +
         getContent(s.getSessionId(), pageId) +
         "</body></html>";
+    }
+
+    private static String getContentByMgmtObjects(List objects, String sessionId, int pageId, String host, int port) throws Exception {
+        if (objects == null || objects.size() == 0) {
+            return "";
+        }
+        Class c = objects.get(0).getClass();
+        String type = c.getSimpleName();
+        Annotation a = c.getAnnotation(MgmtClass.class);
+        List<MgmtContainer> mgmtlist = new ArrayList();
+        if (a != null) {
+            Field[] fields = c.getDeclaredFields();
+            Method[] methods = c.getDeclaredMethods();
+            Field idField = null;
+            for (Field f : fields) {
+                Annotation id = f.getAnnotation(Id.class);
+                if (id != null) {
+                    idField = f;
+                }
+            }
+            for (Field f : fields) {
+                Annotation fa = f.getAnnotation(MgmtColumn.class);
+                if (fa != null) {
+                    mgmtlist.add(new MgmtContainer((MgmtColumn) fa, null, f, null, c, idField));
+                }
+            }
+            for (Method m : methods) {
+                Annotation ma = m.getAnnotation(MgmtAction.class);
+                if (ma != null) {
+                    mgmtlist.add(new MgmtContainer(null, (MgmtAction) ma, null, m, c, idField));
+                }
+            }
+        }
+        int size = mgmtlist.size();
+        if (size > 0) {
+            String result = "<table class=head border=0 cellpadding=5 cellspacing=1 width=100%>\n";
+            result = result + "<tr>";
+            for (MgmtContainer mgmtcnt : mgmtlist) {
+                result = result + "<td class=head width="+mgmtcnt.getSize()+"% height=50 align=left valign=center>"+mgmtcnt.getHeader()+"</td>";
+            }
+            result = result + "</tr>";
+            for (Object o : objects) {
+                result = result + "<tr>";
+                for (MgmtContainer mgmtcnt : mgmtlist) {
+                    String objectId = mgmtcnt.getId(o);
+                    String s = mgmtcnt.isCommand() ? getButtonForm(c, o, mgmtcnt, sessionId, type, objectId, pageId, host, port) : mgmtcnt.getValue(o);
+                    result = result + "<td class=body width="+mgmtcnt.getSize()+"% height=30 align=left valign=center>"+s+"</td>";
+                }
+                result = result + "</tr>";
+            }
+            result = result + "</table>\n";
+            return result;
+        }
+        return "";
     }
 
     private static String getCSS() {
@@ -200,9 +310,10 @@ public class MCContainer {
                 ".phead   {font-family:arial,Helvetica,Verdana; font-size:9pt; color: #002030; font-weight: 700}\n" +
                 "td {font-family: Arial; font-size:8pt; color: #000000; }\n" +
                 "td.even  {font-family: Arial; color: #002040; background-color:f0f0f0}\n" +
-                "td.head {font-family: Arial; font-size:12pt; color: #002040; background-color:dfcfc0}\n" +
+                "td.head {font-family: Arial; font-size:11pt; color: #002040; background-color:afbfd0}\n" +
                 "td.odd  {font-family: Arial; background-color: #cfefd0; }\n" +
-                "td.body {font-family:arial,Helvetica,Verdana; font-size:12pt; color: #001020; background-color:e8e8e8; font-weight: 500}\n" +
+                "td.body {font-family: Arial,Helvetica,Verdana; font-size:10pt; color: #001020; background-color:e8e8f8; font-weight: 500}\n" +
+                "td.frame {font-family: Arial,Helvetica,Verdana; font-size:9pt; color: #001020; background-color:a8e8a8; font-weight: 600}\n" +
                 "td.phead {font-family: Arial,Helvetica,Verdana; font-size:9pt; color:002040; font-weight: 700}\n" +
                 "td.back {font-family: Arial; color: #002040; background-color:c0b0b0}\n" +
                 "table.head { font-size:10pt; background-color: 003060; }\n" +

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -27,7 +27,13 @@ package su.interference.transport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.core.Config;
+import su.interference.core.Instance;
+import su.interference.mgmt.MgmtAction;
+import su.interference.mgmt.MgmtClass;
+import su.interference.mgmt.MgmtColumn;
+import su.interference.persistent.Session;
 
+import javax.persistence.Id;
 import java.io.*;
 
 import java.net.InetSocketAddress;
@@ -42,10 +48,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 1.0
  */
 
+@MgmtClass
 public class TransportChannel {
 
     private final static Logger logger = LoggerFactory.getLogger(TransportChannel.class);
+    @MgmtColumn(name="Node Id", width=20)
+    @Id
     private final int channelId;
+    private final String type;
     private final String channelUUID;
     private final ConcurrentLinkedQueue<TransportMessage> mq = new ConcurrentLinkedQueue<>();
     private final Map<String, TransportMessage> mmap = new ConcurrentHashMap<>();
@@ -53,14 +63,29 @@ public class TransportChannel {
     private final ExecutorService pool = Executors.newFixedThreadPool(1);
     private final AtomicBoolean connected =  new AtomicBoolean(false);
     private final AtomicBoolean started =  new AtomicBoolean(false);
+    @MgmtColumn(name="Host", width=20)
     private final String host;
+    @MgmtColumn(name="Port", width=20)
     private final int port;
+    @MgmtColumn(name="IP Address", width=20)
     private final InetSocketAddress socketAddress;
+    @MgmtColumn(name="State", width=20)
+    private String systemState;
 
     protected TransportChannel(String hostport) {
         this.channelId = Integer.valueOf(hostport.substring(0, hostport.indexOf(":",1)));
+        this.type = "REMOTE";
         this.host = hostport.substring(hostport.indexOf(":")+1, hostport.indexOf(":", hostport.indexOf(":")+1));
         this.port = Integer.valueOf(hostport.substring(hostport.indexOf(":", hostport.indexOf(":", hostport.indexOf(":")+1))+1, hostport.length()));
+        this.channelUUID = UUID.randomUUID().toString();
+        socketAddress = new InetSocketAddress(host, port);
+    }
+
+    protected TransportChannel() {
+        this.channelId = Config.getConfig().LOCAL_NODE_ID;
+        this.type = "LOCAL";
+        this.host = "localhost";
+        this.port = Config.getConfig().RMPORT;
         this.channelUUID = UUID.randomUUID().toString();
         socketAddress = new InetSocketAddress(host, port);
     }
@@ -222,12 +247,51 @@ public class TransportChannel {
         return started.get();
     }
 
+    public String getType() {
+        return type;
+    }
+
     public String getHost() {
         return host;
     }
 
     public int getPort() {
         return port;
+    }
+
+    public InetSocketAddress getSocketAddress() {
+        return socketAddress;
+    }
+
+    public synchronized String getSystemState() throws Exception {
+        return Instance.getInstance().getSystemStateString(this.channelId);
+    }
+
+    public synchronized String getSystemStateCellColor() throws Exception {
+        return Instance.getInstance().getSystemStateCellColor(this.channelId);
+    }
+
+    public synchronized String getActionButtonCommand() throws Exception {
+        return Instance.getInstance().getBtnStringByState(this.channelId);
+    }
+
+    @MgmtAction(name="@getActionButtonCommand", enable="")
+    public synchronized void startupAction(String command, String sessionId) throws Exception {
+        final Session session = sessionId == null ? null : Instance.getInstance().getSession(sessionId);
+        if ("Startup".equals(command)) {
+            if (this.channelId == Instance.getInstance().getLocalNodeId()) {
+                Instance.getInstance().startupDatabase(session);
+            } else {
+                TransportContext.getInstance().send(new MgmtEvent(this.channelId, MgmtEvent.MGMT_STARTUP, sessionId));
+            }
+        }
+        if ("Shutdown".equals(command)) {
+            if (this.channelId == Instance.getInstance().getLocalNodeId()) {
+                Instance.getInstance().shutdownDatabase(session);
+            } else {
+                TransportContext.getInstance().send(new MgmtEvent(this.channelId, MgmtEvent.MGMT_SHUTDOWN, sessionId));
+            }
+        }
     }
 
     @Override

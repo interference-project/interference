@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import su.interference.core.*;
 import su.interference.exception.*;
 import su.interference.metrics.Metrics;
+import su.interference.mgmt.MgmtClass;
 import su.interference.mgmt.MgmtColumn;
 import su.interference.serialize.ByteString;
 
@@ -47,28 +48,31 @@ import javax.persistence.*;
 
 @Entity
 @SystemEntity
+@MgmtClass
 public class DataFile implements Serializable {
 
     @Column
     @Id
     @GeneratedValue
     @IndexColumn
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="File Id",width=10)
     private int fileId;
     @Column
     @IndexColumn
+    @MgmtColumn(name="Type",width=10)
     private int type;
     @Column
     @IndexColumn
+    @MgmtColumn(name="Node Id",width=10)
     private int nodeId;
     @Column
-    @MgmtColumn(width=70, show=true, form=true, edit=false)
+    @MgmtColumn(name="Name",width=70)
     private String fileName;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Size",width=10)
     private long fileSize;
     @Column
-    @MgmtColumn(width=10, show=true, form=false, edit=false)
+    @MgmtColumn(name="Used",width=10)
     private long fileUsed;
     @Column
     private int fileExtAmount;
