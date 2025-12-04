@@ -292,11 +292,16 @@ public class Instance implements Interference {
         return Config.getConfig().CODEPAGE;
     }
 
-    public String getDateFormat() throws ClassNotFoundException, InternalException, InstantiationException, IllegalAccessException {
-        if (systemState==SYSTEM_STATE_UP) {
-            return Storage.getStorage().getDateFormat();
+    public String getDateFormat() {
+        try {
+            if (systemState == SYSTEM_STATE_UP) {
+                return Storage.getStorage().getDateFormat();
+            }
+        } catch (Exception e) {
+            logger.error("Exception occured during Instance.getDateFormat", e);
+        } finally {
+            return Config.getConfig().DATEFORMAT;
         }
-        return Config.getConfig().DATEFORMAT;
     }
 
     public String getLocalhost() {

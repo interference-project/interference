@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -53,6 +53,9 @@ public class CustomSerializer implements SerializerApi {
 
     private byte[] b = new byte[]{};
     private final boolean external;
+    private static SimpleDateFormat df = new SimpleDateFormat(Instance.getInstance() == null ? Config.getConfig().DATEFORMAT : Instance.getInstance().getDateFormat());
+    private static SimpleDateFormat extdf = new SimpleDateFormat(Config.getConfig().DATEFORMAT);
+
 
     public CustomSerializer() {
         this.external = false;
@@ -286,8 +289,7 @@ public class CustomSerializer implements SerializerApi {
                 case (t_double):
                     return Double.parseDouble(v);
                 case (t_date):
-                    SimpleDateFormat df = new SimpleDateFormat(this.external ? Config.getConfig().DATEFORMAT : Instance.getInstance() == null ? Config.getConfig().DATEFORMAT : Instance.getInstance().getDateFormat());
-                    return df.parse(v);
+                    return this.external ? extdf.parse(v) : df.parse(v);
                 case (t_string):
                     return v;
             }
