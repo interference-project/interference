@@ -291,25 +291,36 @@ public class IndexFrame extends Frame {
 
     //accepted only to node element lists
     //for unique indexes
-    public synchronized DataChunk getChildElementPtr(ValueSet value) throws InternalException {
-        //todo if (!this.sorted) {
-            this.sort();
-        //}
-        for (Chunk ie : this.data.getChunks()) {
-            if (((DataChunk)ie).getDcs().compareTo(value)>=0) {
-                return ((DataChunk)ie); //known as ptr for node element
+    public synchronized DataChunk getChildElementPtr(ValueSet key) {
+        this.sort();
+        List<Chunk> chunks = (List) this.data.getChunks();
+
+        int low = 0;
+        int high = chunks.size() - 1;
+
+        DataChunk result = null;
+        while (low <= high) {
+            int mid = (low + high) >>> 1;
+            Comparable midVal = chunks.get(mid).getDcs();
+            int cmp = midVal.compareTo(key);
+
+            if (cmp < 0) {
+                low = mid + 1;
+            } else if (cmp > 0) {
+                result = (DataChunk) chunks.get(mid);
+                high = mid - 1;
+            } else {
+                return (DataChunk) chunks.get(mid);
             }
         }
-        return null;
+        return result;
     }
 
     //accepted only to node element lists
     //for non-unique indexes
     public synchronized ArrayList<Long> getChildElementsPtr(ValueSet value) throws InternalException {
-        //todo if (!this.sorted) {
-            this.sort();
-        //}
-        ArrayList<Long> r = new ArrayList<Long>();
+        this.sort();
+        ArrayList<Long> r = new ArrayList<>();
         for (Chunk ie : this.data.getChunks()) {
             if (((DataChunk)ie).getDcs().compareTo(value) == 0) {
                 r.add (((DataChunk)ie).getHeader().getFramePtr()); //known as ptr for node element
