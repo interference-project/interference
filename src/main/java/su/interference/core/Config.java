@@ -26,13 +26,12 @@ package su.interference.core;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import su.interference.mgmt.MgmtConfig;
 
-import java.util.ArrayList;
-import java.util.Properties;
+import java.util.*;
 import java.io.FileInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.util.StringTokenizer;
 
 /**
  * @author Yuriy Glotanov
@@ -458,6 +457,48 @@ public class Config {
             logger.warn(description + " value is not valid - use default value");
         }
         return def;
+    }
+
+    public Map<String, Object> getSystemParameters() {
+        Map<String, Object> result = new HashMap<>();
+        result.put(P_LOCAL_NODE_ID, LOCAL_NODE_ID);
+        result.put(P_DB_PATH, DB_PATH);
+        result.put(JOURNAL_PATH, JOURNAL_PATH);
+        result.put(P_CLUSTER_NODES, CLUSTER_NODES);
+        result.put(P_REGISTER_CLASSES, REGISTER_CLASSES);
+        result.put(P_MMPORT, MMPORT);
+        result.put(P_RMPORT, RMPORT);
+        result.put(P_FRAMESIZE, FRAMESIZE);
+        result.put(P_FRAMESIZE2, FRAMESIZE2);
+        result.put(P_FILES_AMOUNT, FILES_AMOUNT);
+        result.put(P_DISKIO_MODE, DISKIO_MODE);
+        result.put(P_SYNC_LOCK_ENABLE, SYNC_LOCK_ENABLE);
+        result.put(P_SYNC_PERIOD, SYNC_PERIOD);
+        result.put(P_RETRIEVE_QUEUE_SIZE, RETRIEVE_QUEUE_SIZE);
+        result.put(P_RETRIEVE_THREADS_AMOUNT, RETRIEVE_THREADS_AMOUNT);
+        result.put(P_CODEPAGE, CODEPAGE);
+        result.put(P_DATEFORMAT, DATEFORMAT);
+        result.put(P_REMOTE_SYNC_TIMEOUT, REMOTE_SYNC_TIMEOUT);
+        result.put(P_READ_BUFFER_SIZE, READ_BUFFER_SIZE);
+        result.put(P_WRITE_BUFFER_SIZE, WRITE_BUFFER_SIZE);
+        result.put(P_TRANS_CLEANUP_TIMEOUT, TRANS_CLEANUP_TIMEOUT);
+        result.put(P_CLEANUP_ENABLE, CLEANUP_ENABLE);
+        result.put(P_CLEANUP_TIMEOUT, CLEANUP_TIMEOUT);
+        result.put(P_CLEANUP_PROTECTION_THR, CLEANUP_PROTECTION_THR);
+        result.put(P_IX_CLEANUP_PROTECTION_THR, IX_CLEANUP_PROTECTION_THR);
+        result.put(P_HEAP_USE_THR_DATA, HEAP_USE_THR_DATA);
+        result.put(P_HEAP_USE_THR_INDX, HEAP_USE_THR_INDX);
+        result.put(P_HEAP_USE_THR_TEMP, HEAP_USE_THR_TEMP);
+        result.put(P_HEAP_USE_THR_UNDO, HEAP_USE_THR_UNDO);
+        return result;
+    }
+
+    public List<MgmtConfig> getMgmtConfigParams() {
+        List<MgmtConfig> result = new ArrayList<>();
+        for (Map.Entry<String, Object> entry : getSystemParameters().entrySet()) {
+            result.add(new MgmtConfig(entry.getKey(), entry.getValue()));
+        }
+        return result;
     }
 
 }

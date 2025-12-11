@@ -41,6 +41,8 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.InvocationTargetException;
 import javax.persistence.*;
 
+import static su.interference.core.Storage.*;
+
 /**
  * @author Yuriy Glotanov
  * @since 1.0
@@ -59,7 +61,6 @@ public class DataFile implements Serializable {
     private int fileId;
     @Column
     @IndexColumn
-    @MgmtColumn(name="Type",width=10)
     private int type;
     @Column
     @IndexColumn
@@ -69,14 +70,21 @@ public class DataFile implements Serializable {
     @MgmtColumn(name="Name",width=70)
     private String fileName;
     @Column
-    @MgmtColumn(name="Size",width=10)
     private long fileSize;
     @Column
-    @MgmtColumn(name="Used",width=10)
     private long fileUsed;
     @Column
     private int fileExtAmount;
+    @MgmtColumn(name="Frames allocated",width=20)
+    @Transient
+    private int framesCnt;
+    @MgmtColumn(name="Frames deallocated",width=20)
+    @Transient
+    private int freeFramesCnt;
 
+    @MgmtColumn(name="Type",width=20)
+    @Transient
+    private String dataFileType;
     @Transient
     public static final int CLASS_ID = 4;
     @Transient
@@ -523,7 +531,7 @@ public class DataFile implements Serializable {
     }
 
     public boolean isData() {
-        return this.type == Storage.DATAFILE_TYPEID;
+        return this.type == DATAFILE_TYPEID;
     }
 
     public boolean isIndex() {
@@ -590,4 +598,25 @@ public class DataFile implements Serializable {
         this.fileExtAmount = fileExtAmount;
     }
 
+    public int getFramesCnt() {
+        return Instance.getInstance().getFramesCount(this.fileId);
+    }
+
+    public int getFreeFramesCnt() {
+        return Instance.getInstance().getFreeFramesCount(this.fileId);
+    }
+
+    public String getDataFileType() {
+        switch (this.type) {
+            case DATAFILE_TYPEID:
+                return "DATA";
+            case INDXFILE_TYPEID:
+                return "INDEX";
+            case UNDOFILE_TYPEID:
+                return "UNDO";
+            case TEMPFILE_TYPEID:
+                return "TEMP";
+        }
+        return "N/A";
+    }
 }

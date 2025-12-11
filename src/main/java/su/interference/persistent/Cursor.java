@@ -28,6 +28,7 @@ import su.interference.core.*;
 import su.interference.exception.InternalException;
 import su.interference.mgmt.MgmtClass;
 import su.interference.mgmt.MgmtColumn;
+import su.interference.sql.SQLCursor;
 import su.interference.sql.SQLSelect;
 
 import javax.persistence.*;
@@ -219,6 +220,10 @@ public class Cursor implements Serializable {
 
     public boolean isStream() {
         return this.type == STREAM_TYPE;
+    }
+
+    public List<SQLCursor> getSQLCursors() {
+        return this.getSqlStmt().getSQLCursors();
     }
 
 }

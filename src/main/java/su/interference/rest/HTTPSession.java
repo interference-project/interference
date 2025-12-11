@@ -199,6 +199,11 @@ public class HTTPSession implements Runnable {
                     sbuf.append(pbuf, 0, read);
                     read = in.read(pbuf);
                 }
+                StringBuffer sbuf2 = new StringBuffer();
+                while (read >= 0 && !(sbuf2.lastIndexOf("\r\n") == sbuf2.length())) {
+                    sbuf2.append(pbuf, 0, read);
+                    read = in.read(pbuf);
+                }
                 parseParams(sbuf.toString().trim(), params);
             }
 

@@ -749,6 +749,31 @@ public class Instance implements Interference {
         return (FreeFrame)dc.getEntity();
     }
 
+    public int getFreeFramesCount (int fileId) {
+        final IndexList ixf = tFreeFrame.getIndexFieldByColumn("frameId").getIndex();
+        int result = 0;
+        for (Object o : ixf.getContent()) {
+            final DataChunk dc = (DataChunk) o;
+            if (((FreeFrame) dc.getEntity()).getFile() == fileId) {
+                result++;
+            }
+        }
+        return result;
+    }
+
+    public int getFramesCount (int fileId) {
+        final MapField ixf = tFrameData.getMapFieldByColumn("frameId");
+        final Map ixl = ixf.getMap();
+        int result = 0;
+        for (Object o : ixl.values()) {
+            final DataChunk dc = (DataChunk) o;
+            if (((FrameData) dc.getEntity()).getFile() == fileId) {
+                result++;
+            }
+        }
+        return result;
+    }
+
     public ArrayList<FrameSync> getSyncFrames(int nodeId) {
         final ArrayList<FrameSync> r = new ArrayList<>();
         String uuid = null;

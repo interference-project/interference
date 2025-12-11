@@ -72,6 +72,7 @@ public final class HeartBeatProcess implements Runnable, ManagedProcess {
     }
 
     public void run () {
+        this.f = true;
         Thread.currentThread().setName("interference-heartbeat-thread-"+Thread.currentThread().getId());
         if (Instance.getInstance().getClusterState() == Instance.CLUSTER_STATE_DOWN) {
             f = false;

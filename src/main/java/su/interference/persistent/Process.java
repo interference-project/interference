@@ -86,8 +86,7 @@ public class Process implements Comparable {
         this.ro = r;
         this.th = new Thread(r);
         this.th.start();
-        Thread.State ts = this.th.getState();
-        this.state = ts.name();
+        this.state = "STARTED";
         try {
             s.persist(this); //update
         } catch (Exception e) {

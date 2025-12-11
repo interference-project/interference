@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -28,6 +28,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import su.interference.core.Config;
 import su.interference.core.IndexDescript;
+import su.interference.mgmt.MgmtClass;
+import su.interference.mgmt.MgmtColumn;
 import su.interference.persistent.*;
 import su.interference.exception.InternalException;
 import su.interference.core.Instance;
@@ -43,8 +45,10 @@ import java.util.concurrent.*;
  * @since 1.0
  */
 
+@MgmtClass
 public class SQLCursor implements FrameIterator {
 
+    @MgmtColumn(name = "Cursor Id", width = 10)
     private final int id;
     private ResultSet target;
     private static ExecutorService exec = SQLJoinThreadPool.getThreadPool();
@@ -80,6 +84,19 @@ public class SQLCursor implements FrameIterator {
     private final IndexDescript leadingIndex;
     private final boolean process;
     private final Class evtprc;
+
+    @MgmtColumn(name = "SQL", width = 30)
+    private String sql;
+    @MgmtColumn(name = "Join", width = 30)
+    private String joinInfo;
+    @MgmtColumn(name = "LTasks Unproc", width = 10)
+    private int ltasksUnproc;
+    @MgmtColumn(name = "LTasks Processed", width = 10)
+    private int ltasksProc;
+    @MgmtColumn(name = "RTasks Unproc", width = 10)
+    private int rtasksUnproc;
+    @MgmtColumn(name = "RTasks Processed", width = 10)
+    private int rtasksProc;
 
     private static Map<Integer, Map<Long, ConcurrentLinkedQueue<FrameApi>>> sfmap = new ConcurrentHashMap<>();
     private static final int BATCH_SIZE = 8;
@@ -727,5 +744,28 @@ public class SQLCursor implements FrameIterator {
         return evtprc;
     }
 
+    public String getSql() {
+        return this.cur.getSql();
+    }
+
+    public String getJoinInfo() {
+        return this.hmap == null ? "NONE" : this.hmap.getJoinInfo();
+    }
+
+    public int getLtasksUnproc() {
+        return this.ltasks.size();
+    }
+
+    public int getLtasksProc() {
+        return this.ltasks.remainingCapacity();
+    }
+
+    public int getRtasksUnproc() {
+        return this.rtasks.size();
+    }
+
+    public int getRtasksProc() {
+        return this.rtasks.remainingCapacity();
+    }
 }
 
