@@ -29,12 +29,10 @@ import org.slf4j.LoggerFactory;
 import su.interference.core.Config;
 import su.interference.core.Instance;
 import su.interference.core.Storage;
-import su.interference.mgmt.MgmtAction;
-import su.interference.mgmt.MgmtClass;
-import su.interference.mgmt.MgmtColumn;
-import su.interference.mgmt.MgmtContainer;
+import su.interference.mgmt.*;
 import su.interference.persistent.*;
 import su.interference.persistent.Cursor;
+import su.interference.sql.SQLCursor;
 import su.interference.transport.HeartBeatProcess;
 import su.interference.transport.TransportChannel;
 
@@ -92,10 +90,10 @@ public class MCContainer {
                         return getFramesPage(sessionId, id);
                 }
             } catch (NumberFormatException e) {
-                return "Wrong page idetifier";
+                return getSystemPage(sessionId, 1);
             }
         }
-        return "No page defined";
+        return getSystemPage(sessionId, 1);
     }
 
     private static String getButtonForm(Class c, Object o, MgmtContainer mgmtcnt, String sessionId, String type, String objectId, int pageId, String host, int port) throws Exception {
@@ -131,13 +129,29 @@ public class MCContainer {
         return result;
     }
 
+    // getUploadForm(sessionId, pageId, mmhost, Config.getConfig().MMPORT)
+    private static String getUploadForm(String sessionId, int pageId, String host, int port) {
+        String result = "<form method=\"POST\" action=\"http://"+host+":"+port+"\" enctype=\"multipart/form-data\">\n" +
+                "<input type=\"hidden\" name=\"session_id\" value=\""+sessionId+"\">\n" +
+                "<input type=\"hidden\" name=\"page_id\" value=\""+pageId+"\">\n" +
+                "<input type=\"file\" name=\"upload\">\n" +
+                "<input type=\"submit\" name=\"sys_button\" value=\"Upload\" onclick=\"javascript:this.disabled=true; this.form.submit()\">\n" +
+                "</form>\n";
+        return result;
+    }
+
     private static String getSystemPage(String sessionId, int pageId) throws Exception {
-        return getChannelsPage(sessionId, pageId) + "<br>" + getDataFilesPage(sessionId, pageId) + "<br>" +getProcessesPage(sessionId, pageId);
+        return getChannelsPage(sessionId, pageId) + "<br>" + getConfigPage(sessionId, pageId) + "<br>" + getDataFilesPage(sessionId, pageId) + "<br>" +getProcessesPage(sessionId, pageId);
     }
 
     private static String getChannelsPage(String sessionId, int pageId) throws Exception {
         List<TransportChannel> channels = HeartBeatProcess.getChannelsMCC().values().stream().collect(Collectors.toList());
         return getContentByMgmtObjects(channels, sessionId, pageId, mmhost, Config.getConfig().MMPORT);
+    }
+
+    private static String getConfigPage(String sessionId, int pageId) throws Exception {
+        List<MgmtConfig> configs = Config.getConfig().getMgmtConfigParams();
+        return getContentByMgmtObjects(configs, sessionId, pageId, mmhost, Config.getConfig().MMPORT);
     }
 
     private static String getDataFilesPage(String sessionId, int pageId) throws Exception {
@@ -165,8 +179,18 @@ public class MCContainer {
         return getContentByMgmtObjects(transactions, sessionId, pageId, mmhost, Config.getConfig().MMPORT);
     }
 
-    private static String getSQLQueriesPage(String sessionId, int pageId) throws Exception {
+    private static String getSQLQueriesPage2(String sessionId, int pageId) throws Exception {
         List<Cursor> cursors = Instance.getInstance().getCursors();
+        return getContentByMgmtObjects(cursors, sessionId, pageId, mmhost, Config.getConfig().MMPORT);
+    }
+
+    private static String getSQLQueriesPage(String sessionId, int pageId) throws Exception {
+        List<SQLCursor> cursors = new ArrayList<>();
+        for (Cursor c: Instance.getInstance().getCursors()) {
+            if (c.getSqlStmt() != null) {
+                cursors.addAll(c.getSqlStmt().getSQLCursors());
+            }
+        }
         return getContentByMgmtObjects(cursors, sessionId, pageId, mmhost, Config.getConfig().MMPORT);
     }
 

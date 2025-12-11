@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -52,6 +52,7 @@ public class SQLJoinDispatcher implements Comparable {
     private final int weight;
     private final int join;
     private final Session s;
+    private final String joinInfo;
     private final static Logger logger = LoggerFactory.getLogger(SQLJoinDispatcher.class);
     public final static int MERGE = 1;
     public final static int RIGHT_MERGE = 2;
@@ -81,6 +82,7 @@ public class SQLJoinDispatcher implements Comparable {
                 this.join = MERGE;
                 final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
                 final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
+                this.joinInfo = "merge join " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName();
                 logger.info("use merge join for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
                 lbi_ = new SQLIndex(ix1, lt, true, c1, c2, true, nc, MERGE, this.process, s);
                 rbi_ = new SQLIndex(ix2, rt, false, c1, c2, true, nc, MERGE, this.process, s);
@@ -94,6 +96,7 @@ public class SQLJoinDispatcher implements Comparable {
                 this.join = MERGE;
                 final Table lt = Instance.getInstance().getTableById(rbi.getObjectId());
                 final Table rt = Instance.getInstance().getTableById(lbi.getObjectId());
+                this.joinInfo = "merge join " + lt.getName() + "." + c2.getColumn().getName() + " * " + rt.getName() + "." + c1.getColumn().getName();
                 logger.info("use merge join for " + lt.getName() + "." + c2.getColumn().getName() + " * " + rt.getName() + "." + c1.getColumn().getName());
                 lbi_ = new SQLIndex(ix2, lt, true, c2, c1, true, nc, MERGE, this.process, s);
                 rbi_ = new SQLIndex(ix1, rt, false, c2, c1, true, nc, MERGE, this.process, s);
@@ -119,6 +122,7 @@ public class SQLJoinDispatcher implements Comparable {
                 final Table rt_ = Instance.getInstance().getTableById(hbi.getObjectId());
                 SQLColumn cmap_ = hbi.getObjectId() == c1.getObjectId() ? c1 : c2;
                 SQLColumn ckey_ = hbi.getObjectId() == c1.getObjectId() ? c2 : c1;
+                this.joinInfo = "right hash join " + lt_.getName() + "." + c1.getColumn().getName() + " * " + rt_.getName() + "." + c2.getColumn().getName();
                 logger.info("use right hash join for " + lt_.getName() + "." + c1.getColumn().getName() + " * " + rt_.getName() + "." + c2.getColumn().getName());
                 rbi_ = new SQLHashMap(cmap_, ckey_, hbi, rt_, s);
                 if (lbi_ instanceof SQLIndex) {
@@ -133,6 +137,7 @@ public class SQLJoinDispatcher implements Comparable {
                 this.join = RIGHT_INDEX;
                 final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
                 final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
+                this.joinInfo = "index scan " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName();
                 logger.info("use index scan for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
                 if (ix1 != null) {
                     lbi_ = ix2 == null ? rbi : new SQLIndex(ix1, lt, true, c1, c2, false, nc, RIGHT_INDEX, this.process, s);
@@ -153,6 +158,7 @@ public class SQLJoinDispatcher implements Comparable {
         } else {
             final Table lt = Instance.getInstance().getTableById(lbi.getObjectId());
             final Table rt = Instance.getInstance().getTableById(rbi.getObjectId());
+            this.joinInfo = "nested loops " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName();
             logger.info("use nested loops for " + lt.getName() + "." + c1.getColumn().getName() + " * " + rt.getName() + "." + c2.getColumn().getName());
             lbi_ = lbi;
             rbi_ = rbi;
@@ -203,5 +209,9 @@ public class SQLJoinDispatcher implements Comparable {
 
     public int getWeight() {
         return weight;
+    }
+
+    public String getJoinInfo() {
+        return joinInfo;
     }
 }

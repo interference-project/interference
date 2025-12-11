@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2021 head systems, ltd
+ Copyright (c) 2010-2025 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -51,6 +51,7 @@ public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
     private final transient CountDownLatch latch = new CountDownLatch(1);
     private BlockingQueue<Object> result;
     private boolean failed;
+    private boolean processed = false;
     private final boolean terminate;
 
     public FrameApiJoin(int nodeId, SQLCursor cur,  FrameIterator pbi, FrameApi bd1, FrameApi bd2) throws Exception {
@@ -95,6 +96,7 @@ public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
             latch.await();
             Metrics.get("remoteTask").stop();
         }
+        this.processed = true;
         return this;
     }
 
@@ -156,5 +158,9 @@ public class FrameApiJoin implements Serializable, Callable<FrameApiJoin> {
 
     public boolean isTerminate() {
         return terminate;
+    }
+
+    public boolean isProcessed() {
+        return processed;
     }
 }

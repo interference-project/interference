@@ -45,6 +45,7 @@ public class SystemCleanUp implements Runnable, ManagedProcess {
     public static final int INDEX_RETRIEVED_PRIORITY = 9;
 
     public void run () {
+        this.f = true;
         Thread.currentThread().setName("interference-cleanup-thread-"+Thread.currentThread().getId());
         while (f) {
             latch = new CountDownLatch(1);

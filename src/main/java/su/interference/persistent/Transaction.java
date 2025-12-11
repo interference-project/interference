@@ -75,7 +75,6 @@ public class Transaction implements Serializable {
     @MgmtColumn(name="Timestamp",width=10)
     private long timeStamp;
     @Column
-    @MgmtColumn(name="Transaction type",width=10)
     private int transType; // 0 - READ COMMITTED, 1 - SERIALIZABLE, 9 - THR
     @Column
     @MgmtColumn(name="MTRAN",width=10)
@@ -84,6 +83,9 @@ public class Transaction implements Serializable {
     @MgmtColumn(name="Commit Id",width=10)
     private long cid;
 
+    @MgmtColumn(name="Transaction type",width=20)
+    @Transient
+    private String transactionType;
     @Transient
     private final transient List<TransFrame> tframes = new CopyOnWriteArrayList<>();
     @Transient
@@ -780,5 +782,19 @@ public class Transaction implements Serializable {
 
     public void setJoin(SQLJoin join) {
         this.join = join;
+    }
+
+    public String getTransactionType() {
+        switch (this.transType) {
+            case TRAN_READ_COMMITTED:
+                return "READ COMMITTED";
+            case TRAN_SERIALIZABLE:
+                return "SERIALIZABLE";
+            case TRAN_THR:
+                return "COMPLETED";
+            case TRAN_LEGACY:
+                return "COMPLETED";
+        }
+        return "N/A";
     }
 }
