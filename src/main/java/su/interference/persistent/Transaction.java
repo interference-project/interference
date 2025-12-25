@@ -58,7 +58,11 @@ public class Transaction implements Serializable {
     @Transient
     public static final int TRAN_THR = 9;
     @Transient
-    public static final int TRAN_LEGACY = 10;
+    public static final int TRAN_RBC = 10;
+    @Transient
+    public static final int TRAN_LEGACY = 11;
+    @Transient
+    public static final int TRAN_LEGACY_RBC = 12;
 
     @Id
     @Column
@@ -519,7 +523,7 @@ public class Transaction implements Serializable {
             logger.info("check frames ok: "+is_ok);
 
             this.cid = Instance.getInstance().getTableByName(this.getClass().getName()).getIncValue(s, null);
-            this.transType = TRAN_THR;
+            this.transType = TRAN_RBC;
             s.persist(this);
 
 /*
@@ -546,7 +550,7 @@ public class Transaction implements Serializable {
 
     @Deprecated
     public void unlockUndoFrames (int objectId, Session s) throws InternalException {
-        if (this.getTransType()!=TRAN_THR) {
+        if (this.getTransType() != TRAN_THR && this.getTransType() != TRAN_RBC) {
             throw new InternalException();  //ONLY FOR FIXED TRANSACTIONS
         }
         final ArrayList<Long> fptr = new ArrayList<>();
@@ -791,9 +795,13 @@ public class Transaction implements Serializable {
             case TRAN_SERIALIZABLE:
                 return "SERIALIZABLE";
             case TRAN_THR:
-                return "COMPLETED";
+                return "COMMITTED";
+            case TRAN_RBC:
+                return "ROLLED BACK";
             case TRAN_LEGACY:
-                return "COMPLETED";
+                return "COMMITTED/CLEAN";
+            case TRAN_LEGACY_RBC:
+                return "ROLLED BACK/CLEAN";
         }
         return "N/A";
     }

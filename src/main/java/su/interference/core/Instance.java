@@ -622,15 +622,12 @@ public class Instance implements Interference {
         return ixf.getMap();
     }
 
-    public List<FrameData> getSortedDataFrames (Map<Integer, DataFile> dfsmap, int type) {
+    public List<FrameData> getSortedDataFrames (int fileId) {
         final MapField ixf = tFrameData.getMapFieldByColumn("frameId");
         final ArrayList<FrameData> r = new ArrayList<>();
-        //ixf.getMap().values().stream().map(o -> ((DataChunk) o).getEntity()).filter(o -> dfsmap.get(((FrameData) o).getAllocFile()).getType() == type).sorted().forEach(o -> r.add((FrameData) o));
         for (Object o : ixf.getMap().values()) {
             FrameData fd = (FrameData) ((DataChunk) o).getEntity();
-            int fileId = (int) fd.getFile();
-            System.out.println(fileId);
-            if (dfsmap.get(fileId).getType() == type) {
+            if (fd.getFile() == fileId) {
                 r.add(fd);
             }
         }

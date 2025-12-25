@@ -74,7 +74,7 @@ public class TransCleanUp implements Runnable, ManagedProcess {
         try {
             for (Transaction t : Instance.getInstance().getTransactions()) {
                 ArrayList<Long> fptr = new ArrayList<>();
-                if (t.getTransType() == Transaction.TRAN_THR && t.getCid() > 0) {
+                if ((t.getTransType() == Transaction.TRAN_THR || t.getTransType() == Transaction.TRAN_RBC) && t.getCid() > 0) {
                     int i = 0;
                     for (TransFrame tf : Instance.getInstance().getTransFramesByTransId(t.getTransId())) {
                         if (t.isLocal()) {
@@ -104,7 +104,11 @@ public class TransCleanUp implements Runnable, ManagedProcess {
                         session.delete(tf);
                         i++;
                     }
-                    t.setTransType(Transaction.TRAN_LEGACY);
+                    if (t.getTransType() == Transaction.TRAN_THR) {
+                        t.setTransType(Transaction.TRAN_LEGACY);
+                    } else if (t.getTransType() == Transaction.TRAN_RBC) {
+                        t.setTransType(Transaction.TRAN_LEGACY_RBC);
+                    }
                     session.persist(t);
                     logger.info(i+" transaction frames removed for transaction id = "+t.getTransId());
                 }
