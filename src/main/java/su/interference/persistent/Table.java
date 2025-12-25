@@ -41,9 +41,7 @@ import su.interference.core.*;
 import su.interference.exception.*;
 import su.interference.metrics.Meter;
 import su.interference.metrics.Metrics;
-import su.interference.mgmt.MgmtClass;
-import su.interference.mgmt.MgmtClassIdColumn;
-import su.interference.mgmt.MgmtColumn;
+import su.interference.mgmt.*;
 import su.interference.sql.ResultSet;
 import su.interference.transport.CommandEvent;
 import su.interference.transport.TransportSyncTask;
@@ -75,19 +73,20 @@ public class Table implements ResultSet {
     @Id
     @MapColumn
     @GeneratedValue
-    @MgmtColumn(name="Table ID", width=10)
+    @MgmtColumn(name = "Table ID", width = 10)
     private int objectId;
     @Column
     @MapColumn
-    @MgmtColumn(name="Name", width=80)
+    @MgmtColumn(name = "Name", width = 80)
     @MgmtClassIdColumn
+    @MgmtLink(type = "Table", retrieveMethod = "getContent")
     private String name;
     @Column
     private int fileStart;
     @Column
     private long frameStart;
     @Column
-    @MgmtColumn(name="Size (frames)", width=10)
+    @MgmtColumn(name = "Size (frames)", width = 10)
     private int frameSize;
     @Column
     private int fileLast;
@@ -171,15 +170,15 @@ public class Table implements ResultSet {
     }
 
     public long getIdValue() {
-        return idValue==null?0:idValue.get();
+        return idValue == null ? 0 : idValue.get();
     }
 
     public long getIncValue() {
-        return incValue==null?0:incValue.get();
+        return incValue == null ? 0 : incValue.get();
     }
 
     public long getFrameOrder() {
-        return frameOrder==null?0:frameOrder.get();
+        return frameOrder == null ? 0 : frameOrder.get();
     }
 
     public WaitFrame[] getLbs() {
@@ -187,10 +186,10 @@ public class Table implements ResultSet {
     }
 
     public long getIdValue(Session s, LLT llt) throws Exception {
-        if (idValue==null) {
+        if (idValue == null) {
             idValue = new AtomicLong(0);
         }
-        if (idIncrement<=1) {
+        if (idIncrement <= 1) {
             if (idValue2 == null) {
                 idValue2 = new AtomicLong(idValue.get());
                 idValue.getAndAdd(IDENT_STORE_SIZE);
@@ -209,14 +208,18 @@ public class Table implements ResultSet {
     }
 
     public synchronized long getIncValue(Session s, LLT llt) throws Exception {
-        if (incValue==null) { incValue = new AtomicLong(0); }
+        if (incValue == null) {
+            incValue = new AtomicLong(0);
+        }
         incValue.addAndGet(1);
         s.persist(this, llt); //update
         return incValue.get();
     }
 
     public synchronized long getFrameOrder(Session s, LLT llt) throws Exception {
-        if (frameOrder==null) { frameOrder = new AtomicLong(0); }
+        if (frameOrder == null) {
+            frameOrder = new AtomicLong(0);
+        }
         frameOrder.addAndGet(1);
         return frameOrder.get();
     }
@@ -229,11 +232,11 @@ public class Table implements ResultSet {
         this.incValue = incValue;
     }
 
-    protected void incFrameAmount () {
+    protected void incFrameAmount() {
         frameAmount.incrementAndGet();
     }
 
-    protected  void decFrameAmount () {
+    protected void decFrameAmount() {
         frameAmount.decrementAndGet();
     }
 
@@ -241,12 +244,12 @@ public class Table implements ResultSet {
         return CLASS_ID;
     }
 
-    public long getId () {
+    public long getId() {
         return this.objectId;
     }
 
     public long getLastFrameId() {
-        return this.getFileLast()+this.getFrameLast();
+        return this.getFileLast() + this.getFrameLast();
     }
 
     //todo rename to isSystem
@@ -268,13 +271,13 @@ public class Table implements ResultSet {
         if (isIndex()) {
             return Instance.getInstance().getTableById(this.parentId).isDistributed();
         }
-        final NoDistribute ca = (NoDistribute)this.genericClass.getAnnotation(NoDistribute.class);
+        final NoDistribute ca = (NoDistribute) this.genericClass.getAnnotation(NoDistribute.class);
         return ca == null;
     }
 
     public String getSystemName() {
         if (!isNoTran()) {
-            if (this.sc!=null) {
+            if (this.sc != null) {
                 return this.sc.getName();
             }
         }
@@ -292,7 +295,7 @@ public class Table implements ResultSet {
         Runnable r = new Runnable() {
             @Override
             public void run() {
-                Thread.currentThread().setName("interference-retrieve-frames-"+caller+"-"+Thread.currentThread().getId());
+                Thread.currentThread().setName("interference-retrieve-frames-" + caller + "-" + Thread.currentThread().getId());
                 try {
                     for (Object o : ixl.getObjectsByKey(id)) {
                         q.put((FrameData) ((DataChunk) o).getEntity(s));
@@ -315,7 +318,7 @@ public class Table implements ResultSet {
         Runnable r = new Runnable() {
             @Override
             public void run() {
-                Thread.currentThread().setName("interference-retrieve-frames-thread-"+Thread.currentThread().getId());
+                Thread.currentThread().setName("interference-retrieve-frames-thread-" + Thread.currentThread().getId());
                 try {
                     for (Object o : ixl.getObjectsByKey(id)) {
                         q.put((FrameData) ((DataChunk) o).getEntity());
@@ -350,12 +353,12 @@ public class Table implements ResultSet {
     //used in Session.newEntity
     public Object newInstance(Object[] params) throws InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
         final Class<?>[] cs = new Class<?>[params.length];
-        for (int i=0; i<params.length; i++) {
+        for (int i = 0; i < params.length; i++) {
             cs[i] = params[i].getClass();
         }
 
-        final SystemEntity ca = (SystemEntity)this.getClass().getAnnotation(SystemEntity.class);
-        if (ca!=null) { //System non-transactional
+        final SystemEntity ca = (SystemEntity) this.getClass().getAnnotation(SystemEntity.class);
+        if (ca != null) { //System non-transactional
             return this.getClass().getConstructor(cs).newInstance(params);
         }
 
@@ -366,15 +369,15 @@ public class Table implements ResultSet {
     @SuppressWarnings("unchecked")
     public Object newInstance(Object[] params, Session s) throws Exception {
         final Class<?>[] cs = new Class<?>[params.length];
-        for (int i=0; i<params.length; i++) {
+        for (int i = 0; i < params.length; i++) {
             cs[i] = params[i].getClass();
         }
 
-        if (this.sc!=null) {
-            final SystemEntity ca = (SystemEntity)this.sc.getAnnotation(SystemEntity.class);
+        if (this.sc != null) {
+            final SystemEntity ca = (SystemEntity) this.sc.getAnnotation(SystemEntity.class);
             if (ca == null) { //transactional
                 s.startTransaction();
-                final EntityContainer to = (EntityContainer)this.sc.getConstructor(cs).newInstance(params);
+                final EntityContainer to = (EntityContainer) this.sc.getConstructor(cs).newInstance(params);
                 to.setTran(s.getTransaction());
                 ident(to, s, null);
                 return to;
@@ -392,15 +395,15 @@ public class Table implements ResultSet {
     //used in DataChunk.getEntity
     public Object getInstance() throws InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
         final Class c = this.getTableClass();
-        final SystemEntity ca = (SystemEntity)c.getAnnotation(SystemEntity.class);
-        final IndexEntity xa = (IndexEntity)c.getAnnotation(IndexEntity.class);
-        final ResultSetEntity ra = (ResultSetEntity)c.getAnnotation(ResultSetEntity.class);
-        if (ca!=null||xa!=null||ra!=null) { //System non-transactional
+        final SystemEntity ca = (SystemEntity) c.getAnnotation(SystemEntity.class);
+        final IndexEntity xa = (IndexEntity) c.getAnnotation(IndexEntity.class);
+        final ResultSetEntity ra = (ResultSetEntity) c.getAnnotation(ResultSetEntity.class);
+        if (ca != null || xa != null || ra != null) { //System non-transactional
             //Object o = c.getConstructor().newInstance();
             return c.getConstructor().newInstance();
             //only for user-defined entities
         } else {
-            if (this.sc!=null) {
+            if (this.sc != null) {
                 return this.sc.getConstructor().newInstance();
             }
         }
@@ -412,11 +415,11 @@ public class Table implements ResultSet {
         final Class c = this.getTableClass();
         final Annotation[] ca = c.getAnnotations();
         final ArrayList<IndexDescript> r = new ArrayList<>();
-        for (int i=0; i<ca.length; i++) {
+        for (int i = 0; i < ca.length; i++) {
             final Annotation a = ca[i];
             //for old javax.persistence versions
             if (a.annotationType().getName().equals("javax.persistence.Index")) {
-                final Index ix = (Index)a;
+                final Index ix = (Index) a;
                 r.add(new IndexDescript(this, this.simpleName + "$" + ix.name(), ix.columnList(), ix.unique()));
             }
             if (a.annotationType().getName().equals("javax.persistence.Table")) {
@@ -432,11 +435,11 @@ public class Table implements ResultSet {
     public IndexDescript getIndexDescriptByColumnName(String name) throws InternalException {
         final Class c = this.getTableClass();
         final Annotation[] ca = c.getAnnotations();
-        for (int i=0; i<ca.length; i++) {
+        for (int i = 0; i < ca.length; i++) {
             final Annotation a = ca[i];
             //for old javax.persistence versions
             if (a.annotationType().getName().equals("javax.persistence.Index")) {
-                final Index ix = (Index)a;
+                final Index ix = (Index) a;
                 final IndexDescript id = new IndexDescript(this, this.simpleName + "$" + ix.name(), ix.columnList(), ix.unique());
                 if (id.getColumns()[0].equals(name)) {
                     return id;
@@ -458,11 +461,11 @@ public class Table implements ResultSet {
     public IndexDescript getIndexDescriptByObjectId(int objectId) throws InternalException {
         final Class c = this.getTableClass();
         final Annotation[] ca = c.getAnnotations();
-        for (int i=0; i<ca.length; i++) {
+        for (int i = 0; i < ca.length; i++) {
             final Annotation a = ca[i];
             //for old javax.persistence versions
             if (a.annotationType().getName().equals("javax.persistence.Index")) {
-                final Index ix = (Index)a;
+                final Index ix = (Index) a;
                 final IndexDescript id = new IndexDescript(this, this.simpleName + "$" + ix.name(), ix.columnList(), ix.unique());
                 if (id.getIndex().getObjectId() == objectId) {
                     return id;
@@ -485,11 +488,11 @@ public class Table implements ResultSet {
     public Table getFirstIndexByColumnName(String name) throws InternalException {
         final Class c = this.getTableClass();
         final Annotation[] ca = c.getAnnotations();
-        for (int i=0; i<ca.length; i++) {
+        for (int i = 0; i < ca.length; i++) {
             final Annotation a = ca[i];
             //for old javax.persistence versions
             if (a.annotationType().getName().equals("javax.persistence.Index")) {
-                final Index ix = (Index)a;
+                final Index ix = (Index) a;
                 final IndexDescript id = new IndexDescript(this, ix.name(), ix.columnList(), ix.unique());
                 if (id.getColumns()[0].equals(name)) {
                     return Instance.getInstance().getTableByName(SYSTEM_PKG_PREFIX + this.simpleName + "$" + ix.name());
@@ -511,11 +514,11 @@ public class Table implements ResultSet {
     private Table getFirstIndexByIdColumn() throws InternalException {
         final Class c = this.getTableClass();
         final Annotation[] ca = c.getAnnotations();
-        for (int i=0; i<ca.length; i++) {
+        for (int i = 0; i < ca.length; i++) {
             Annotation a = ca[i];
             //for old javax.persistence versions
             if (a.annotationType().getName().equals("javax.persistence.Index")) {
-                final Index ix = (Index)a;
+                final Index ix = (Index) a;
                 final IndexDescript id = new IndexDescript(this, ix.name(), ix.columnList(), ix.unique());
                 if (id.getColumns()[0].equals(getIdField().getName())) {
                     return Instance.getInstance().getTableByName(SYSTEM_PKG_PREFIX + this.simpleName + "$" + ix.name());
@@ -538,9 +541,9 @@ public class Table implements ResultSet {
         final Class c = this.getTableClass();
         final ArrayList<java.lang.reflect.Field> res = new ArrayList<java.lang.reflect.Field>();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
-        for (int i=0; i<f.length; i++) {
+        for (int i = 0; i < f.length; i++) {
             Transient ta = f[i].getAnnotation(Transient.class);
-            if (ta==null) {
+            if (ta == null) {
                 final int m = f[i].getModifiers();
                 if (Modifier.isPrivate(m)) {
                     f[i].setAccessible(true);
@@ -567,7 +570,7 @@ public class Table implements ResultSet {
     private java.lang.reflect.Field getTableIdField() {
         final Class c = this.getTableClass();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
-        for (int i=0; i<f.length; i++) {
+        for (int i = 0; i < f.length; i++) {
             Id a = f[i].getAnnotation(Id.class);
             if (a != null) {
                 return f[i];
@@ -608,9 +611,9 @@ public class Table implements ResultSet {
     private java.lang.reflect.Field getGeneratedField() {
         final Class c = this.getTableClass();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
-        for (int i=0; i<f.length; i++) {
+        for (int i = 0; i < f.length; i++) {
             GeneratedValue a = f[i].getAnnotation(GeneratedValue.class);
-            if (a!=null) {
+            if (a != null) {
                 return f[i];
             }
         }
@@ -620,9 +623,9 @@ public class Table implements ResultSet {
     public Class<?> getTableClass() {
         //todo dirty hack for use sc class of sqlcursors (system, non-transact entities) & index entities
         //todo possibly deprecated
-        if (sc!=null) {
-            TransEntity sa = (TransEntity)sc.getAnnotation(TransEntity.class);
-            if (sa==null) {
+        if (sc != null) {
+            TransEntity sa = (TransEntity) sc.getAnnotation(TransEntity.class);
+            if (sa == null) {
                 return sc;
             }
         }
@@ -660,10 +663,10 @@ public class Table implements ResultSet {
         this.lbs = new WaitFrame[Config.getConfig().FILES_AMOUNT];
         this.genericClass = Class.forName(name);
         this.simpleName = genericClass.getSimpleName();
-        SystemEntity ca = (SystemEntity)this.genericClass.getAnnotation(SystemEntity.class);
-        IndexEntity xa = (IndexEntity)this.genericClass.getAnnotation(IndexEntity.class);
-        this.notran = ca!=null;
-        this.index = xa!=null;
+        SystemEntity ca = (SystemEntity) this.genericClass.getAnnotation(SystemEntity.class);
+        IndexEntity xa = (IndexEntity) this.genericClass.getAnnotation(IndexEntity.class);
+        this.notran = ca != null;
+        this.index = xa != null;
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
@@ -676,7 +679,7 @@ public class Table implements ResultSet {
     public Table(String name, Class pclass) throws ClassNotFoundException, NoSuchMethodException, SecurityException {
         this.setName(name);
         this.lbs = new WaitFrame[Config.getConfig().FILES_AMOUNT];
-        for (int i=0; i<Config.getConfig().FILES_AMOUNT; i++) {
+        for (int i = 0; i < Config.getConfig().FILES_AMOUNT; i++) {
             this.lbs[i] = new WaitFrame(null);
         }
         this.indexes = new ArrayList<>();
@@ -691,10 +694,10 @@ public class Table implements ResultSet {
             }
         }
         this.simpleName = genericClass.getSimpleName();
-        SystemEntity ca = (SystemEntity)this.genericClass.getAnnotation(SystemEntity.class);
-        IndexEntity xa = (IndexEntity)this.genericClass.getAnnotation(IndexEntity.class);
-        this.notran = ca!=null;
-        this.index = xa!=null;
+        SystemEntity ca = (SystemEntity) this.genericClass.getAnnotation(SystemEntity.class);
+        IndexEntity xa = (IndexEntity) this.genericClass.getAnnotation(IndexEntity.class);
+        this.notran = ca != null;
+        this.index = xa != null;
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
@@ -708,7 +711,7 @@ public class Table implements ResultSet {
     public Table(String name, String name_) throws ClassNotFoundException, NoSuchMethodException, SecurityException, MalformedURLException {
         this.setName(name);
         this.lbs = new WaitFrame[Config.getConfig().FILES_AMOUNT];
-        for (int i=0; i<Config.getConfig().FILES_AMOUNT; i++) {
+        for (int i = 0; i < Config.getConfig().FILES_AMOUNT; i++) {
             this.lbs[i] = new WaitFrame(null);
         }
         this.indexes = new ArrayList<>();
@@ -719,10 +722,10 @@ public class Table implements ResultSet {
             this.genericClass = Instance.getUCL().loadClass(name);
         }
         this.simpleName = genericClass.getSimpleName();
-        SystemEntity ca = (SystemEntity)this.genericClass.getAnnotation(SystemEntity.class);
-        IndexEntity xa = (IndexEntity)this.genericClass.getAnnotation(IndexEntity.class);
-        this.notran = ca!=null;
-        this.index = xa!=null;
+        SystemEntity ca = (SystemEntity) this.genericClass.getAnnotation(SystemEntity.class);
+        IndexEntity xa = (IndexEntity) this.genericClass.getAnnotation(IndexEntity.class);
+        this.notran = ca != null;
+        this.index = xa != null;
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
@@ -738,17 +741,17 @@ public class Table implements ResultSet {
         this.name = FrameData.class.getName();
         this.frameSize = Instance.getInstance().getFrameSize();
         this.lbs = new WaitFrame[Config.getConfig().FILES_AMOUNT];
-        for (int i=0; i<Config.getConfig().FILES_AMOUNT; i++) {
+        for (int i = 0; i < Config.getConfig().FILES_AMOUNT; i++) {
             this.lbs[i] = new WaitFrame(null);
         }
         this.indexes = new ArrayList<>();
         this.maps = new ArrayList<>();
         this.genericClass = Class.forName(name);
         this.simpleName = genericClass.getSimpleName();
-        SystemEntity ca = (SystemEntity)this.genericClass.getAnnotation(SystemEntity.class);
-        IndexEntity xa = (IndexEntity)this.genericClass.getAnnotation(IndexEntity.class);
-        this.notran = ca!=null;
-        this.index = xa!=null;
+        SystemEntity ca = (SystemEntity) this.genericClass.getAnnotation(SystemEntity.class);
+        IndexEntity xa = (IndexEntity) this.genericClass.getAnnotation(IndexEntity.class);
+        this.notran = ca != null;
+        this.index = xa != null;
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
@@ -762,15 +765,15 @@ public class Table implements ResultSet {
     public Table(int id, String name) throws ClassNotFoundException, NoSuchMethodException, SecurityException {
         this.objectId = id;
         this.name = name;
-        this.indexes  = new ArrayList<>();
+        this.indexes = new ArrayList<>();
         this.maps = new ArrayList<>();
         this.lbs = new WaitFrame[Config.getConfig().FILES_AMOUNT];
         this.genericClass = Class.forName(name);
         this.simpleName = genericClass.getSimpleName();
-        SystemEntity ca = (SystemEntity)this.genericClass.getAnnotation(SystemEntity.class);
-        IndexEntity xa = (IndexEntity)this.genericClass.getAnnotation(IndexEntity.class);
-        this.notran = ca!=null;
-        this.index = xa!=null;
+        SystemEntity ca = (SystemEntity) this.genericClass.getAnnotation(SystemEntity.class);
+        IndexEntity xa = (IndexEntity) this.genericClass.getAnnotation(IndexEntity.class);
+        this.notran = ca != null;
+        this.index = xa != null;
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
@@ -782,14 +785,14 @@ public class Table implements ResultSet {
     }
 
     //constructor for low-level storage function (initial first-time load table descriptions from datafile)
-    public Table (DataChunk chunk, IndexList ixl) throws IllegalAccessException, ClassNotFoundException, InternalException, NoSuchMethodException, SecurityException {
+    public Table(DataChunk chunk, IndexList ixl) throws IllegalAccessException, ClassNotFoundException, InternalException, NoSuchMethodException, SecurityException {
         final Object[] dcs = chunk.getDcs().getValueSet();
         final Class c = this.getClass();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
         int x = 0;
-        for (int i=0; i<f.length; i++) {
+        for (int i = 0; i < f.length; i++) {
             final Transient ta = f[i].getAnnotation(Transient.class);
-            if (ta==null) {
+            if (ta == null) {
                 int m = f[i].getModifiers();
                 if (Modifier.isPrivate(m)) {
                     f[i].setAccessible(true);
@@ -801,11 +804,11 @@ public class Table implements ResultSet {
         //this.genericClass = Class.forName(name);
         this.genericClass = Instance.getUCL().loadClass(name);
         this.simpleName = genericClass.getSimpleName();
-        final SystemEntity sa = (SystemEntity)this.genericClass.getAnnotation(SystemEntity.class);
-        final IndexEntity xa = (IndexEntity)this.genericClass.getAnnotation(IndexEntity.class);
-        final ResultSetEntity rsa = (ResultSetEntity)this.genericClass.getAnnotation(ResultSetEntity.class);
-        this.notran = sa!=null;
-        this.index = xa!=null;
+        final SystemEntity sa = (SystemEntity) this.genericClass.getAnnotation(SystemEntity.class);
+        final IndexEntity xa = (IndexEntity) this.genericClass.getAnnotation(IndexEntity.class);
+        final ResultSetEntity rsa = (ResultSetEntity) this.genericClass.getAnnotation(ResultSetEntity.class);
+        this.notran = sa != null;
+        this.index = xa != null;
         this.idfield = getTableIdField();
         this.idfieldtype = getTableIdField() == null ? null : getTableIdField().getType().getName();
         this.idfieldgetter = getTableIdField() == null ? null : ("get" + this.idfield.getName().substring(0, 1).toUpperCase() + this.idfield.getName().substring(1, this.idfield.getName().length()));
@@ -836,7 +839,7 @@ public class Table implements ResultSet {
             try {
                 final List<Object> bds = ixl.getObjectsByKey(this.getObjectId());
                 for (Object b : bds) {
-                    final FrameData bd = (FrameData)((DataChunk)b).getEntity();
+                    final FrameData bd = (FrameData) ((DataChunk) b).getEntity();
                     bd.setDataObject(this); //todo must be refactored, FrameData->new DataFrame->new DataChunk->t.getFields() possibly may be simply
 
                     if (sa != null && rsa == null && this.objectId != Table.CLASS_ID) {
@@ -846,7 +849,7 @@ public class Table implements ResultSet {
                         } catch (Exception e) {
                             logger.error("internal Table.<init>");
                         }
-                        for (Chunk ck : ((DataFrame)db).getChunks()) {
+                        for (Chunk ck : ((DataFrame) db).getChunks()) {
                             if (ck.getHeader().getState() == Header.RECORD_NORMAL_STATE) {  //miss deleted or archived records
                                 this.addIndexValue((DataChunk) ck);
                             }
@@ -863,7 +866,7 @@ public class Table implements ResultSet {
         }
 
         //get LBS frames
-        if (!this.isIndex()&&!this.name.equals(UndoChunk.class.getName())) {
+        if (!this.isIndex() && !this.name.equals(UndoChunk.class.getName())) {
             final List<Object> bds = ixl.getObjectsByKey(this.objectId);
             final ArrayList<WaitFrame> lbs = new ArrayList<>();
             for (Object b : bds) {
@@ -894,26 +897,26 @@ public class Table implements ResultSet {
 
     }
 
-    public void initIndexFields () {
+    public void initIndexFields() {
         final Class c = this.getTableClass();
         final java.lang.reflect.Field[] f = c.getDeclaredFields();
-        for (int i=0; i<f.length; i++) {
+        for (int i = 0; i < f.length; i++) {
             final IndexColumn a = f[i].getAnnotation(IndexColumn.class);
             final MapColumn b = f[i].getAnnotation(MapColumn.class);
-            if (a!=null) {
+            if (a != null) {
                 indexes.add(new IndexField(f[i], new IndexList()));
             }
-            if (b!=null) {
+            if (b != null) {
                 maps.add(new MapField(f[i], new ConcurrentHashMap()));
             }
         }
     }
 
-    public void addIndexValue (DataChunk dc) throws IllegalAccessException, InvocationTargetException, NoSuchMethodException {
+    public void addIndexValue(DataChunk dc) throws IllegalAccessException, InvocationTargetException, NoSuchMethodException {
         final Object o = dc.getEntity();
         final Class c = o.getClass();
-        final TransEntity ta = (TransEntity)c.getAnnotation(TransEntity.class);
-        if (ta==null) {
+        final TransEntity ta = (TransEntity) c.getAnnotation(TransEntity.class);
+        if (ta == null) {
             for (IndexField ix : indexes) {
                 final Method z = c.getMethod("get" + ix.getField().getName().substring(0, 1).toUpperCase() + ix.getField().getName().substring(1, ix.getField().getName().length()), null);
                 final Object v = z.invoke(o, null);
@@ -948,8 +951,8 @@ public class Table implements ResultSet {
     private void removeIndexValue(DataChunk dc) throws IllegalAccessException, InvocationTargetException, NoSuchMethodException {
         final Object o = dc.getEntity();
         final Class c = o.getClass();
-        final TransEntity ta = (TransEntity)c.getAnnotation(TransEntity.class);
-        if (ta==null) {
+        final TransEntity ta = (TransEntity) c.getAnnotation(TransEntity.class);
+        if (ta == null) {
             for (IndexField ix : indexes) {
                 final Method z = c.getMethod("get" + ix.getField().getName().substring(0, 1).toUpperCase() + ix.getField().getName().substring(1, ix.getField().getName().length()), null);
                 final Object v = z.invoke(o, null);
@@ -968,7 +971,7 @@ public class Table implements ResultSet {
         for (Chunk c : b.getChunks()) {
             if (c.getHeader().getState() == Header.RECORD_NORMAL_STATE) {  //miss deleted or archived records
                 //Object o = ((DataChunk)c).getEntity(this);
-                updateIndexValue((DataChunk)c);
+                updateIndexValue((DataChunk) c);
             }
         }
     }
@@ -993,7 +996,7 @@ public class Table implements ResultSet {
 
     public IndexField getIdIndexField() {
         java.lang.reflect.Field id = this.getIdField();
-        if (id!=null) {
+        if (id != null) {
             for (IndexField ix : indexes) {
                 if (ix.getField().getName().equals(id.getName())) {
                     return ix;
@@ -1004,15 +1007,15 @@ public class Table implements ResultSet {
     }
 
     public void printIndexInfo() {
-        System.out.println("Index info for "+this.getName());
-        if (this.sc!=null) {
-            System.out.println("System sc: "+this.sc.getName());
+        System.out.println("Index info for " + this.getName());
+        if (this.sc != null) {
+            System.out.println("System sc: " + this.sc.getName());
         }
         for (MapField map : maps) {
-            System.out.println("map: "+map.getField().getName()+" "+map.getMap().size());
+            System.out.println("map: " + map.getField().getName() + " " + map.getMap().size());
         }
         for (IndexField ix : indexes) {
-            System.out.println("index: "+ix.getField().getName()+" "+ix.getIndex().getInfo());
+            System.out.println("index: " + ix.getField().getName() + " " + ix.getIndex().getInfo());
         }
     }
 
@@ -1055,24 +1058,26 @@ public class Table implements ResultSet {
                         }
                     }
                 } finally {
-                    if (extllt == null) { llt.commit(); }
+                    if (extllt == null) {
+                        llt.commit();
+                    }
                 }
             }
         }
     }
 
-    public void usedSpace (final FrameData bd, final int used, final boolean persist, final Session s, LLT llt) {
+    public void usedSpace(final FrameData bd, final int used, final boolean persist, final Session s, LLT llt) {
         bd.setUsed(used);
-        if (used==0) {
+        if (used == 0) {
             if (!checkLBS(bd)) {
                 //deallocate frame
                 final FreeFrame fb = new FreeFrame(0, bd.getFrameId(), bd.getSize());
-                final FrameData pb = bd.getPrevFrameId()>0?Instance.getInstance().getFrameById(bd.getPrevFrameId()):null;
+                final FrameData pb = bd.getPrevFrameId() > 0 ? Instance.getInstance().getFrameById(bd.getPrevFrameId()) : null;
                 final FrameData nb = Instance.getInstance().getFrameById(bd.getNextFrameId());
-                nb.setPrevFile(pb==null?0:pb.getFile());
-                nb.setPrevFrame(pb==null?0:pb.getPtr());
+                nb.setPrevFile(pb == null ? 0 : pb.getFile());
+                nb.setPrevFrame(pb == null ? 0 : pb.getPtr());
                 try {
-                    if (pb!=null) {
+                    if (pb != null) {
                         pb.setNextFile(nb.getFile());
                         pb.setNextFrame(nb.getPtr());
                         s.persist(pb, llt); //update
@@ -1101,7 +1106,7 @@ public class Table implements ResultSet {
         }
     }
 
-    protected synchronized void freeFrames (List<Long> flist, Session s, Transaction tran, String cause) throws Exception {
+    protected synchronized void freeFrames(List<Long> flist, Session s, Transaction tran, String cause) throws Exception {
         for (Long frameId : flist) {
             final FrameData cb = Instance.getInstance().getFrameById(frameId);
             logger.info("freeing frame " + cb.getFile() + " " + cb.getPtr() + " by " + cause + " of " + tran.getTransId());
@@ -1136,7 +1141,7 @@ public class Table implements ResultSet {
     private WaitFrame getAvailableFrame(final Object o, final boolean fpart) throws ClassNotFoundException, InstantiationException, InternalException, IllegalAccessException {
         Metrics.get("getAvailableFrame").start();
         final long st = System.currentTimeMillis();
-        final int a = avframeStart.get()%this.lbs.length;
+        final int a = avframeStart.get() % this.lbs.length;
         int ctr = 0;
 
         while (true) {
@@ -1154,10 +1159,10 @@ public class Table implements ResultSet {
             }
             if (ctr > Config.getConfig().CHECK_AVAIL_FRAME_ATTEMPTS) {
                 for (int i = 0; i < this.lbs.length; i++) {
-                    logger.warn("lbs: "+lbs[i].getBd().getFrameId()+":"+lbs[i].getBusy().get());
+                    logger.warn("lbs: " + lbs[i].getBd().getFrameId() + ":" + lbs[i].getBusy().get());
                 }
-                logger.warn("avframestart: "+avframeStart.get());
-                logger.warn("total time ms: "+tp);
+                logger.warn("avframestart: " + avframeStart.get());
+                logger.warn("total time ms: " + tp);
                 logger.warn("number of attempts exceeded for getavailableframe method: " + Config.getConfig().CHECK_AVAIL_FRAME_ATTEMPTS);
                 break;
             }
@@ -1192,18 +1197,18 @@ public class Table implements ResultSet {
             return true;
         }
         for (WaitFrame wb : this.lbs) {
-            if (wb.getBd().getFrameId()==bd.getFrameId()) {
+            if (wb.getBd().getFrameId() == bd.getFrameId()) {
                 return true;
             }
         }
         return false;
     }
 
-    public synchronized DataChunk persist (final Object o, final Session s) throws Exception {
+    public synchronized DataChunk persist(final Object o, final Session s) throws Exception {
         return persist(o, s, null);
     }
 
-    protected DataChunk persist (final Object o, final Session s, final LLT extllt) throws Exception {
+    protected DataChunk persist(final Object o, final Session s, final LLT extllt) throws Exception {
         final boolean ignoreNoLocal = false;
         final Class cc = o.getClass();
         boolean fpart = false;
@@ -1232,7 +1237,7 @@ public class Table implements ResultSet {
                 final WaitFrame bdw = getAvailableFrame(o, fpart);
                 final FrameData bd = bdw.getBd();
 
-                final LLT llt = extllt==null?LLT.getLLT():extllt;
+                final LLT llt = extllt == null ? LLT.getLLT() : extllt;
                 try {
                     this.ident(o, s, llt); //ident system entities during persist
                     final int p = bd.insertChunk(nc, s, true, llt);
@@ -1258,7 +1263,7 @@ public class Table implements ResultSet {
             } else {
                 final int len = dc.getBytesAmount();
                 final FrameData bd = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId() + dc.getHeader().getRowID().getFramePointer());
-                final LLT llt = extllt==null?LLT.getLLT():extllt;
+                final LLT llt = extllt == null ? LLT.getLLT() : extllt;
                 try {
 
                     final int newlen = bd.updateChunk(dc, o, s, llt);
@@ -1350,7 +1355,7 @@ public class Table implements ResultSet {
                         return nc;
 
                     } else {
-                        final FrameData bd = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId()+dc.getHeader().getRowID().getFramePointer());
+                        final FrameData bd = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId() + dc.getHeader().getRowID().getFramePointer());
 
                         if (!bd.getFrame().isLocal()) {
                             if (!ignoreNoLocal) {
@@ -1416,13 +1421,13 @@ public class Table implements ResultSet {
     }
 
     //event process action - ignore nolocal frame constraint
-    public void delete (final Object o, final Session s) throws Exception {
+    public void delete(final Object o, final Session s) throws Exception {
         this.delete(o, s, null, false, true);
     }
 
-    protected void delete (final Object o, final Session s, LLT extllt, boolean ignoreTransaction, boolean ignoreNoLocal) throws Exception {
+    protected void delete(final Object o, final Session s, LLT extllt, boolean ignoreTransaction, boolean ignoreNoLocal) throws Exception {
         final boolean noTran = ignoreTransaction ? true : isNoTran();
-        final LLT llt = extllt==null?LLT.getLLT():extllt;
+        final LLT llt = extllt == null ? LLT.getLLT() : extllt;
         if (!noTran) {
             s.startTransaction();
         }
@@ -1439,7 +1444,7 @@ public class Table implements ResultSet {
             }
 
             final int len = dc.getBytesAmount();
-            final FrameData bd = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId()+dc.getHeader().getRowID().getFramePointer());
+            final FrameData bd = Instance.getInstance().getFrameById(dc.getHeader().getRowID().getFileId() + dc.getHeader().getRowID().getFramePointer());
 
             if (!bd.getFrame().isLocal()) {
                 if (!ignoreNoLocal) {
@@ -1475,7 +1480,9 @@ public class Table implements ResultSet {
                 s.getTransaction().storeFrame(bd, udc == null ? null : udc.getUframe(), 0 - len, s, llt);
             }
         } finally {
-            if (extllt == null) { llt.commit(); }
+            if (extllt == null) {
+                llt.commit();
+            }
         }
     }
 
@@ -1483,7 +1490,7 @@ public class Table implements ResultSet {
         for (IndexDescript ids : this.getIndexNames()) {
             final Table ixt = Instance.getInstance().getTableByName(SYSTEM_PKG_PREFIX + ids.getName());
             //create IndexChunk implementation
-            final Object io = ixt.getTableClass().getConstructor(new Class<?>[]{c.getClass(),s.getClass()}).newInstance(new Object[]{c, s});
+            final Object io = ixt.getTableClass().getConstructor(new Class<?>[]{c.getClass(), s.getClass()}).newInstance(new Object[]{c, s});
             ixt.add(c.getHeader().getRowID(), io, s, llt);
         }
     }
@@ -1502,7 +1509,7 @@ public class Table implements ResultSet {
             if (noTran) {
                 usedSpace(ibd, ibd.getUsed() - iclen, true, s, llt);
             } else {
-                s.getTransaction().storeFrame(ibd, udc == null ? null : udc.getUframe(),0 - iclen, s, llt);
+                s.getTransaction().storeFrame(ibd, udc == null ? null : udc.getUframe(), 0 - iclen, s, llt);
             }
         }
         if (remove) {
@@ -1515,7 +1522,7 @@ public class Table implements ResultSet {
         for (IndexDescript ids : this.getIndexNames()) {
             final DataChunk ic = dc.getIcForUpdate(ids, s, llt);
             final DataChunk udc = ic.lock(s, llt);
-            s.getTransaction().storeFrame(ic.getFrameData(), udc == null ? null : udc.getUframe(),0 - ic.getBytesAmount(), s, llt);
+            s.getTransaction().storeFrame(ic.getFrameData(), udc == null ? null : udc.getUframe(), 0 - ic.getBytesAmount(), s, llt);
             res.add(ic);
         }
         return res;
@@ -1573,7 +1580,7 @@ public class Table implements ResultSet {
     public void unlockTable(Session s) {
         try {
             final RetrieveLock rl = Instance.getInstance().getRetrieveLockById(this.objectId, s.getTransaction().getTransId());
-            if (rl!=null) {
+            if (rl != null) {
                 final List<TransFrame> tbs = Instance.getInstance().getTransFrameByObjectId(this.objectId);
                 final List<Long> ts = new ArrayList<Long>();
                 for (TransFrame tb : tbs) {
@@ -1583,7 +1590,7 @@ public class Table implements ResultSet {
                 }
                 for (long t : ts) {
                     final Transaction tr = Instance.getInstance().getTransactionById(t);
-                    if (tr.getTransType()==Transaction.TRAN_THR) {
+                    if (tr.getTransType() == Transaction.TRAN_THR || tr.getTransType() == Transaction.TRAN_RBC) {
                         tr.unlockUndoFrames(this.objectId, s);
                     }
                 }
@@ -1616,7 +1623,7 @@ public class Table implements ResultSet {
         final ManagedCallable<Boolean> r = new ManagedCallable<Boolean>() {
             @Override
             public Boolean call() throws Exception {
-                Thread.currentThread().setName("interference-retrieve-queue-thread-"+Thread.currentThread().getId());
+                Thread.currentThread().setName("interference-retrieve-queue-thread-" + Thread.currentThread().getId());
                 synchronized (t) {
                     final LinkedBlockingQueue<FrameData> bds = Instance.getInstance().getTableById(getObjectId()).getFrames();
                     boolean cnue = true;
@@ -1763,7 +1770,7 @@ public class Table implements ResultSet {
     }
 
     @Deprecated
-    protected ArrayList<FrameData> getStream (Map<Long, Long> retrieved, Session s) throws Exception {
+    protected ArrayList<FrameData> getStream(Map<Long, Long> retrieved, Session s) throws Exception {
         final ArrayList<FrameData> r = new ArrayList<>();
         if (this.isIndex()) { //index table
             throw new InternalException();
@@ -1786,10 +1793,10 @@ public class Table implements ResultSet {
         return r;
     }
 
-    public DataChunk getChunkByEntity (Object o, Session s, LLT llt) throws Exception {
+    public DataChunk getChunkByEntity(Object o, Session s, LLT llt) throws Exception {
         final Class c = o.getClass();
-        final ResultSetEntity ca = (ResultSetEntity)c.getAnnotation(ResultSetEntity.class);
-        if (ca!=null) { //ResultSet entities ALWAYS insert only, then, no neccessary for find datachunk
+        final ResultSetEntity ca = (ResultSetEntity) c.getAnnotation(ResultSetEntity.class);
+        if (ca != null) { //ResultSet entities ALWAYS insert only, then, no neccessary for find datachunk
             return null;
         }
         if (this.isNoTran()) {
@@ -1802,15 +1809,19 @@ public class Table implements ResultSet {
             final IndexField ix = this.getIndexFieldByColumn(idf.getName());
             if (mf != null) {
                 final DataChunk dc = (DataChunk) mf.getMap().get(idmethod.invoke(o, null));
-                if (llt != null && dc != null) { llt.add(dc.getFrameData().getFrame()); }
+                if (llt != null && dc != null) {
+                    llt.add(dc.getFrameData().getFrame());
+                }
                 return dc;
             } else if (ix != null) {
                 final DataChunk dc = (DataChunk) ix.getIndex().getObjectByKey(new IndexElementKey(new Object[]{idMethod.invoke(o, null)}));
-                if (llt != null && dc != null) { llt.add(dc.getFrameData().getFrame()); }
+                if (llt != null && dc != null) {
+                    llt.add(dc.getFrameData().getFrame());
+                }
                 return dc;
             } else {
                 final byte[] id = new DataChunkId(o, this, s).getIdBytes();
-                if (id!=null) {
+                if (id != null) {
                     final LinkedBlockingQueue<FrameData> bds = Instance.getInstance().getTableById(this.getObjectId()).getFrames();
                     boolean cnue = true;
                     while (cnue) {
@@ -1833,7 +1844,7 @@ public class Table implements ResultSet {
                 }
             }
         } else {
-            final EntityContainer to = (EntityContainer)o;
+            final EntityContainer to = (EntityContainer) o;
             final Table idt = getFirstIndexByIdColumn();
             if (to.getDataChunk() == null) {
                 //todo need further optimize
@@ -1870,7 +1881,9 @@ public class Table implements ResultSet {
                     }
                 }
             } else {
-                if (llt != null) { llt.add(to.getDataChunk().getFrameData().getFrame()); }
+                if (llt != null) {
+                    llt.add(to.getDataChunk().getFrameData().getFrame());
+                }
                 return to.getDataChunk();
             }
         }
@@ -1878,17 +1891,17 @@ public class Table implements ResultSet {
         return null;
     }
 
-    public DataChunk getChunkById (long id, Session s) throws Exception {
+    public DataChunk getChunkById(long id, Session s) throws Exception {
         final String type = getIdField().getType().getName();
         final Table idt = getFirstIndexByIdColumn();
-        final Integer id_ = type.equals("int") || type.equals("java.lang.Integer") ? (int)id : null;
+        final Integer id_ = type.equals("int") || type.equals("java.lang.Integer") ? (int) id : null;
         final ValueSet vs = id_ == null ? (new ValueSet(id)) : (new ValueSet(id_));
         if (idt != null) {
             final DataChunk idc = idt.getObjectByKey(vs, s);
-            if (idc==null) {
+            if (idc == null) {
                 return null;
             }
-            final IndexChunk ibx = (IndexChunk)idc.getEntity();
+            final IndexChunk ibx = (IndexChunk) idc.getEntity();
             return ibx.getDataChunk();
         } else {
             byte[] iid = null;
@@ -1939,7 +1952,7 @@ public class Table implements ResultSet {
         return bb.array();
     }
 
-    private byte[] append(byte[] b, byte[] toAdd){
+    private byte[] append(byte[] b, byte[] toAdd) {
         final byte[] res = new byte[b.length + toAdd.length];
         System.arraycopy(b, 0, res, 0, b.length);
         System.arraycopy(toAdd, 0, res, b.length, toAdd.length);
@@ -1949,16 +1962,16 @@ public class Table implements ResultSet {
     /****************** persistent indexes *******************/
 
     //rowid used in DataChunk constructor for build standalone indexes
-    private synchronized void add (RowId rowid, Object o, Session s, LLT extllt) throws Exception {
+    private synchronized void add(RowId rowid, Object o, Session s, LLT extllt) throws Exception {
 
         final DataChunk dc = new DataChunk(o, s, rowid, this);
         final int len = dc.getBytesAmount();
         dc.getHeader().setTran(s.getTransaction());
 
         boolean cnue = true;
-        FrameData target = Instance.getInstance().getFrameById(this.getFileStart()+this.getFrameStart());
+        FrameData target = Instance.getInstance().getFrameById(this.getFileStart() + this.getFrameStart());
 
-        final LLT llt = extllt==null?LLT.getLLT():extllt;
+        final LLT llt = extllt == null ? LLT.getLLT() : extllt;
 
         try {
             while (cnue) {
@@ -2023,14 +2036,16 @@ public class Table implements ResultSet {
                 }
             }
         } finally {
-            if (extllt == null) { llt.commit(); }
+            if (extllt == null) {
+                llt.commit();
+            }
         }
 
         if (!isNoTran()) {
 //todo            ((EntityContainer)o).setTransId(dc.getHeader().getTran());
 //todo            ((EntityContainer)o).setRowId(dc.getHeader().getRowID());
 //todo            ((EntityContainer)o).setDataChunk(dc);
-            ((EntityContainer)o).getDataChunk().setIc(dc);
+            ((EntityContainer) o).getDataChunk().setIc(dc);
         }
     }
 
@@ -2071,7 +2086,7 @@ public class Table implements ResultSet {
     @Deprecated
     public synchronized List<Chunk> getContent(Session s) throws Exception {
         ArrayList<Chunk> res = new ArrayList<>();
-        res.addAll(getLocalContent(this.fileStart+this.frameStart, s));
+        res.addAll(getLocalContent(this.fileStart + this.frameStart, s));
         for (Map.Entry<Integer, Long> entry : ixstartfs.entrySet()) {
             res.addAll(getLocalContent(entry.getValue(), s));
         }
@@ -2096,22 +2111,22 @@ public class Table implements ResultSet {
         levelNodes.add(el);
         while (cnue) {
             ArrayList<IndexFrame> inNodes = new ArrayList<>();
-            for (int k=0; k<levelNodes.size(); k++) {
+            for (int k = 0; k < levelNodes.size(); k++) {
                 levelNodes.get(k).sort();
-                if (levelNodes.get(k).getType()==1) {
+                if (levelNodes.get(k).getType() == 1) {
                     cnue = false;
                     for (Chunk ie : levelNodes.get(k).getFrameChunks(s)) {
-                        if (levelNodes.get(k).getType()==1) {
+                        if (levelNodes.get(k).getType() == 1) {
                             res.add(ie);
                         }
                     }
                 } else {
-                    for (int i=0; i<levelNodes.get(k).getFrameChunks(s).size(); i++) {
+                    for (int i = 0; i < levelNodes.get(k).getFrameChunks(s).size(); i++) {
                         inNodes.add(Instance.getInstance().getFrameById(levelNodes.get(k).getFrameChunks(s).get(i).getHeader().getFramePtr()).getIndexFrame());
                     }
-                    if (k==levelNodes.size()-1) {
+                    if (k == levelNodes.size() - 1) {
                         final long lcId = levelNodes.get(k).getLcId();
-                        if (lcId>0) {
+                        if (lcId > 0) {
                             inNodes.add(Instance.getInstance().getFrameById(lcId).getIndexFrame());
                         }
                     }
@@ -2123,17 +2138,17 @@ public class Table implements ResultSet {
     }
 
     //todo warning: queue returns not-ordered index frames for multi-tree indices
-    private synchronized LinkedBlockingQueue<FrameData> getLeafFrames (Session s, String caller) {
+    private synchronized LinkedBlockingQueue<FrameData> getLeafFrames(Session s, String caller) {
         final LinkedBlockingQueue<FrameData> q = new LinkedBlockingQueue<>(1000);
         final ArrayList<Long> startfs = new ArrayList<>();
-        startfs.add(this.fileStart+this.frameStart);
+        startfs.add(this.fileStart + this.frameStart);
         for (Map.Entry<Integer, Long> entry : ixstartfs.entrySet()) {
             startfs.add(entry.getValue());
         }
         Runnable r = new Runnable() {
             @Override
             public void run() {
-                Thread.currentThread().setName("interference-retrieve-overall-index-frames-"+caller+"-"+Thread.currentThread().getId());
+                Thread.currentThread().setName("interference-retrieve-overall-index-frames-" + caller + "-" + Thread.currentThread().getId());
                 try {
                     for (int a = 0; a < startfs.size(); a++) {
                         ArrayList<IndexFrame> levelNodes = new ArrayList<>();
@@ -2192,11 +2207,11 @@ public class Table implements ResultSet {
     }
 
     // todo which possibility of refactor IndexFrame -> FrameData to decrease heap load
-    private synchronized LinkedBlockingQueue<FrameData> getLocalLeafFrames (LinkedBlockingQueue<FrameData> q, long start, String caller, boolean terminate, Session s) {
+    private synchronized LinkedBlockingQueue<FrameData> getLocalLeafFrames(LinkedBlockingQueue<FrameData> q, long start, String caller, boolean terminate, Session s) {
         Runnable r = new Runnable() {
             @Override
             public void run() {
-                Thread.currentThread().setName("interference-retrieve-index-frames-"+caller+"-"+Thread.currentThread().getId());
+                Thread.currentThread().setName("interference-retrieve-index-frames-" + caller + "-" + Thread.currentThread().getId());
                 ArrayList<IndexFrame> levelNodes = new ArrayList<>();
                 boolean cnue = true;
                 final FrameData bd = Instance.getInstance().getFrameById(start);
@@ -2257,7 +2272,7 @@ public class Table implements ResultSet {
     public synchronized String getInfo(Session s) throws Exception {
         ArrayList<IndexFrame> levelNodes = new ArrayList<>();
         boolean cnue = true;
-        IndexFrame el = Instance.getInstance().getFrameById(this.fileStart+this.frameStart).getIndexFrame();
+        IndexFrame el = Instance.getInstance().getFrameById(this.fileStart + this.frameStart).getIndexFrame();
         el.sort();
         levelNodes.add(el);
         int nodecnt = 0;
@@ -2266,25 +2281,25 @@ public class Table implements ResultSet {
         int leafamt = 0;
         while (cnue) {
             ArrayList<IndexFrame> inNodes = new ArrayList<>();
-            for (int k=0; k<levelNodes.size(); k++) {
+            for (int k = 0; k < levelNodes.size(); k++) {
                 levelNodes.get(k).sort();
-                if (levelNodes.get(k).getType()==1) {
+                if (levelNodes.get(k).getType() == 1) {
                     cnue = false;
                     leafcnt++;
                     for (Chunk ie : levelNodes.get(k).getFrameChunks(s)) {
-                        if (levelNodes.get(k).getType()==1) {
+                        if (levelNodes.get(k).getType() == 1) {
                             leafamt++;
                         }
                     }
                 } else {
                     nodecnt++;
-                    for (int i=0; i<levelNodes.get(k).getFrameChunks(s).size(); i++) {
+                    for (int i = 0; i < levelNodes.get(k).getFrameChunks(s).size(); i++) {
                         nodeamt++;
                         inNodes.add(Instance.getInstance().getFrameById(levelNodes.get(k).getFrameChunks(s).get(i).getHeader().getFramePtr()).getIndexFrame());
                     }
-                    if (k==levelNodes.size()-1) {
+                    if (k == levelNodes.size() - 1) {
                         final long lcId = levelNodes.get(k).getLcId();
-                        if (lcId>0) {
+                        if (lcId > 0) {
                             inNodes.add(Instance.getInstance().getFrameById(lcId).getIndexFrame());
                         }
                     }
@@ -2292,12 +2307,12 @@ public class Table implements ResultSet {
             }
             levelNodes = inNodes;
         }
-        return "nframes: "+nodecnt+" nds: "+nodeamt+" lframes: "+leafcnt+" lfs: "+leafamt;
+        return "nframes: " + nodecnt + " nds: " + nodeamt + " lframes: " + leafcnt + " lfs: " + leafamt;
     }
 
 
-    public synchronized DataChunk getObjectByKey (ValueSet key, Session s) throws Exception {
-        final long start = this.fileStart+this.frameStart;
+    public synchronized DataChunk getObjectByKey(ValueSet key, Session s) throws Exception {
+        final long start = this.fileStart + this.frameStart;
         final DataChunk dc = getLocalObjectByKey(start, key, s);
         if (dc != null) {
             return dc;
@@ -2312,8 +2327,8 @@ public class Table implements ResultSet {
         return null;
     }
 
-    public synchronized List<DataChunk> getObjectsByKey (ValueSet key, Session s) throws Exception {
-        final long start = this.fileStart+this.frameStart;
+    public synchronized List<DataChunk> getObjectsByKey(ValueSet key, Session s) throws Exception {
+        final long start = this.fileStart + this.frameStart;
         final List<DataChunk> r = getLocalObjectsByKey(start, key, s);
         for (Map.Entry<Integer, Long> entry : ixstartfs.entrySet()) {
             r.addAll(getLocalObjectsByKey(entry.getValue(), key, s));
@@ -2321,8 +2336,8 @@ public class Table implements ResultSet {
         return r;
     }
 
-    public synchronized DataChunk getObjectByKey (ValueSet key, long frameptr, int ptr, Session s) throws Exception {
-        final long start = this.fileStart+this.frameStart;
+    public synchronized DataChunk getObjectByKey(ValueSet key, long frameptr, int ptr, Session s) throws Exception {
+        final long start = this.fileStart + this.frameStart;
         final List<DataChunk> r = getLocalObjectsByKey(start, key, frameptr, ptr, s);
         for (Map.Entry<Integer, Long> entry : ixstartfs.entrySet()) {
             r.addAll(getLocalObjectsByKey(entry.getValue(), key, frameptr, ptr, s));
@@ -2334,20 +2349,20 @@ public class Table implements ResultSet {
     }
 
     //for unique indexes
-    private synchronized DataChunk getLocalObjectByKey (long start, ValueSet key, Session s) throws Exception {
+    private synchronized DataChunk getLocalObjectByKey(long start, ValueSet key, Session s) throws Exception {
         boolean cnue = true;
         IndexFrame target = Instance.getInstance().getFrameById(start).getIndexFrame();
         while (cnue) {
-            if (target.getType()==1) { //leaf
+            if (target.getType() == 1) { //leaf
                 cnue = false;
             } else {
                 DataChunk cc = target.getChildElementPtr(key);
-                if (cc!=null) {
+                if (cc != null) {
                     target = Instance.getInstance().getFrameById(cc.getHeader().getFramePtr()).getIndexFrame();
                 } else {
                     target = Instance.getInstance().getFrameById(target.getLcId()).getIndexFrame(); //get by last child
                     if (target == null) {
-                        logger.error("null target returned for frame id "+target.getLcId());
+                        logger.error("null target returned for frame id " + target.getLcId());
                     }
                 }
             }
@@ -2356,7 +2371,7 @@ public class Table implements ResultSet {
     }
 
     //for non-unique indexes
-    private synchronized List<DataChunk> getLocalObjectsByKey (long start, ValueSet key, Session s) throws Exception {
+    private synchronized List<DataChunk> getLocalObjectsByKey(long start, ValueSet key, Session s) throws Exception {
         final List<DataChunk> r = new ArrayList<>();
         boolean cnue = true;
         List<IndexFrame> targets = new ArrayList<>();
@@ -2364,17 +2379,17 @@ public class Table implements ResultSet {
         while (cnue) {
             List<IndexFrame> ntargets = new ArrayList<>();
             for (IndexFrame target : targets) {
-                if (target.getType()==1) { //leaf
+                if (target.getType() == 1) { //leaf
                     r.addAll(target.getObjectsByKey(key, s));
                     cnue = false;
                 } else {
                     ArrayList<Long> cptr = target.getChildElementsPtr(key);
-                    if (cptr.size()>0) {
+                    if (cptr.size() > 0) {
                         for (Long i : cptr) {
                             ntargets.add(Instance.getInstance().getFrameById(i).getIndexFrame());
                         }
                     }
-                    if (target.getLcId()>0) {
+                    if (target.getLcId() > 0) {
                         ntargets.add(Instance.getInstance().getFrameById(target.getLcId()).getIndexFrame()); //get by last child
                     }
                 }
@@ -2385,7 +2400,7 @@ public class Table implements ResultSet {
     }
 
     //for non-unique indexes - get unique object by ptr
-    private synchronized List<DataChunk> getLocalObjectsByKey (long start, ValueSet key, long frameptr, int ptr, Session s) throws Exception {
+    private synchronized List<DataChunk> getLocalObjectsByKey(long start, ValueSet key, long frameptr, int ptr, Session s) throws Exception {
         final List<DataChunk> r = new ArrayList<>();
         boolean cnue = true;
         List<IndexFrame> targets = new ArrayList<>();
@@ -2393,17 +2408,17 @@ public class Table implements ResultSet {
         while (cnue) {
             List<IndexFrame> ntargets = new ArrayList<>();
             for (IndexFrame target : targets) {
-                if (target.getType()==1) { //leaf
+                if (target.getType() == 1) { //leaf
                     r.addAll(target.getObjectsByKey(key, frameptr, ptr, s));
                     cnue = false;
                 } else {
                     ArrayList<Long> cptr = target.getChildElementsPtr(key);
-                    if (cptr.size()>0) {
+                    if (cptr.size() > 0) {
                         for (Long i : cptr) {
                             ntargets.add(Instance.getInstance().getFrameById(i).getIndexFrame());
                         }
                     }
-                    if (target.getLcId()>0) {
+                    if (target.getLcId() > 0) {
                         ntargets.add(Instance.getInstance().getFrameById(target.getLcId()).getIndexFrame()); //get by last child
                     }
                 }
@@ -2418,22 +2433,26 @@ public class Table implements ResultSet {
     private synchronized void removeObjects(ValueSet key, Object o, Session s, LLT llt) throws Exception {
         boolean cnue = true;
         ArrayList<FrameData> targets = new ArrayList<FrameData>();
-        targets.add(Instance.getInstance().getFrameById(this.fileStart+this.frameStart));
+        targets.add(Instance.getInstance().getFrameById(this.fileStart + this.frameStart));
         while (cnue) {
             ArrayList<FrameData> ntargets = new ArrayList<FrameData>();
             for (FrameData target : targets) {
-                if (target.getIndexFrame().getType()==1) { //leaf
+                if (target.getIndexFrame().getType() == 1) { //leaf
                     int len = target.getIndexFrame().removeObjects(key, o);
-                    if (isNoTran()) { usedSpace(target, target.getUsed()-len, true, s, llt); } else { s.getTransaction().storeFrame(target, 0-len, s, llt); }
+                    if (isNoTran()) {
+                        usedSpace(target, target.getUsed() - len, true, s, llt);
+                    } else {
+                        s.getTransaction().storeFrame(target, 0 - len, s, llt);
+                    }
                     cnue = false;
                 } else {
                     ArrayList<Long> cptr = target.getIndexFrame().getChildElementsPtr(key);
-                    if (cptr.size()>0) {
+                    if (cptr.size() > 0) {
                         for (Long i : cptr) {
                             ntargets.add(Instance.getInstance().getFrameById(i));
                         }
                     }
-                    if (target.getIndexFrame().getLcId()>0) {
+                    if (target.getIndexFrame().getLcId() > 0) {
                         ntargets.add(Instance.getInstance().getFrameById(target.getIndexFrame().getLcId())); //get by last child
                     }
                 }
@@ -2444,7 +2463,7 @@ public class Table implements ResultSet {
 
     public synchronized boolean lock(long transId) {
         if (this.lock.compareAndSet(0, transId)) {
-            logger.info(this.getName()+" successfully locked");
+            logger.info(this.getName() + " successfully locked");
             return true;
         }
         return false;
@@ -2452,7 +2471,7 @@ public class Table implements ResultSet {
 
     public synchronized boolean unlock(long transId) {
         if (this.lock.compareAndSet(transId, 0)) {
-            logger.info(this.getName()+" successfully unlocked");
+            logger.info(this.getName() + " successfully unlocked");
             return true;
         }
         return false;
@@ -2476,6 +2495,28 @@ public class Table implements ResultSet {
             this.lock(transId);
         }
         return false;
+    }
+
+    public synchronized String getActionButtonCommand() {
+        if (this.isIndex()) {
+            return "Rebuild";
+        } else {
+            return "Check";
+        }
+    }
+
+    @MgmtAction(name="@getActionButtonCommand", enable="")
+    public synchronized void optimizeAction(String command, String sessionId) {
+        final Session session = sessionId == null ? null : Instance.getInstance().getSession(sessionId);
+        if (this.isIndex()) {
+            if ("Rebuild".equals(command)) {
+                System.out.println("Rebuild");
+            }
+        } else {
+            if ("Check".equals(command)) {
+                System.out.println("Check");
+            }
+        }
     }
 
     public int getObjectId() {

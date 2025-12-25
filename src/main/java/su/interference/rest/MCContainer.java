@@ -26,9 +26,7 @@ package su.interference.rest;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import su.interference.core.Config;
-import su.interference.core.Instance;
-import su.interference.core.Storage;
+import su.interference.core.*;
 import su.interference.mgmt.*;
 import su.interference.persistent.*;
 import su.interference.persistent.Cursor;
@@ -54,16 +52,18 @@ public class MCContainer {
     public static String mmhost = "localhost";
     private final static Logger logger = LoggerFactory.getLogger(MCContainer.class);
 
-    private static String getContent(String sessionId, String pageId) throws Exception {
+    private static String getContent(String tableId, String sessionId, String pageId, String fileId) throws Exception {
         String result = "<table class=head border=0 cellpadding=5 cellspacing=1 width=100% height=100%>\n";
         result = result + "<tr><td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 1, "System")+"</td>";
         result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 2, "Tables")+"</td>";
-        result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 3, "Sessions")+"</td>";
-        result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 4, "Transactions")+"</td>";
-        result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 5, "SQL Queries")+"</td>";
-        result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 6, "Frames")+"</td>";
+        result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 3, "Indexes")+"</td>";
+        result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 4, "Sessions")+"</td>";
+        result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 5, "Transactions")+"</td>";
+        result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 6, "SQL Queries")+"</td>";
+        result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 7, "Frames")+"</td>";
+        // result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 8, "Import")+"</td>";
         result = result + "<td width=50% height=50 align=left valign=center>&nbsp;</td></tr>";
-        result = result + "<tr><td class=body colspan=7 width=100% height=100% align=left valign=top>"+getPageContent(pageId, sessionId)+"</td></tr></table>";
+        result = result + "<tr><td class=body colspan=8 width=100% height=100% align=left valign=top>"+getPageContent(tableId, pageId, fileId, sessionId)+"</td></tr></table>";
         return result;
     }
 
@@ -71,23 +71,35 @@ public class MCContainer {
         return "<a class=hed href=\"?session_id="+sessionId+"&page_id="+pageId+"\">"+pageName+"</a>";
     }
 
-    private static String getPageContent(String pageId, String sessionId) throws Exception {
+    private static String getPageContent(String tableId, String pageId, String fileId, String sessionId) throws Exception {
         if (pageId != null) {
             try {
                 int id = Integer.valueOf(pageId);
+                int file = (fileId == null || "".equals(fileId)) ? 1 : Integer.valueOf(fileId);
                 switch (id) {
                     case 1:
                         return getSystemPage(sessionId, id);
                     case 2:
                         return getTablesPage(sessionId, id);
                     case 3:
-                        return getSessionsPage(sessionId, id);
+                        return getIndexesPage(sessionId, id);
                     case 4:
-                        return getTransactionsPage(sessionId, id);
+                        return getSessionsPage(sessionId, id);
                     case 5:
-                        return getSQLQueriesPage(sessionId, id);
+                        return getTransactionsPage(sessionId, id);
                     case 6:
-                        return getFramesPage(sessionId, id);
+                        return getSQLQueriesPage(sessionId, id);
+                    case 7:
+                        return getFramesPage(sessionId, id, file);
+                    case 8:
+                        return getUploadForm(sessionId, id, mmhost, Config.getConfig().MMPORT);
+                    case 10:
+                        if (tableId != null && tableId.matches("-?\\d+(\\.\\d+)?")) {
+                            int tId = Integer.valueOf(tableId);
+                            return getTablePage(sessionId, id, tId);
+                        } else {
+                            return "Table identifier incorrect: "+ tableId;
+                        }
                 }
             } catch (NumberFormatException e) {
                 return getSystemPage(sessionId, 1);
@@ -165,7 +177,12 @@ public class MCContainer {
     }
 
     private static String getTablesPage(String sessionId, int pageId) throws Exception {
-        List tables = Instance.getInstance().getTables();
+        List tables = Instance.getInstance().getTables().stream().filter(t -> !t.isNoTran()).filter(t -> !t.isIndex()).collect(Collectors.toList());
+        return getContentByMgmtObjects(tables, sessionId, pageId, mmhost, Config.getConfig().MMPORT);
+    }
+
+    private static String getIndexesPage(String sessionId, int pageId) throws Exception {
+        List tables = Instance.getInstance().getTables().stream().filter(t -> !t.isNoTran()).filter(t -> t.isIndex()).collect(Collectors.toList());
         return getContentByMgmtObjects(tables, sessionId, pageId, mmhost, Config.getConfig().MMPORT);
     }
 
@@ -194,31 +211,133 @@ public class MCContainer {
         return getContentByMgmtObjects(cursors, sessionId, pageId, mmhost, Config.getConfig().MMPORT);
     }
 
-    private static String getFramesPage(String sessionId, int pageId) throws Exception {
-        Map<Integer, DataFile> dfsmap = Instance.getInstance().getDataFilesMap();
-        List<FrameData> frames = Instance.getInstance().getSortedDataFrames(dfsmap, Storage.DATAFILE_TYPEID);
-        StringBuffer result = new StringBuffer();
-        result.append("<table class=head border=0 cellpadding=5 cellspacing=1 width=100%>\n");
-        int size = frames.size()/24 + (frames.size()%24 > 0 ? 1 : 0);
-        for (int i = 0; i < size; i++) {
-            result.append("<tr>");
-            for (int j = 0; j < 24; j++) {
-                int ptr = (j + 1) * (i + 1) - 1;
-                if (ptr < frames.size()) {
-                    FrameData frameData = frames.get(ptr);
-                    result.append("<td class=frame width=6% height=50 align=left valign=top>" + frameData.getFrameId() + "<br>" + frameData.getAllocId() + "<br>" + frameData.getFrameUsed() + "</td>");
-                } else {
-                    result.append("<td class=frame width=6% height=50 align=left valign=top>No frame</td>");
+    private static String getTablePage(String sessionId, int pageId, int tableId) throws Exception {
+        Session session = Instance.getInstance().getSession(sessionId);
+        if (session != null) {
+            Table table = Instance.getInstance().getTableById(tableId);
+            if (table != null) {
+                session.startTransaction();
+                List<Object> objects = new ArrayList<>();
+                Object o = table.poll(session);
+                if (o != null) {
+                    objects.add(o);
+                    while (o != null) {
+                        o = table.poll(session);
+                        if (o != null) {
+                            objects.add(o);
+                        }
+                    }
                 }
+                session.commit();
+                return getContentByMgmtObjects(objects, sessionId, pageId, mmhost, Config.getConfig().MMPORT);
             }
+        }
+        return "No table data or session incorrect";
+    }
+
+    private static String getFramesPage(String sessionId, int pageId, int fileId) throws Exception {
+        StringBuffer result = new StringBuffer();
+        List<DataFile> datafiles = Arrays.asList(Instance.getInstance().getDataFiles());
+        for (DataFile dataFile : datafiles) {
+            if (dataFile.getFileId() == fileId) {
+                result.append(dataFile.getFileName());
+                result.append("&nbsp;");
+            } else {
+                result.append("<a class=sub href=\"?session_id=");
+                result.append(sessionId);
+                result.append("&page_id=");
+                result.append(pageId);
+                result.append("&file_id=");
+                result.append(dataFile.getFileId());
+                result.append("\">");
+                result.append(dataFile.getFileName());
+                result.append("</a>&nbsp;");
+            }
+        }
+        result.append("<br><br>");
+        int fsize = Instance.getInstance().getFrameSize();
+        Map<Long, DataChunk> fmap = Instance.getInstance().getFramesMap();
+        Map<Long, FrameData> frames = new HashMap<>();
+        for (Map.Entry<Long, DataChunk> entry : fmap.entrySet()) {
+            FrameData fd = (FrameData) entry.getValue().getEntity();
+            if (fd.getFile() == fileId) {
+                frames.put(entry.getKey(), fd);
+            }
+        }
+        int size = frames.size();
+        int i = 0;
+        int cnt = 0;
+        long prevId = fileId;
+        boolean cnue = true;
+        result.append("<table class=head border=0 cellpadding=5 cellspacing=1 width=100%>\n");
+        while (cnue) {
+            String cls = "";
+            if (i%24 == 0) {
+                result.append("<tr>");
+            }
+            long currId = prevId + fsize;
+            FrameData frameData = frames.get(currId);
+            prevId = currId;
+            i++;
+            if (frameData == null) {
+                FreeFrame ff = Instance.getInstance().getFreeFrameById(currId);
+                if (ff == null) {
+                    result.append("<td class=fmiss width=6% height=50 align=left valign=top>");
+                    result.append(currId);
+                    result.append("</td>");
+                } else {
+                    result.append("<td class=ffree width=6% height=50 align=left valign=top>");
+                    result.append(currId);
+                    result.append("</td>");
+                }
+            } else {
+                cnt++;
+                if (frameData.isNoTran()) {
+                    cls = "fsys";
+                } else if (!frameData.isLocal()) {
+                    cls = "fouter";
+                } else {
+                    if (frameData.isSynced()) {
+                        if (frameData.isFrameBusy()) {
+                            cls = "ftran";
+                        } else {
+                            cls = "fsync";
+                        }
+                    } else {
+                        if (frameData.isFrameBusy()) {
+                            cls = "ftranns";
+                        } else {
+                            cls = "fnosync";
+                        }
+                    }
+                }
+                result.append("<td class=");
+                result.append(cls);
+                result.append(" width=6% height=50 align=left valign=top>");
+                result.append(frameData.getFrameId());
+                result.append("<br>");
+                result.append(frameData.getAllocId());
+                result.append("<br>");
+                result.append(frameData.getFrameUsed());
+                result.append("</td>");
+            }
+            if (cnt == size) {
+                cnue = false;
+            }
+        }
+        while (i%24 < 23) {
+            result.append("<td width=6% height=50 align=left valign=top>No frame</td>");
+            i++;
+        }
+        if (i%24 == 23) {
+            result.append("<td width=6% height=50 align=left valign=top>No frame</td>");
             result.append("</tr>");
         }
         result.append("</table>");
-
         return result.toString();
     }
 
-    protected static String getMCContent(String pageId, Session s) throws Exception {
+    protected static String getMCContent(String tableId, String pageId, String fileId, Session s) throws Exception {
         return "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\">\n" +
         "<html><head>\n" +
         "<META http-equiv=\"Content-Type\" content=\"text/html; charset=UTF8\">\n" +
@@ -227,7 +346,7 @@ public class MCContainer {
         getCSS() +
         "<title>Interference management console</title></HEAD>\n" +
         "<body aLink=\"0000ff\" bgColor=\"efefef\" link=\"0000ff\" text=\"000000\" topMargin=\"0\" leftMargin=\"0\" rightMargin=\"0\" vLink=\"0000ff\">\n" +
-        getContent(s.getSessionId(), pageId) +
+        getContent(tableId, s.getSessionId(), pageId, fileId) +
         "</body></html>";
     }
 
@@ -236,6 +355,10 @@ public class MCContainer {
             return "";
         }
         Class c = objects.get(0).getClass();
+        Annotation te = c.getAnnotation(TransEntity.class);
+        if (te != null) {
+            c = c.getSuperclass();
+        }
         String type = c.getSimpleName();
         Annotation a = c.getAnnotation(MgmtClass.class);
         List<MgmtContainer> mgmtlist = new ArrayList();
@@ -252,13 +375,18 @@ public class MCContainer {
             for (Field f : fields) {
                 Annotation fa = f.getAnnotation(MgmtColumn.class);
                 if (fa != null) {
-                    mgmtlist.add(new MgmtContainer((MgmtColumn) fa, null, f, null, c, idField));
+                    Annotation la = f.getAnnotation(MgmtLink.class);
+                    if (la == null) {
+                        mgmtlist.add(new MgmtContainer((MgmtColumn) fa, null, null, f, null, c, idField));
+                    } else {
+                        mgmtlist.add(new MgmtContainer((MgmtColumn) fa, null, (MgmtLink) la, f, null, c, idField));
+                    }
                 }
             }
             for (Method m : methods) {
                 Annotation ma = m.getAnnotation(MgmtAction.class);
                 if (ma != null) {
-                    mgmtlist.add(new MgmtContainer(null, (MgmtAction) ma, null, m, c, idField));
+                    mgmtlist.add(new MgmtContainer(null, (MgmtAction) ma, null, null, m, c, idField));
                 }
             }
         }
@@ -274,7 +402,7 @@ public class MCContainer {
                 result = result + "<tr>";
                 for (MgmtContainer mgmtcnt : mgmtlist) {
                     String objectId = mgmtcnt.getId(o);
-                    String s = mgmtcnt.isCommand() ? getButtonForm(c, o, mgmtcnt, sessionId, type, objectId, pageId, host, port) : mgmtcnt.getValue(o);
+                    String s = mgmtcnt.isCommand() ? getButtonForm(c, o, mgmtcnt, sessionId, type, objectId, pageId, host, port) : mgmtcnt.getValue(o, objectId, sessionId, pageId);
                     result = result + "<td class=body width="+mgmtcnt.getSize()+"% height=30 align=left valign=center>"+s+"</td>";
                 }
                 result = result + "</tr>";
@@ -310,9 +438,6 @@ public class MCContainer {
                 "a.hnav:link { font-family: verdana,arial, Helvetica, sans-serif; font-size:7pt; font-weight: 600; text-decoration:none; color: ffffff; }\n" +
                 "a.hnav:visited { font-family: verdana,arial, Helvetica, sans-serif; font-size:7pt; font-weight: 600; text-decoration:none; color: ffffff; }\n" +
                 "a.hnav:hover { font-family: verdana,arial, Helvetica, sans-serif; font-size:7pt; font-weight: 600; text-decoration:none; color: ff0000; }\n" +
-                "a.ora:link { font-family: verdana,arial, Helvetica, sans-serif; font-size:8pt; font-weight: 500; text-decoration:none; color: ffffff; }\n" +
-                "a.ora:visited { Font-family: verdana,arial, Helvetica, sans-serif; font-size:8pt; font-weight: 500; text-decoration:none; color: ffffff; }\n" +
-                "a.ora:hover { font-family: verdana,arial, Helvetica, sans-serif; font-size:8pt; font-weight: 500; text-decoration:none; color: ffffff; }\n" +
                 "h1 {font-family: MS Sans Serif; font-size:40pt; color:ffffff;font-weight: 700}\n" +
                 "h2 {font-family: Arial; font-size:12pt; color:ffffff;font-weight: 500}\n" +
                 "h3 {font-family: MS Sans Serif; font-size:20pt; color:001020;font-weight: 700}\n" +
@@ -336,8 +461,15 @@ public class MCContainer {
                 "td.even  {font-family: Arial; color: #002040; background-color:f0f0f0}\n" +
                 "td.head {font-family: Arial; font-size:11pt; color: #002040; background-color:afbfd0}\n" +
                 "td.odd  {font-family: Arial; background-color: #cfefd0; }\n" +
-                "td.body {font-family: Arial,Helvetica,Verdana; font-size:10pt; color: #001020; background-color:e8e8f8; font-weight: 500}\n" +
-                "td.frame {font-family: Arial,Helvetica,Verdana; font-size:9pt; color: #001020; background-color:a8e8a8; font-weight: 600}\n" +
+                "td.body {font-family: Arial,Helvetica,Verdana; font-size:8pt; color: #001020; background-color:e8e8f8; font-weight: 500}\n" +
+                "td.fsync {font-family: Arial,Helvetica,Verdana; font-size:9pt; color: #001020; background-color:b8f8b8; font-weight: 500}\n" +
+                "td.fnosync {font-family: Arial,Helvetica,Verdana; font-size:9pt; color: #001020; background-color:b8b880; font-weight: 500}\n" +
+                "td.ftran {font-family: Arial,Helvetica,Verdana; font-size:9pt; color: #001020; background-color:b88840; font-weight: 500}\n" +
+                "td.ftranns {font-family: Arial,Helvetica,Verdana; font-size:9pt; color: #001020; background-color:d84840; font-weight: 500}\n" +
+                "td.fouter {font-family: Arial,Helvetica,Verdana; font-size:9pt; color: #001020; background-color:2848d8; font-weight: 500}\n" +
+                "td.fsys {font-family: Arial,Helvetica,Verdana; font-size:9pt; color: #001020; background-color:28a8d8; font-weight: 500}\n" +
+                "td.fmiss {font-family: Arial,Helvetica,Verdana; font-size:9pt; color: #001020; background-color:d80000; font-weight: 500}\n" +
+                "td.ffree {font-family: Arial,Helvetica,Verdana; font-size:9pt; color: #001020; background-color:e8e8e8; font-weight: 500}\n" +
                 "td.phead {font-family: Arial,Helvetica,Verdana; font-size:9pt; color:002040; font-weight: 700}\n" +
                 "td.back {font-family: Arial; color: #002040; background-color:c0b0b0}\n" +
                 "table.head { font-size:10pt; background-color: 003060; }\n" +

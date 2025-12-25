@@ -63,7 +63,6 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
 
     @Column
     @IndexColumn
-    @MgmtColumn(name="Frame Id",width=20)
     private volatile int objectId;
     @Column
     @MgmtColumn(name="File Id",width=10)
@@ -104,6 +103,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @Id
     @MapColumn
     @Transient
+    @MgmtColumn(name="Frame Id",width=20)
     private long frameId; //virtual Id field
     @Transient
     private final Map<Long, Map<Long, TransFrame>> tcounter = new ConcurrentHashMap<>();

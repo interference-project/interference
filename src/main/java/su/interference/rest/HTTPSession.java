@@ -59,7 +59,9 @@ public class HTTPSession implements Runnable {
     public static final String HTTP_MIME_HTML = "text/html";
     public static final String HTTP_MIME_DEFAULT_BINARY = "application/octet-stream";
     public static final String HTTP_MIME_XML = "text/xml";
+    public static final String HTTP_MIME_CSV = "text/csv";
     public static final String HTTP_MIME_FORM_URLENCODED = "application/x-www-form-urlencoded";
+    public static final String HTTP_MIME_EXCEL = "application/vnd.ms-excel";
     private final static Logger logger = LoggerFactory.getLogger(HTTPSession.class);
     private final ExecutorService pool = Executors.newCachedThreadPool();
     private static int bufsize = 8192;
@@ -82,6 +84,8 @@ public class HTTPSession implements Runnable {
         final String sessionId = (String)params.get("session_id");
         final String pageId = (String)params.get("page_id");
         final String objectId = (String)params.get("object_id");
+        final String fileId = (String)params.get("file_id");
+        final String showTable = (String)params.get("showtable");
         final String type = (String)params.get("type");
         final String command = (String)params.get("command");
         final String param = (String)params.get("param");
@@ -95,7 +99,7 @@ public class HTTPSession implements Runnable {
             }
         }
         try {
-            HTTPResponse response = getResponse(session, uri, pageId);
+            HTTPResponse response = getResponse(session, uri, showTable, pageId, fileId);
             return response;
         } catch (Exception e) {
             logger.error("Exception occured during process HTTP request", e);
@@ -192,19 +196,89 @@ public class HTTPSession implements Runnable {
             if (method.equalsIgnoreCase("POST")) {
                 StringTokenizer st = new StringTokenizer(header.getProperty("content-type") , "; ");
                 String ctype = st.hasMoreTokens() ? st.nextToken() : "";
-                StringBuffer sbuf = new StringBuffer();
-                char pbuf[] = new char[512];
-                int read = in.read(pbuf);
-                while (read >= 0 && !(sbuf.lastIndexOf("\r\n") == sbuf.length())) {
-                    sbuf.append(pbuf, 0, read);
-                    read = in.read(pbuf);
+                if (ctype.equalsIgnoreCase("multipart/form-data")) {
+                    if (!st.hasMoreTokens()) {
+                        sendResponse(HTTP_500_INTERNAL_ERROR, "multipart/form-data boundary missing" );
+                    }
+                    String boundary = st.nextToken();
+                    st = new StringTokenizer(boundary, "=" );
+                    if (st.countTokens() != 2) {
+                        sendResponse(HTTP_500_INTERNAL_ERROR, "multipart/form-data boundary is incorrect" );
+                    }
+
+                    st.nextToken();
+                    boundary = st.nextToken();
+
+                    boolean cnue = true;
+                    boolean fstart = false;
+                    String pname = null;
+                    while (cnue) {
+                        String line = in.readLine();
+                        if (line.indexOf(boundary + "--") >= 0) {
+                            cnue = false;
+                            continue;
+                        }
+                        if (line.indexOf(boundary) >= 0) {
+                            cnue = true;
+                            continue;
+                        }
+                        if (pname != null) {
+                            params.put(pname, line);
+                            pname = null;
+                        }
+                        if (fstart) {
+                            System.out.println(line);
+                        }
+                        if (line.indexOf("Content-Disposition: form-data;") >= 0) {
+                            StringTokenizer st2 = new StringTokenizer(line, ";");
+                            st2.nextToken();
+                            String t2 = st2.nextToken();
+                            if (t2.indexOf("name=") > 0) {
+                                StringTokenizer st3 = new StringTokenizer(t2, "=");
+                                st3.nextToken();
+                                String paramName = st3.nextToken();
+                                pname = paramName.substring(1, paramName.length()-1);
+                            } else {
+                                sendResponse(HTTP_500_INTERNAL_ERROR, "multipart/form-data is incorrect" );
+                            }
+                            if (st2.hasMoreTokens()) {
+                                t2 = st2.nextToken();
+                                if (t2.indexOf("filename=") > 0) {
+                                    String ctype2 = in.readLine();
+                                    if (ctype2.indexOf("Content-Type:") >= 0) {
+                                        StringTokenizer st4 = new StringTokenizer(ctype2, "; ");
+                                        st4.nextToken();
+                                        ctype2 = st4.nextToken();
+                                        if (HTTP_MIME_CSV.equals(ctype2) || HTTP_MIME_EXCEL.equals(ctype2)) {
+                                            fstart = true;
+                                        } else {
+                                            sendResponse(HTTP_500_INTERNAL_ERROR, "Unsupported uploaded file" );
+                                        }
+                                    } else {
+                                        sendResponse(HTTP_500_INTERNAL_ERROR, "multipart/form-data is incorrect" );
+                                    }
+                                } else {
+                                    sendResponse(HTTP_500_INTERNAL_ERROR, "multipart/form-data is incorrect" );
+                                }
+                                in.readLine();
+                            }
+                        }
+                    }
+                } else {
+                    StringBuffer sbuf = new StringBuffer();
+                    char pbuf[] = new char[512];
+                    int read = in.read(pbuf);
+                    while (read >= 0 && !(sbuf.lastIndexOf("\r\n") == sbuf.length())) {
+                        sbuf.append(pbuf, 0, read);
+                        read = in.read(pbuf);
+                    }
+                    StringBuffer sbuf2 = new StringBuffer();
+                    while (read >= 0 && !(sbuf2.lastIndexOf("\r\n") == sbuf2.length())) {
+                        sbuf2.append(pbuf, 0, read);
+                        read = in.read(pbuf);
+                    }
+                    parseParams(sbuf.toString().trim(), params);
                 }
-                StringBuffer sbuf2 = new StringBuffer();
-                while (read >= 0 && !(sbuf2.lastIndexOf("\r\n") == sbuf2.length())) {
-                    sbuf2.append(pbuf, 0, read);
-                    read = in.read(pbuf);
-                }
-                parseParams(sbuf.toString().trim(), params);
             }
 
             // get response
@@ -346,7 +420,7 @@ public class HTTPSession implements Runnable {
         }
     }
 
-    private HTTPResponse getResponse (Session session, String uri, String pageId) {
+    private HTTPResponse getResponse (Session session, String uri, String tableId, String pageId, String fileId) {
         HTTPResponse res = null;
 
         if (res == null) {
@@ -370,7 +444,7 @@ public class HTTPSession implements Runnable {
                     session.setIpAddress(sock.getInetAddress().getHostAddress());
                     uri += "?session_id="+session.getSessionId();
                     String s = "<html><head>";
-                    s+="<META http-equiv=\"Content-Type\" content=\"text/html; charset=windows-1251\">";
+                    s+="<META http-equiv=\"Content-Type\" content=\"text/html; charset=UTF8\">";
                     s+="<META http-equiv=\"EXPIRES\"      content=\"Wed, 07 Jul 2004 12:34:56 GMT\">";
                     s+="<META http-equiv=\"PRAGMA\"       content=\"NO-CACHE\">";
                     s+="</head><body>Redirected: <a href=\"" + uri + "\">" + uri + "</a></body></html>";
@@ -382,7 +456,7 @@ public class HTTPSession implements Runnable {
             if (res == null)	{
                 if (uri.equals("/")) {
                     try {
-                        res = new HTTPResponse(HTTP_200_OK, HTTP_MIME_HTML, MCContainer.getMCContent(pageId, session));
+                        res = new HTTPResponse(HTTP_200_OK, HTTP_MIME_HTML, MCContainer.getMCContent(tableId, pageId, fileId, session));
                     } catch (Exception e) {
                         logger.error("Exception occured during build HTTP response", e);
                         res = new HTTPResponse(HTTP_500_INTERNAL_ERROR, HTTP_MIME_HTML, "Internal Server Error");

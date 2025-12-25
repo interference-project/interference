@@ -36,14 +36,16 @@ import java.lang.reflect.Method;
 public class MgmtContainer {
     MgmtColumn mgmtColumn;
     MgmtAction mgmtAction;
+    MgmtLink   mgmtLink;
     Field field;
     Method method;
     Class c;
     Field idField;
 
-    public MgmtContainer(MgmtColumn mgmtColumn, MgmtAction mgmtAction, Field field, Method method, Class c, Field idField) {
+    public MgmtContainer(MgmtColumn mgmtColumn, MgmtAction mgmtAction, MgmtLink mgmtLink, Field field, Method method, Class c, Field idField) {
         this.mgmtColumn = mgmtColumn;
         this.mgmtAction = mgmtAction;
+        this.mgmtLink = mgmtLink;
         this.field = field;
         this.method = method;
         this.c = c;
@@ -82,14 +84,18 @@ public class MgmtContainer {
         }
     }
 
-    public String getValue(Object o) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+    public String getValue(Object o, String objectId, String sessionId, int pageId) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
         if (this.mgmtColumn == null || this.field == null) {
             return null;
         } else {
             String getName  = "get" + this.field.getName().substring(0,1).toUpperCase() + this.field.getName().substring(1);
             Method m = this.c.getMethod(getName, null);
             Object result = m.invoke(o, null);
-            return String.valueOf(result);
+            if (this.mgmtLink != null) {
+                return "<a href=\"?showtable="+objectId+"&session_id="+sessionId+"&page_id=10\">"+result+"</a>";
+            } else {
+                return String.valueOf(result);
+            }
         }
     }
 
