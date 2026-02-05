@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2025 head systems, ltd
+ Copyright (c) 2010-2026 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -48,16 +48,16 @@ import java.net.MalformedURLException;
 public class UndoChunk implements FilePartitioned {
 
     @Column
-    @MgmtColumn(name="Transaction Id",width=10)
+    @MgmtColumn(name="Transaction Id", width=10, table = true)
     private long transId;
     @Column
-    @MgmtColumn(name="File Id",width=10)
+    @MgmtColumn(name="File Id", width=10, table = true)
     private int file;
     @Column
-    @MgmtColumn(name="Frame",width=10)
+    @MgmtColumn(name="Frame", width=10, table = true)
     private long frame;
     @Column
-    @MgmtColumn(name="PTR",width=10)
+    @MgmtColumn(name="PTR", width=10, table = true)
     private int ptr;
     @Column
     private DataChunk dataChunk;

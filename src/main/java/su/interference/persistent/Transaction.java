@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2025 head systems, ltd
+ Copyright (c) 2010-2026 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -49,7 +49,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Entity
 @SystemEntity
 @DisableSync
-@MgmtClass
+@MgmtClass(allowEdit = false)
 public class Transaction implements Serializable {
     @Transient
     public static final int TRAN_READ_COMMITTED = 0;
@@ -69,25 +69,25 @@ public class Transaction implements Serializable {
     @MapColumn
     @GeneratedValue
     @DistributedId
-    @MgmtColumn(name="Transaction Id",width=10)
+    @MgmtColumn(name="Transaction Id", width=10, table = true)
     private long transId;
     @Column
-    @MgmtColumn(name="SID",width=10)
+    @MgmtColumn(name="SID", width=10, table = true)
     @IndexColumn
     private long sid;
     @Column
-    @MgmtColumn(name="Timestamp",width=10)
+    @MgmtColumn(name="Timestamp", width=10, table = true)
     private long timeStamp;
     @Column
     private int transType; // 0 - READ COMMITTED, 1 - SERIALIZABLE, 9 - THR
     @Column
-    @MgmtColumn(name="MTRAN",width=10)
+    @MgmtColumn(name="MTRAN", width=10, table = true)
     private long mTran;
     @Column
-    @MgmtColumn(name="Commit Id",width=10)
+    @MgmtColumn(name="Commit Id", width=10, table = true)
     private long cid;
 
-    @MgmtColumn(name="Transaction type",width=20)
+    @MgmtColumn(name="Transaction type", width=20, table = true)
     @Transient
     private String transactionType;
     @Transient

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2025 head systems, ltd
+ Copyright (c) 2010-2026 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -48,11 +48,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 1.0
  */
 
-@MgmtClass
+@MgmtClass(allowEdit = false)
 public class TransportChannel {
 
     private final static Logger logger = LoggerFactory.getLogger(TransportChannel.class);
-    @MgmtColumn(name="Node Id", width=20)
+    @MgmtColumn(name="Node Id", width=20, table = true)
     @Id
     private final int channelId;
     private final String type;
@@ -63,13 +63,13 @@ public class TransportChannel {
     private final ExecutorService pool = Executors.newFixedThreadPool(1);
     private final AtomicBoolean connected =  new AtomicBoolean(false);
     private final AtomicBoolean started =  new AtomicBoolean(false);
-    @MgmtColumn(name="Host", width=20)
+    @MgmtColumn(name="Host", width=20, table = true)
     private final String host;
-    @MgmtColumn(name="Port", width=20)
+    @MgmtColumn(name="Port", width=20, table = true)
     private final int port;
-    @MgmtColumn(name="IP Address", width=20)
+    @MgmtColumn(name="IP Address", width=20, table = true)
     private final InetSocketAddress socketAddress;
-    @MgmtColumn(name="State", width=20)
+    @MgmtColumn(name="State", width=20, table = true)
     private String systemState;
 
     protected TransportChannel(String hostport) {

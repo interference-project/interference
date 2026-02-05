@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2025 head systems, ltd
+ Copyright (c) 2010-2026 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -57,7 +57,7 @@ import javax.persistence.*;
 @Entity
 @SystemEntity
 @DisableSync
-@MgmtClass
+@MgmtClass(allowEdit = false)
 public class Table implements ResultSet {
 
     @Transient
@@ -73,11 +73,11 @@ public class Table implements ResultSet {
     @Id
     @MapColumn
     @GeneratedValue
-    @MgmtColumn(name = "Table ID", width = 10)
+    @MgmtColumn(name = "Table ID", width = 10, table = true)
     private int objectId;
     @Column
     @MapColumn
-    @MgmtColumn(name = "Name", width = 80)
+    @MgmtColumn(name = "Name", width = 80, table = true)
     @MgmtClassIdColumn
     @MgmtLink(type = "Table", retrieveMethod = "getContent")
     private String name;
@@ -86,7 +86,7 @@ public class Table implements ResultSet {
     @Column
     private long frameStart;
     @Column
-    @MgmtColumn(name = "Size (frames)", width = 10)
+    @MgmtColumn(name = "Size (frames)", width = 10, table = true)
     private int frameSize;
     @Column
     private int fileLast;
@@ -357,9 +357,9 @@ public class Table implements ResultSet {
             cs[i] = params[i].getClass();
         }
 
-        final SystemEntity ca = (SystemEntity) this.getClass().getAnnotation(SystemEntity.class);
+        final SystemEntity ca = (SystemEntity) this.getTableClass().getAnnotation(SystemEntity.class);
         if (ca != null) { //System non-transactional
-            return this.getClass().getConstructor(cs).newInstance(params);
+            return this.getTableClass().getConstructor(cs).newInstance(params);
         }
 
         return null;

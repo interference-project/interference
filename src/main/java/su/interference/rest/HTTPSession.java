@@ -1,7 +1,7 @@
 /**
 The MIT License (MIT)
 
-Copyright (c) 2010-2025 interference
+Copyright (c) 2010-2026 interference
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -26,17 +26,25 @@ package su.interference.rest;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import su.interference.mgmt.MgmtContainer;
 import su.interference.persistent.Session;
 import su.interference.core.*;
+import su.interference.persistent.Table;
 import su.interference.transport.HeartBeatProcess;
 
 import java.lang.reflect.Method;
 import java.net.Socket;
 import java.io.*;
+import java.text.ParseException;
 import java.util.*;
 import java.text.SimpleDateFormat;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
+import static su.interference.core.Types.*;
+import static su.interference.core.Types.t_string;
 
 /**
  * @author Yuriy Glotanov
@@ -66,10 +74,12 @@ public class HTTPSession implements Runnable {
     private final ExecutorService pool = Executors.newCachedThreadPool();
     private static int bufsize = 8192;
     private static SimpleDateFormat sdf;
+    private static SimpleDateFormat basesdf;
 
     static {
         sdf = new SimpleDateFormat( "E, d MMM yyyy HH:mm:ss 'GMT'", Locale.US);
         sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
+        basesdf = new SimpleDateFormat(Config.getConfig().DATEFORMAT);
     }
 
     private final Socket sock;
@@ -79,17 +89,19 @@ public class HTTPSession implements Runnable {
         pool.submit(this);
     }
 
-    private HTTPResponse processRequest(Properties params, String uri, String method, Properties header) throws Exception {
+    private HTTPResponse processRequest(Properties params, String uri) throws Exception {
         //process request
         final String sessionId = (String)params.get("session_id");
         final String pageId = (String)params.get("page_id");
+        final String tableId = (String)params.get("table_id");
         final String objectId = (String)params.get("object_id");
         final String fileId = (String)params.get("file_id");
-        final String showTable = (String)params.get("showtable");
         final String type = (String)params.get("type");
+        final String action = (String)params.get("action");
         final String command = (String)params.get("command");
         final String param = (String)params.get("param");
         final Session session = sessionId == null ? null : Instance.getInstance().getSession(sessionId);
+        final List<String> errors = new ArrayList<>();
         if (session != null && type != null && objectId != null) {
             final Object object = getObjectByTypeAndId(type, objectId);
             if (object != null) {
@@ -98,8 +110,29 @@ public class HTTPSession implements Runnable {
                 m.invoke(object, param, session.getSessionId());
             }
         }
+        if (session != null && tableId != null && objectId != null) {
+            final Table t = getTableById(tableId);
+            Class c = t.getTableClass();
+            if ("apply".equals(action)) {
+                final Object object = getObjectByTableIdAndId(tableId, objectId, sessionId);
+                final Object o = object == null ? session.newEntity(c) : object;
+                List<MgmtContainer> mclist = MCContainer.getMgmtContainers(c, false);
+                try {
+                    updateEntity(o, mclist, params);
+                    session.persist(o);
+                    session.commit();
+                } catch (Exception e) {
+                    errors.add(e.getMessage());
+                }
+            }
+            if ("delete".equals(action)) {
+                final Object object = getObjectByTableIdAndId(tableId, objectId, sessionId);
+                session.delete(object);
+                session.commit();
+            }
+        }
         try {
-            HTTPResponse response = getResponse(session, uri, showTable, pageId, fileId);
+            HTTPResponse response = getResponse(session, uri, action, tableId, objectId, pageId, fileId);
             return response;
         } catch (Exception e) {
             logger.error("Exception occured during process HTTP request", e);
@@ -131,39 +164,78 @@ public class HTTPSession implements Runnable {
         return null;
     }
 
+    private Table getTableById(String tableId) {
+        if (tableId != null && tableId.matches("\\d+")) {
+            int tId = Integer.valueOf(tableId);
+            if (tId > 0) {
+                return Instance.getInstance().getTableById(tId);
+            } else {
+                return null;
+            }
+        } else {
+            logger.error("Table identifier incorrect: " + tableId);
+            return null;
+        }
+    }
+
+    private Object getObjectByTableIdAndId(String tableId, String objectId, String sessionId) throws Exception {
+        Session s = Instance.getInstance().getSession(sessionId);
+        if (s == null) {
+            logger.error("Session identifier incorrect: "+sessionId);
+            return null;
+        }
+        int tId = 0;
+        long oId = 0;
+        if (tableId != null && tableId.matches("\\d+")) {
+            tId = Integer.valueOf(tableId);
+        } else {
+            logger.error("Table identifier incorrect: " + tableId);
+            return null;
+        }
+        if (objectId != null) {
+            if (objectId.matches("\\d+")) {
+                oId = Long.valueOf(objectId);
+            } else {
+                logger.error("Object identifier incorrect: " + objectId);
+                return null;
+            }
+        }
+        return s.find(tId, oId);
+    }
+
     @Override
     public void run() {
         try	{
             final InputStream is = sock.getInputStream();
+            final PipedOutputStream pos = new PipedOutputStream();
+            final PipedInputStream pis = new PipedInputStream(pos);
+            final BufferedReader in = new BufferedReader(new InputStreamReader(pis));
             final Properties p = new Properties();
             final Properties params = new Properties();
             final Properties header = new Properties();
+            final AtomicLong cleft = new AtomicLong(Long.MAX_VALUE);
 
             if (is == null) return;
 
             byte[] b = new byte[bufsize];
-            int l = is.read(b, 0, bufsize);
-            if (l <= 0) return;
+            final AtomicInteger l = new AtomicInteger(is.read(b, 0, bufsize));
+            if (l.get() <= 0) return;
 
-            final BufferedReader br = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(b, 0, l)));
+            final BufferedReader br = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(b, 0, l.get())));
 
             parseHeaders(p, params, header, br);
-            final String method = p.getProperty("method");
-            final String uri = p.getProperty("uri");
 
-            long z = Long.MAX_VALUE;
-            final String cl = header.getProperty("content-length");
-            if (cl != null) {
+            if (header.getProperty("content-length") != null) {
                 try {
-                    z = Integer.parseInt(cl);
+                    cleft.set(Long.parseLong(header.getProperty("content-length")));
                 } catch (NumberFormatException e) {
-                    logger.error("Exception occured during HTTPRequest parse", e);
+                    logger.error("Exception occured during content-length process", e);
                 }
             }
 
             int x = 0;
             boolean check = false;
-            while (x < l) {
+            while (x < l.get()) {
                 if (b[x] == '\r' && b[++x] == '\n' && b[++x] == '\r' && b[++x] == '\n') {
                     check = true;
                     break;
@@ -172,28 +244,38 @@ public class HTTPSession implements Runnable {
             }
             x++;
 
-            final ByteArrayOutputStream f = new ByteArrayOutputStream();
-            if (x < l) {
-                f.write(b, x, l - x);
+            if (x < l.get()) {
+                pos.write(b, x, l.get() - x);
             }
 
-            if (x < l) {
-                z -= l - x + 1;
-            } else if (!check || z == Long.MAX_VALUE) {
-                z = 0;
+            if (x < l.get()) {
+                long z = cleft.get();
+                z -= l.get() - x + 1;
+                cleft.set(z);
+            } else if (!check || cleft.get() == Long.MAX_VALUE) {
+                cleft.set(0);
             }
 
-            b = new byte[512];
-            while (l >= 0 && z > 0) {
-                l = is.read(b, 0, 512);
-                z -= l;
-                if (l > 0) f.write(b, 0, l);
-            }
+            Runnable r = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        byte[] b = new byte[512];
+                        while (l.get() >= 0 && cleft.get() > 0) {
+                            l.set(is.read(b, 0, 512));
+                            cleft.set(cleft.get() - l.get());
+                            if (l.get() > 0) pos.write(b, 0, l.get());
+                        }
+                        pos.close();
+                    } catch (IOException e) {
+                        logger.error("IOException occured", e);
+                    }
+                }
+            };
 
-            final byte[] fb = f.toByteArray();
-            final BufferedReader in = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(fb)));
+            pool.submit(r);
 
-            if (method.equalsIgnoreCase("POST")) {
+            if (p.getProperty("method").equalsIgnoreCase("POST")) {
                 StringTokenizer st = new StringTokenizer(header.getProperty("content-type") , "; ");
                 String ctype = st.hasMoreTokens() ? st.nextToken() : "";
                 if (ctype.equalsIgnoreCase("multipart/form-data")) {
@@ -272,17 +354,12 @@ public class HTTPSession implements Runnable {
                         sbuf.append(pbuf, 0, read);
                         read = in.read(pbuf);
                     }
-                    StringBuffer sbuf2 = new StringBuffer();
-                    while (read >= 0 && !(sbuf2.lastIndexOf("\r\n") == sbuf2.length())) {
-                        sbuf2.append(pbuf, 0, read);
-                        read = in.read(pbuf);
-                    }
                     parseParams(sbuf.toString().trim(), params);
                 }
             }
 
             // get response
-            HTTPResponse response = processRequest(params, uri, method, header);
+            HTTPResponse response = processRequest(params, p.getProperty("uri"));
 
             //send response
             if (response == null) {
@@ -290,8 +367,10 @@ public class HTTPSession implements Runnable {
             } else {
                 sendResponse (response);
             }
+
             in.close();
             is.close();
+            pis.close();
 
         } catch (Exception e) {
             logger.error("Exception occured during HTTP session process", e);
@@ -316,9 +395,9 @@ public class HTTPSession implements Runnable {
             int q = uri.indexOf('?');
             if (q >= 0) {
                 parseParams(uri.substring(q+1), params);
-                uri = parsePerc(uri.substring(0, q));
+                uri = parseParam(uri.substring(0, q));
             } else {
-                uri = parsePerc(uri);
+                uri = parseParam(uri);
             }
 
             if (st.hasMoreTokens()) {
@@ -337,7 +416,7 @@ public class HTTPSession implements Runnable {
         }
     }
 
-    private String parsePerc (String s) {
+    private String parseParam (String s) {
         StringBuffer sb = new StringBuffer();
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
@@ -360,7 +439,7 @@ public class HTTPSession implements Runnable {
         while (st.hasMoreTokens()) {
             String e = st.nextToken();
             int d = e.indexOf('=');
-            if (d >= 0) p.put(parsePerc(e.substring(0, d)).trim(), parsePerc(e.substring(d+1)));
+            if (d >= 0) p.put(parseParam(e.substring(0, d)).trim(), parseParam(e.substring(d+1)));
         }
     }
 
@@ -420,7 +499,7 @@ public class HTTPSession implements Runnable {
         }
     }
 
-    private HTTPResponse getResponse (Session session, String uri, String tableId, String pageId, String fileId) {
+    private HTTPResponse getResponse (Session session, String uri, String action, String tableId, String objectId, String pageId, String fileId) {
         HTTPResponse res = null;
 
         if (res == null) {
@@ -456,7 +535,7 @@ public class HTTPSession implements Runnable {
             if (res == null)	{
                 if (uri.equals("/")) {
                     try {
-                        res = new HTTPResponse(HTTP_200_OK, HTTP_MIME_HTML, MCContainer.getMCContent(tableId, pageId, fileId, session));
+                        res = new HTTPResponse(HTTP_200_OK, HTTP_MIME_HTML, MCContainer.getMCContent(action, tableId, objectId, pageId, fileId, session));
                     } catch (Exception e) {
                         logger.error("Exception occured during build HTTP response", e);
                         res = new HTTPResponse(HTTP_500_INTERNAL_ERROR, HTTP_MIME_HTML, "Internal Server Error");
@@ -471,5 +550,45 @@ public class HTTPSession implements Runnable {
 
         res.addHeader("Accept-Ranges", "bytes");
         return res;
+    }
+
+    private Object updateEntity(Object o, List<MgmtContainer> mclist, Properties params) throws Exception {
+        for (MgmtContainer mgmtContainer : mclist) {
+            String value = (String) params.get(mgmtContainer.getField().getName());
+            if (value != null && !"".equals(value)) {
+                mgmtContainer.getField().setAccessible(true);
+                try {
+                    switch (mgmtContainer.getField().getType().getName()) {
+                        case (p_int):
+                        case (t_int):
+                        case (c_int):
+                            mgmtContainer.getField().setInt(o, Integer.valueOf(value));
+                            break;
+                        case (p_float):
+                        case (t_float):
+                            mgmtContainer.getField().setFloat(o, Float.valueOf(value));
+                            break;
+                        case (p_long):
+                        case (t_long):
+                        case (c_long):
+                            mgmtContainer.getField().setLong(o, Long.valueOf(value));
+                            break;
+                        case (p_double):
+                        case (t_double):
+                            mgmtContainer.getField().setDouble(o, Double.valueOf(value));
+                            break;
+                        case (t_date):
+                            mgmtContainer.getField().set(o, basesdf.parse(value));
+                            break;
+                        case (t_string):
+                            mgmtContainer.getField().set(o, value);
+                            break;
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException("Cannot set value " + value + " to field " + mgmtContainer.getField().getName());
+                }
+            }
+        }
+        return o;
     }
 }

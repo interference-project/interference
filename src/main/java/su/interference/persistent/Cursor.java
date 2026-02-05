@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2025 head systems, ltd
+ Copyright (c) 2010-2026 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -44,7 +44,7 @@ import java.util.List;
 @Entity
 @SystemEntity
 @DisableSync
-@MgmtClass
+@MgmtClass(allowEdit = false)
 public class Cursor implements Serializable {
     @Transient
     public static final int MASTER_TYPE     = 1;
@@ -68,25 +68,25 @@ public class Cursor implements Serializable {
     @IndexColumn
     @GeneratedValue
     @DistributedId
-    @MgmtColumn(name="Cursor Id",width=10)
+    @MgmtColumn(name="Cursor Id",width=10, table = true)
     private long cursorId;
     @Column
-    @MgmtColumn(name="SQL",width=50)
+    @MgmtColumn(name="SQL",width=50, table = true)
     private String sql;
     @Column
-    @MgmtColumn(name="Target Node",width=10)
+    @MgmtColumn(name="Target Node",width=10, table = true)
     private int targetNodeId;
     @Column
-    @MgmtColumn(name="Target Id",width=10)
+    @MgmtColumn(name="Target Id",width=10, table = true)
     private int targetId;
     @Column
-    @MgmtColumn(name="Target Class",width=10)
+    @MgmtColumn(name="Target Class",width=10, table = true)
     private String targetClassName;
     @Column
-    @MgmtColumn(name="Type",width=10)
+    @MgmtColumn(name="Type",width=10, table = true)
     private int type;
     @Column
-    @MgmtColumn(name="State",width=10)
+    @MgmtColumn(name="State",width=10, table = true)
     private int state;
 
     @Transient

@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2025 head systems, ltd
+ Copyright (c) 2010-2026 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -45,10 +45,10 @@ import java.util.concurrent.*;
  * @since 1.0
  */
 
-@MgmtClass
+@MgmtClass(allowEdit = false)
 public class SQLCursor implements FrameIterator {
 
-    @MgmtColumn(name = "Cursor Id", width = 10)
+    @MgmtColumn(name = "Cursor Id", width = 10, table = true)
     private final int id;
     private ResultSet target;
     private static ExecutorService exec = SQLJoinThreadPool.getThreadPool();
@@ -85,17 +85,17 @@ public class SQLCursor implements FrameIterator {
     private final boolean process;
     private final Class evtprc;
 
-    @MgmtColumn(name = "SQL", width = 30)
+    @MgmtColumn(name = "SQL", width = 30, table = true)
     private String sql;
-    @MgmtColumn(name = "Join", width = 30)
+    @MgmtColumn(name = "Join", width = 30, table = true)
     private String joinInfo;
-    @MgmtColumn(name = "LTasks Unproc", width = 10)
+    @MgmtColumn(name = "LTasks Unproc", width = 10, table = true)
     private int ltasksUnproc;
-    @MgmtColumn(name = "LTasks Processed", width = 10)
+    @MgmtColumn(name = "LTasks Processed", width = 10, table = true)
     private int ltasksProc;
-    @MgmtColumn(name = "RTasks Unproc", width = 10)
+    @MgmtColumn(name = "RTasks Unproc", width = 10, table = true)
     private int rtasksUnproc;
-    @MgmtColumn(name = "RTasks Processed", width = 10)
+    @MgmtColumn(name = "RTasks Processed", width = 10, table = true)
     private int rtasksProc;
 
     private static Map<Integer, Map<Long, ConcurrentLinkedQueue<FrameApi>>> sfmap = new ConcurrentHashMap<>();

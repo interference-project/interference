@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2025 interference
+ Copyright (c) 2010-2026 interference
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -29,11 +29,11 @@ package su.interference.mgmt;
  * @since 1.0
  */
 
-@MgmtClass
+@MgmtClass(allowEdit = false)
 public class MgmtConfig {
-    @MgmtColumn(name="Configuration parameter",width=20)
+    @MgmtColumn(name="Configuration parameter", width=20, table = true)
     private final String confParam;
-    @MgmtColumn(name="Parameter Value",width=80)
+    @MgmtColumn(name="Parameter Value", width=80, table = true)
     private final Object confValue;
 
     public MgmtConfig(String confParam, Object confValue) {

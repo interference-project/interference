@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2025 head systems, ltd
+ Copyright (c) 2010-2026 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -51,7 +51,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Entity
 @SystemEntity
 @DisableSync
-@MgmtClass
+@MgmtClass(allowEdit = false)
 public class FrameData implements Serializable, Comparable, FrameApi, FilePartitioned, OnDelete {
 
     @Transient
@@ -65,32 +65,32 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @IndexColumn
     private volatile int objectId;
     @Column
-    @MgmtColumn(name="File Id",width=10)
+    @MgmtColumn(name="File Id",width=10, table = true)
     private volatile int file;
     @Column
-    @MgmtColumn(name="PTR",width=30)
+    @MgmtColumn(name="PTR",width=30, table = true)
     private volatile long ptr;
     @Column
-    @MgmtColumn(name="Size",width=10)
+    @MgmtColumn(name="Size",width=10, table = true)
     private volatile int size;
     @Column
-    @MgmtColumn(name="Used",width=10)
+    @MgmtColumn(name="Used",width=10, table = true)
     private volatile int used;
     @Column
-    @MgmtColumn(name="Prev File Id",width=10)
+    @MgmtColumn(name="Prev File Id",width=10, table = true)
     private volatile int prevFile;
     @Column
-    @MgmtColumn(name="Prev PTR",width=10)
+    @MgmtColumn(name="Prev PTR",width=10, table = true)
     private volatile long prevFrame;
     @Column
-    @MgmtColumn(name="Next File Id",width=10)
+    @MgmtColumn(name="Next File Id",width=10, table = true)
     private volatile int nextFile;
     @Column
-    @MgmtColumn(name="Next PTR",width=10)
+    @MgmtColumn(name="Next PTR",width=10, table = true)
     private volatile long nextFrame;
     @Column
     @MapColumn
-    @MgmtColumn(name="Alloc Id",width=10)
+    @MgmtColumn(name="Alloc Id",width=10, table = true)
     private volatile long allocId; //virtual Id field
     @Column
     private int frameType;
@@ -103,7 +103,7 @@ public class FrameData implements Serializable, Comparable, FrameApi, FilePartit
     @Id
     @MapColumn
     @Transient
-    @MgmtColumn(name="Frame Id",width=20)
+    @MgmtColumn(name="Frame Id",width=20, table = true)
     private long frameId; //virtual Id field
     @Transient
     private final Map<Long, Map<Long, TransFrame>> tcounter = new ConcurrentHashMap<>();
