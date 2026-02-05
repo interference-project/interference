@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2025 interference
+ Copyright (c) 2010-2026 interference
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -52,7 +52,7 @@ public class MCContainer {
     public static String mmhost = "localhost";
     private final static Logger logger = LoggerFactory.getLogger(MCContainer.class);
 
-    private static String getContent(String tableId, String sessionId, String pageId, String fileId) throws Exception {
+    private static String getContent(String action, String tableId, String objectId, String sessionId, String pageId, String fileId) throws Exception {
         String result = "<table class=head border=0 cellpadding=5 cellspacing=1 width=100% height=100%>\n";
         result = result + "<tr><td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 1, "System")+"</td>";
         result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 2, "Tables")+"</td>";
@@ -61,9 +61,9 @@ public class MCContainer {
         result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 5, "Transactions")+"</td>";
         result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 6, "SQL Queries")+"</td>";
         result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 7, "Frames")+"</td>";
-        // result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 8, "Import")+"</td>";
+        result = result + "<td width=10% height=50 align=left valign=center>"+getPageA1(sessionId, 8, "Import")+"</td>";
         result = result + "<td width=50% height=50 align=left valign=center>&nbsp;</td></tr>";
-        result = result + "<tr><td class=body colspan=8 width=100% height=100% align=left valign=top>"+getPageContent(tableId, pageId, fileId, sessionId)+"</td></tr></table>";
+        result = result + "<tr><td class=body colspan=9 width=100% height=100% align=left valign=top>"+getPageContent(action, tableId, objectId, pageId, fileId, sessionId)+"</td></tr></table>";
         return result;
     }
 
@@ -71,35 +71,51 @@ public class MCContainer {
         return "<a class=hed href=\"?session_id="+sessionId+"&page_id="+pageId+"\">"+pageName+"</a>";
     }
 
-    private static String getPageContent(String tableId, String pageId, String fileId, String sessionId) throws Exception {
+    private static String getPageContent(String action, String tableId, String objectId, String pageId, String fileId, String sessionId) throws Exception {
         if (pageId != null) {
             try {
                 int id = Integer.valueOf(pageId);
                 int file = (fileId == null || "".equals(fileId)) ? 1 : Integer.valueOf(fileId);
-                switch (id) {
-                    case 1:
-                        return getSystemPage(sessionId, id);
-                    case 2:
-                        return getTablesPage(sessionId, id);
-                    case 3:
-                        return getIndexesPage(sessionId, id);
-                    case 4:
-                        return getSessionsPage(sessionId, id);
-                    case 5:
-                        return getTransactionsPage(sessionId, id);
-                    case 6:
-                        return getSQLQueriesPage(sessionId, id);
-                    case 7:
-                        return getFramesPage(sessionId, id, file);
-                    case 8:
-                        return getUploadForm(sessionId, id, mmhost, Config.getConfig().MMPORT);
-                    case 10:
-                        if (tableId != null && tableId.matches("-?\\d+(\\.\\d+)?")) {
-                            int tId = Integer.valueOf(tableId);
-                            return getTablePage(sessionId, id, tId);
-                        } else {
-                            return "Table identifier incorrect: "+ tableId;
-                        }
+                if (action == null) {
+                    switch (id) {
+                        case 1:
+                            return getSystemPage(sessionId, id);
+                        case 2:
+                            return getTablesPage(sessionId, id);
+                        case 3:
+                            return getIndexesPage(sessionId, id);
+                        case 4:
+                            return getSessionsPage(sessionId, id);
+                        case 5:
+                            return getTransactionsPage(sessionId, id);
+                        case 6:
+                            return getSQLQueriesPage(sessionId, id);
+                        case 7:
+                            return getFramesPage(sessionId, id, file);
+                        case 8:
+                            return getUploadForm(sessionId, id, mmhost, Config.getConfig().MMPORT);
+                        case 10:
+                            if (tableId != null && tableId.matches("\\d+")) {
+                                int tId = Integer.valueOf(tableId);
+                                return getTablePage(sessionId, id, tId);
+                            } else {
+                                return "Table identifier incorrect: " + tableId;
+                            }
+                    }
+                } else {
+                    switch (action) {
+                        case "showtable":
+                            if (tableId != null && tableId.matches("\\d+")) {
+                                int tId = Integer.valueOf(tableId);
+                                return getTablePage(sessionId, id, tId);
+                            } else {
+                                return "Table identifier incorrect: " + tableId;
+                            }
+                        case "edit":
+                            return getEditForm(tableId, objectId, sessionId, id, mmhost, Config.getConfig().MMPORT);
+                        case "insert":
+                            return getEditForm(tableId, null, sessionId, id, mmhost, Config.getConfig().MMPORT);
+                    }
                 }
             } catch (NumberFormatException e) {
                 return getSystemPage(sessionId, 1);
@@ -108,7 +124,7 @@ public class MCContainer {
         return getSystemPage(sessionId, 1);
     }
 
-    private static String getButtonForm(Class c, Object o, MgmtContainer mgmtcnt, String sessionId, String type, String objectId, int pageId, String host, int port) throws Exception {
+    private static String getButtonForm(Class c, Object o, MgmtContainer mgmtcnt, String sessionId, String type, int pageId, String host, int port) throws Exception {
         String btn = mgmtcnt.getMgmtAction().name();
         String command = mgmtcnt.getMethod().getName();
         if (btn == null || btn.equals("")) {
@@ -132,7 +148,7 @@ public class MCContainer {
         String result = "<form method=\"POST\" action=\"http://"+host+":"+port+"\">\n" +
                 "<input type=\"hidden\" name=\"session_id\" value=\""+sessionId+"\">\n" +
                 "<input type=\"hidden\" name=\"page_id\" value=\""+pageId+"\">\n" +
-                "<input type=\"hidden\" name=\"object_id\" value=\""+objectId+"\">\n" +
+                "<input type=\"hidden\" name=\"object_id\" value=\""+mgmtcnt.getId(o)+"\">\n" +
                 "<input type=\"hidden\" name=\"type\" value=\""+type+"\">\n" +
                 "<input type=\"hidden\" name=\"command\" value=\""+command+"\">\n" +
                 "<input type=\"hidden\" name=\"param\" value=\""+name+"\">\n" +
@@ -212,19 +228,26 @@ public class MCContainer {
     }
 
     private static String getTablePage(String sessionId, int pageId, int tableId) throws Exception {
+        // todo filters, orders
         Session session = Instance.getInstance().getSession(sessionId);
         if (session != null) {
             Table table = Instance.getInstance().getTableById(tableId);
             if (table != null) {
                 session.startTransaction();
                 List<Object> objects = new ArrayList<>();
+                int cnt = 0;
                 Object o = table.poll(session);
                 if (o != null) {
                     objects.add(o);
+                    cnt++;
                     while (o != null) {
                         o = table.poll(session);
                         if (o != null) {
                             objects.add(o);
+                            cnt++;
+                        }
+                        if (cnt >= 100) {
+                            break;
                         }
                     }
                 }
@@ -337,7 +360,7 @@ public class MCContainer {
         return result.toString();
     }
 
-    protected static String getMCContent(String tableId, String pageId, String fileId, Session s) throws Exception {
+    protected static String getMCContent(String action, String tableId, String objectId, String pageId, String fileId, Session s) throws Exception {
         return "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\">\n" +
         "<html><head>\n" +
         "<META http-equiv=\"Content-Type\" content=\"text/html; charset=UTF8\">\n" +
@@ -346,7 +369,7 @@ public class MCContainer {
         getCSS() +
         "<title>Interference management console</title></HEAD>\n" +
         "<body aLink=\"0000ff\" bgColor=\"efefef\" link=\"0000ff\" text=\"000000\" topMargin=\"0\" leftMargin=\"0\" rightMargin=\"0\" vLink=\"0000ff\">\n" +
-        getContent(tableId, s.getSessionId(), pageId, fileId) +
+        getContent(action, tableId, objectId, s.getSessionId(), pageId, fileId) +
         "</body></html>";
     }
 
@@ -359,9 +382,115 @@ public class MCContainer {
         if (te != null) {
             c = c.getSuperclass();
         }
+        MgmtClass a = (MgmtClass) c.getAnnotation(MgmtClass.class);
+        boolean showEditLink = a.allowEdit();
         String type = c.getSimpleName();
-        Annotation a = c.getAnnotation(MgmtClass.class);
+        Table t = Instance.getInstance().getTableByName(c.getName());
+        int tableId = t == null ? 0 : t.getObjectId();
+        List<MgmtContainer> mgmtlist = getMgmtContainers(c, true);
+        int size = mgmtlist.size();
+        if (size > 0) {
+            String result = "<table class=head border=0 cellpadding=5 cellspacing=1 width=100%>\n";
+            result = result + "<tr>";
+            for (MgmtContainer mgmtcnt : mgmtlist) {
+                result = result + "<td class=head width="+mgmtcnt.getSize()+"% height=50 align=left valign=center>"+mgmtcnt.getHeader()+"</td>";
+            }
+            result = result + "</tr>";
+            for (Object o : objects) {
+                boolean showMgmtLink = true;
+                if (o instanceof Table) {
+                    Table to = (Table) o;
+                    showMgmtLink = !to.isIndex();
+                }
+                result = result + "<tr>";
+                for (MgmtContainer mgmtcnt : mgmtlist) {
+                    String s = mgmtcnt.isCommand() ? getButtonForm(c, o, mgmtcnt, sessionId, type, pageId, host, port) : mgmtcnt.getValue(o, tableId, sessionId, pageId, showMgmtLink, showEditLink);
+                    result = result + "<td class=body width="+mgmtcnt.getSize()+"% height=30 align=left valign=center>"+s+"</td>";
+                }
+                result = result + "</tr>";
+            }
+            result = result + "<tr>";
+            if (a.allowEdit()) {
+                for (MgmtContainer mgmtcnt : mgmtlist) {
+                    String s = mgmtcnt.isId() ? mgmtcnt.getInsertLink(tableId, sessionId, pageId) : "";
+                    result = result + "<td class=body width=" + mgmtcnt.getSize() + "% height=30 align=left valign=center>" + s + "</td>";
+                }
+            }
+            result = result + "</tr>";
+            result = result + "</table>\n";
+            return result;
+        }
+        return "";
+    }
+
+    private static String getEditForm(String tableId, String objectId, String sessionId, int pageId, String host, int port) throws Exception {
+        Session s = Instance.getInstance().getSession(sessionId);
+        String msg = "";
+        if (s == null) {
+            return "Session identifier incorrect: " + sessionId;
+        }
+        int tId = 0;
+        long oId = 0;
+        if (tableId != null && tableId.matches("\\d+")) {
+            tId = Integer.valueOf(tableId);
+        } else {
+            return "Table identifier incorrect: " + tableId;
+        }
+        if (objectId != null) {
+            if (objectId.matches("\\d+")) {
+                oId = Long.valueOf(objectId);
+            } else {
+                return "Object identifier incorrect: " + objectId;
+            }
+        }
+        Table t = Instance.getInstance().getTableById(tId);
+        Object object = t == null ? null : s.find(tId, oId);
+        if (object == null) {
+            msg = "Object not found with identifier: " + objectId;
+            oId = 0;
+        }
+        Class c = t == null ? null : t.getTableClass();
+        Annotation te = c == null ? null : c.getAnnotation(TransEntity.class);
+        if (te != null) {
+            c = c.getSuperclass();
+        }
+        MgmtClass a = (MgmtClass) c.getAnnotation(MgmtClass.class);
+        boolean allowEdit = a.allowEdit();
+        List<MgmtContainer> mgmtlist = getMgmtContainers(c, false);
+        int size = mgmtlist.size();
+        String result = "<form method=\"POST\" action=\"http://"+host+":"+port+"\">\n" +
+                "<input type=\"hidden\" name=\"session_id\" value=\""+sessionId+"\">\n" +
+                "<input type=\"hidden\" name=\"page_id\" value=\""+pageId+"\">\n" +
+                "<input type=\"hidden\" id=\"action\" name=\"action\" value=\"submit\">\n" +
+                "<input type=\"hidden\" name=\"table_id\" value=\""+tId+"\">\n" +
+                "<input type=\"hidden\" name=\"object_id\" value=\""+oId+"\">\n" +
+                "<table class=head border=0 cellpadding=5 cellspacing=1 width=100%>\n";
+        if (size > 0) {
+            for (MgmtContainer mgmtcnt : mgmtlist) {
+                result = result + "<tr>";
+                result = result + "<td class=body width=20% height=30 align=left valign=center>" + mgmtcnt.getHeader() + "</td>";
+                result = result + "<td class=body width=80% height=30 align=left valign=center>" + mgmtcnt.getFormElement(object) + "</td>";
+                result = result + "</tr>";
+            }
+        }
+        result = result + "</table><p>\n";
+        if (allowEdit) {
+            result = result + "<input type=\"submit\" name=\"apply_button\" value=\"Apply changes\" onclick=\"javascript:this.disabled=true; document.getElementById('action').value = 'apply'; this.form.submit()\">\n";
+            if (oId > 0) {
+                result = result + "<input type=\"submit\" name=\"apply_button\" value=\"Delete record\" onclick=\"javascript:if (confirm('Are you sure you want to submit the form?')) { this.disabled=true; document.getElementById('action').value = 'delete'; this.form.submit(); }\">\n";
+            }
+        }
+        result = result + "<input type=\"submit\" name=\"cancel_button\" value=\"Cancel\" onclick=\"javascript:this.disabled=true; document.getElementById('action').value = 'cancel'; this.form.submit()\">\n";
+        result = result + "</form>\n";
+        return result;
+    }
+
+    public static List<MgmtContainer> getMgmtContainers(Class c, boolean includeMethods) {
         List<MgmtContainer> mgmtlist = new ArrayList();
+        if (c == null) {
+            return mgmtlist;
+        }
+        MgmtClass a = (MgmtClass) c.getAnnotation(MgmtClass.class);
         if (a != null) {
             Field[] fields = c.getDeclaredFields();
             Method[] methods = c.getDeclaredMethods();
@@ -377,52 +506,34 @@ public class MCContainer {
                 if (fa != null) {
                     Annotation la = f.getAnnotation(MgmtLink.class);
                     if (la == null) {
-                        mgmtlist.add(new MgmtContainer((MgmtColumn) fa, null, null, f, null, c, idField));
+                        mgmtlist.add(new MgmtContainer((MgmtColumn) fa, null, null, f, null, c, idField, false));
                     } else {
-                        mgmtlist.add(new MgmtContainer((MgmtColumn) fa, null, (MgmtLink) la, f, null, c, idField));
+                        mgmtlist.add(new MgmtContainer((MgmtColumn) fa, null, (MgmtLink) la, f, null, c, idField, false));
                     }
                 }
             }
-            for (Method m : methods) {
-                Annotation ma = m.getAnnotation(MgmtAction.class);
-                if (ma != null) {
-                    mgmtlist.add(new MgmtContainer(null, (MgmtAction) ma, null, null, m, c, idField));
+            if (includeMethods) {
+                for (Method m : methods) {
+                    Annotation ma = m.getAnnotation(MgmtAction.class);
+                    if (ma != null) {
+                        mgmtlist.add(new MgmtContainer(null, (MgmtAction) ma, null, null, m, c, idField, false));
+                    }
                 }
             }
         }
-        int size = mgmtlist.size();
-        if (size > 0) {
-            String result = "<table class=head border=0 cellpadding=5 cellspacing=1 width=100%>\n";
-            result = result + "<tr>";
-            for (MgmtContainer mgmtcnt : mgmtlist) {
-                result = result + "<td class=head width="+mgmtcnt.getSize()+"% height=50 align=left valign=center>"+mgmtcnt.getHeader()+"</td>";
-            }
-            result = result + "</tr>";
-            for (Object o : objects) {
-                result = result + "<tr>";
-                for (MgmtContainer mgmtcnt : mgmtlist) {
-                    String objectId = mgmtcnt.getId(o);
-                    String s = mgmtcnt.isCommand() ? getButtonForm(c, o, mgmtcnt, sessionId, type, objectId, pageId, host, port) : mgmtcnt.getValue(o, objectId, sessionId, pageId);
-                    result = result + "<td class=body width="+mgmtcnt.getSize()+"% height=30 align=left valign=center>"+s+"</td>";
-                }
-                result = result + "</tr>";
-            }
-            result = result + "</table>\n";
-            return result;
-        }
-        return "";
+        return mgmtlist;
     }
 
     private static String getCSS() {
         return "<style type=text/css>\n" +
                 ".title  { font-family:arial,Helvetica,Verdana; color:000066; font-size:8pt; font-weight:bold;}\n" +
                 ".but  { font-family:arial,Helvetica,Verdana; color:000000; font-size:8pt}\n" +
-                ".text  { font-family:arial,Helvetica,Verdana; color:000000; font-size:8pt}\n" +
+                ".text  { font-family:arial,Helvetica,Verdana; color:000000; font-size:10pt}\n" +
                 ".redtext  { font-family:arial,Helvetica,Verdana; color:ff0000; font-size:8pt; font-weight: 700}\n" +
                 ".text2 { font-family:arial,Helvetica,Verdana; color:203060; font-size:12pt; font-weight: 700}\n" +
-                "a:visited { font-family: Arial, Helvetica;  font-size:12pt; text-decoration:none; color:2040a0; }\n" +
-                "a:hover { font-family: Arial, Helvetica; font-size:12pt; text-decoration:none; color:a0a0a0;}\n" +
-                "a:link  { font-family: Arial, Helvetica; font-size:12pt; text-decoration:none; color:2040a0;}\n" +
+                "a:visited { font-family: Arial, Helvetica;  font-size:10pt; text-decoration:none; color:2040a0; }\n" +
+                "a:hover { font-family: Arial, Helvetica; font-size:10pt; text-decoration:none; color:a0a0a0;}\n" +
+                "a:link  { font-family: Arial, Helvetica; font-size:10pt; text-decoration:none; color:2040a0;}\n" +
                 "a.hed:visited { font-family: Arial, Helvetica; font-size:8pt; text-decoration:none; font-weight: 500; color:ffffff; }\n" +
                 "a.hed:hover { font-family: Arial, Helvetica; font-size:8pt; text-decoration:none; font-weight: 500; color:ffffff;}\n" +
                 "a.hed:link  { font-family: Arial, Helvetica; font-size:8pt; text-decoration:none; font-weight: 500; color:ffffff;}\n" +
@@ -445,9 +556,9 @@ public class MCContainer {
                 "h5 {font-family: MS Sans Serif; font-size:7pt; color:002040;font-weight: 500}\n" +
                 "h6 {font-family: Arial;  font-size:7pt; color:002040;font-weight: 600}\n" +
                 "p  {font-family: Arial,Helvetica,Verdana; font-size:12pt; font-weight: 500; color:001020}\n" +
-                "font {  font-family:arial,Helvetica,Verdana; ; font-size:8pt;}\n" +
-                ".a{font:12px MS Sans Serif;color:203060;margin-left: 30 px; text-indent: -25 px}\n" +
-                ".b{font:12px Arial;color:black;margin-left: 67 px; text-indent: -62 px}\n" +
+                "font {  font-family:arial,Helvetica,Verdana; ; font-size:10pt;}\n" +
+                ".a{font:10px MS Sans Serif;color:203060;margin-left: 30 px; text-indent: -25 px}\n" +
+                ".b{font:10px Arial;color:black;margin-left: 67 px; text-indent: -62 px}\n" +
                 ".head   {font-family: Courier; font-size:11pt; color:101020; background-color:808090; font-weight: 500}\n" +
                 ".hd     {font-family: Arial; font-size:11pt; color:e0e0f0; font-weight: 500}\n" +
                 ".headr  {font-family: Arial, Helvetica; font-size:8pt; color: #ff0000; background-color: #88dfff; }\n" +
@@ -457,11 +568,11 @@ public class MCContainer {
                 ".flat   {background-color: #e0e0e0; font-size:8pt; font-family: Courier New; color:#002020; text-align: left; border-style: solid; border-width: 1px; border-color:#606070; }\n" +
                 ".flatbut {background-color: #406060; font-size:8pt; font-family: Arial; color:#ffffff; text-align: left; border-style: solid; border-width: 1px; border-color:404040; }\n" +
                 ".phead   {font-family:arial,Helvetica,Verdana; font-size:9pt; color: #002030; font-weight: 700}\n" +
-                "td {font-family: Arial; font-size:8pt; color: #000000; }\n" +
+                "td {font-family: Arial; font-size:10pt; color: #000000; }\n" +
                 "td.even  {font-family: Arial; color: #002040; background-color:f0f0f0}\n" +
                 "td.head {font-family: Arial; font-size:11pt; color: #002040; background-color:afbfd0}\n" +
                 "td.odd  {font-family: Arial; background-color: #cfefd0; }\n" +
-                "td.body {font-family: Arial,Helvetica,Verdana; font-size:8pt; color: #001020; background-color:e8e8f8; font-weight: 500}\n" +
+                "td.body {font-family: Arial,Helvetica,Verdana; font-size:10pt; color: #001020; background-color:e8e8f8; font-weight: 500}\n" +
                 "td.fsync {font-family: Arial,Helvetica,Verdana; font-size:9pt; color: #001020; background-color:b8f8b8; font-weight: 500}\n" +
                 "td.fnosync {font-family: Arial,Helvetica,Verdana; font-size:9pt; color: #001020; background-color:b8b880; font-weight: 500}\n" +
                 "td.ftran {font-family: Arial,Helvetica,Verdana; font-size:9pt; color: #001020; background-color:b88840; font-weight: 500}\n" +

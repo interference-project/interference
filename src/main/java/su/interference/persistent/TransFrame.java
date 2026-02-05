@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2025 head systems, ltd
+ Copyright (c) 2010-2026 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -44,23 +44,23 @@ import java.net.MalformedURLException;
 public class TransFrame implements Comparable, FilePartitioned, Serializable {
 
     @Column
-    @MgmtColumn(name="Transaction Id",width=10)
+    @MgmtColumn(name="Transaction Id", width=10, table = true)
     private long transId;
     @Column
-    @MgmtColumn(name="Object Id",width=10)
+    @MgmtColumn(name="Object Id", width=10, table = true)
     private int objectId;
     @Column
-    @MgmtColumn(name="CFrame Id",width=10)
+    @MgmtColumn(name="CFrame Id", width=10, table = true)
     private long cframeId;
     @Column
-    @MgmtColumn(name="UFrame Id",width=10)
+    @MgmtColumn(name="UFrame Id", width=10, table = true)
     private long uframeId;
     @Column
-    @MgmtColumn(name="Diff",width=10)
+    @MgmtColumn(name="Diff", width=10, table = true)
     private int diff;
     @Id
     @MapColumn
-    @MgmtColumn(name="Frame Id",width=10)
+    @MgmtColumn(name="Frame Id", width=10, table = true)
     @Transient
     private transient TransFrameId frameId;
 

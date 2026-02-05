@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2025 head systems, ltd
+ Copyright (c) 2010-2026 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -50,24 +50,24 @@ import static su.interference.core.Storage.*;
 
 @Entity
 @SystemEntity
-@MgmtClass
+@MgmtClass(allowEdit = false)
 public class DataFile implements Serializable {
 
     @Column
     @Id
     @GeneratedValue
     @IndexColumn
-    @MgmtColumn(name="File Id",width=10)
+    @MgmtColumn(name="File Id",width=10, table = true)
     private int fileId;
     @Column
     @IndexColumn
     private int type;
     @Column
     @IndexColumn
-    @MgmtColumn(name="Node Id",width=10)
+    @MgmtColumn(name="Node Id",width=10, table = true)
     private int nodeId;
     @Column
-    @MgmtColumn(name="Name",width=70)
+    @MgmtColumn(name="Name",width=70, table = true)
     private String fileName;
     @Column
     private long fileSize;
@@ -75,14 +75,14 @@ public class DataFile implements Serializable {
     private long fileUsed;
     @Column
     private int fileExtAmount;
-    @MgmtColumn(name="Frames allocated",width=20)
+    @MgmtColumn(name="Frames allocated",width=20, table = true)
     @Transient
     private int framesCnt;
-    @MgmtColumn(name="Frames deallocated",width=20)
+    @MgmtColumn(name="Frames deallocated",width=20, table = true)
     @Transient
     private int freeFramesCnt;
 
-    @MgmtColumn(name="Type",width=20)
+    @MgmtColumn(name="Type",width=20, table = true)
     @Transient
     private String dataFileType;
     @Transient

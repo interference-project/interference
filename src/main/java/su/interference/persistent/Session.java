@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2025 head systems, ltd
+ Copyright (c) 2010-2026 head systems, ltd
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -55,7 +55,7 @@ import javax.persistence.*;
 @Entity
 @SystemEntity
 @DisableSync
-@MgmtClass
+@MgmtClass(allowEdit = false)
 public class Session implements OnDelete {
     @Transient
     public static final int ROOT_USER_ID = 1;
@@ -65,27 +65,27 @@ public class Session implements OnDelete {
     @DistributedId
     @Column
     @IndexColumn
-    @MgmtColumn(name="Session Id",width=10)
+    @MgmtColumn(name="Session Id",width=10, table = true)
     private long sid;
     @Column
     @IndexColumn
-    @MgmtColumn(name="SID",width=10)
+    @MgmtColumn(name="SID",width=10, table = true)
     private String sessionId;
     @Column
-    @MgmtColumn(name="Node Id",width=10)
+    @MgmtColumn(name="Node Id",width=10, table = true)
     private int nodeId;
     @Column
-    @MgmtColumn(name="User Id",width=10)
+    @MgmtColumn(name="User Id",width=10, table = true)
     private int userId;
     @Column
-    @MgmtColumn(name="Date Start",width=10)
+    @MgmtColumn(name="Date Start",width=10, table = true)
     private Date dateStart;
     @Column
     private Date dateEnd;
     @Column
     private Date dateLastAction;
     @Column
-    @MgmtColumn(name="IP",width=10)
+    @MgmtColumn(name="IP",width=10, table = true)
     private String ipAddress;
 
     @Transient
@@ -321,8 +321,20 @@ public class Session implements OnDelete {
 
     public Object find (String c, long id) throws Exception {
         final Table t = Instance.getInstance().getTableByName(c);
+        return find(t, id);
+    }
+
+    public Object find (int tId, long id) throws Exception {
+        final Table t = Instance.getInstance().getTableById(tId);
+        return find(t, id);
+    }
+
+    protected Object find (Table t, long id) throws Exception {
         t.getFindMeter().start();
         if (t != null) {
+            if (t.isNoTran()) {
+                return find_(t, id);
+            }
             this.startStatement();
             final DataChunk dc = t.getChunkById(id, this);
             final Object res = dc == null ? null : ((EntityContainer) dc.getStandaloneEntity()).getEntity(this);
@@ -336,6 +348,10 @@ public class Session implements OnDelete {
     // find method for internal system mechanism
     public Object find_ (Class c, long id) throws Exception {
         final Table t = Instance.getInstance().getTableByName(c.getName());
+        return find_(t, id);
+    }
+
+    protected Object find_ (Table t, long id) throws Exception {
         if (t != null) {
             final DataChunk dc = t.getChunkById(id, this);
             return dc == null ? null : dc.getEntity();

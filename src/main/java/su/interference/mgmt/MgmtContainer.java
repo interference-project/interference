@@ -1,7 +1,7 @@
 /**
  The MIT License (MIT)
 
- Copyright (c) 2010-2025 interference
+ Copyright (c) 2010-2026 interference
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
@@ -34,15 +34,16 @@ import java.lang.reflect.Method;
  */
 
 public class MgmtContainer {
-    MgmtColumn mgmtColumn;
-    MgmtAction mgmtAction;
-    MgmtLink   mgmtLink;
-    Field field;
-    Method method;
-    Class c;
-    Field idField;
+    final MgmtColumn mgmtColumn;
+    final MgmtAction mgmtAction;
+    final MgmtLink   mgmtLink;
+    final Field field;
+    final Method method;
+    final Class c;
+    final Field idField;
+    final boolean autoGenerate;
 
-    public MgmtContainer(MgmtColumn mgmtColumn, MgmtAction mgmtAction, MgmtLink mgmtLink, Field field, Method method, Class c, Field idField) {
+    public MgmtContainer(MgmtColumn mgmtColumn, MgmtAction mgmtAction, MgmtLink mgmtLink, Field field, Method method, Class c, Field idField, boolean autoGenerate) {
         this.mgmtColumn = mgmtColumn;
         this.mgmtAction = mgmtAction;
         this.mgmtLink = mgmtLink;
@@ -50,6 +51,7 @@ public class MgmtContainer {
         this.method = method;
         this.c = c;
         this.idField = idField;
+        this.autoGenerate = autoGenerate;
     }
 
     public MgmtColumn getMgmtColumn() {
@@ -84,18 +86,42 @@ public class MgmtContainer {
         }
     }
 
-    public String getValue(Object o, String objectId, String sessionId, int pageId) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+    public String getValue(Object o, int tableId, String sessionId, int pageId, boolean showMgmtLink, boolean showEditLink) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
         if (this.mgmtColumn == null || this.field == null) {
             return null;
         } else {
             String getName  = "get" + this.field.getName().substring(0,1).toUpperCase() + this.field.getName().substring(1);
             Method m = this.c.getMethod(getName, null);
             Object result = m.invoke(o, null);
-            if (this.mgmtLink != null) {
-                return "<a href=\"?showtable="+objectId+"&session_id="+sessionId+"&page_id=10\">"+result+"</a>";
+            if (this.isId() && showEditLink) {
+                return "<a href=\"?action=edit&table_id="+tableId+"&object_id="+this.getId(o)+"&session_id="+sessionId+"&page_id="+pageId+"\">"+result+"</a>";
+            } else if (this.mgmtLink != null && showMgmtLink) {
+                return "<a href=\"?action=showtable&table_id="+this.getId(o)+"&session_id="+sessionId+"&page_id="+pageId+"\">"+result+"</a>";
             } else {
                 return String.valueOf(result);
             }
+        }
+    }
+
+    public String getInsertLink(int tableId, String sessionId, int pageId) {
+         return "<a href=\"?action=insert&table_id="+tableId+"&session_id="+sessionId+"&page_id="+pageId+"\">Insert new</a>";
+    }
+
+    public String getFormElement(Object o) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        if (this.mgmtColumn == null || this.field == null) {
+            return null;
+        } else {
+            Object result = "";
+            String disabled = "";
+            if (o != null) {
+                String getName = "get" + this.field.getName().substring(0, 1).toUpperCase() + this.field.getName().substring(1);
+                Method m = this.c.getMethod(getName, null);
+                result = m.invoke(o, null);
+                disabled = this.field.equals(this.idField) ? "disabled" : "";
+            } else {
+                disabled = this.field.equals(this.idField) && this.autoGenerate ? "disabled" : "";
+            }
+            return "<input type=\"text\" size=\"100\" name=\""+this.field.getName()+"\" " + disabled + " value=\""+String.valueOf(result)+"\">\n";
         }
     }
 
@@ -112,5 +138,13 @@ public class MgmtContainer {
 
     public boolean isCommand() {
         return this.method != null && this.mgmtAction != null;
+    }
+
+    public boolean isId() {
+        return this.field != null && this.field.equals(this.idField);
+    }
+
+    public boolean isAutoGenerate() {
+        return autoGenerate;
     }
 }
